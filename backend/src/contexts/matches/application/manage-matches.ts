@@ -15,6 +15,7 @@ export type MatchDetails = {
   round_id: string;
   team_a_id: string;
   team_b_id: string;
+  referee?: { name: string } | null;
   score_a: number;
   score_b: number;
   status: string;
@@ -78,6 +79,7 @@ export interface MatchTimerScheduler {
 }
 
 export type CreateMatchInput = {
+  referee_choice?: string;
   round_id: string;
   team_a_id: string;
   team_b_id: string;
@@ -166,6 +168,10 @@ export function createMatch(input: CreateMatchInput, leagueId: string, actor: Ac
     team_b_id: parseMatchUuid(input.team_b_id, "Time B"),
     goalkeeper_a_id: parseMatchUuid(input.goalkeeper_a_id, "Goleiro A"),
     goalkeeper_b_id: parseMatchUuid(input.goalkeeper_b_id, "Goleiro B"),
+    ...(input.referee_choice === undefined ? {} : {
+      referee_choice: input.referee_choice === "auto" || input.referee_choice === "none"
+        ? input.referee_choice : parseMatchUuid(input.referee_choice, "Juiz"),
+    }),
     replacements: (input.replacements || []).map((entry) => ({
       team_id: parseMatchUuid(entry.team_id, "Time do empréstimo"),
       absent_player_id: parseMatchUuid(entry.absent_player_id, "Jogador ausente"),

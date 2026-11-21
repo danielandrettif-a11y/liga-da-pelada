@@ -545,6 +545,7 @@ export type CreateTeamInput = {
 };
 
 export type CreateMatchInput = {
+  referee_choice?: string;
   idempotency_key?: string;
   client_started_at?: string;
   round_id: string;

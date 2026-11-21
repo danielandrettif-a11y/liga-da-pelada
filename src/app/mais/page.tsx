@@ -25,7 +25,7 @@ import {
   RotateCcw,
   Microphone,
 } from "@/components/icons";
-import { getStadiums } from "@/lib/actions/stadiums";
+import { getLastCallupStadiumId, getStadiums } from "@/lib/actions/stadiums";
 import { getSelectedLeague } from "@/lib/league-context";
 import { readManagerSourceLeague } from "@/lib/bq-manager/server";
 
@@ -130,7 +130,7 @@ export default async function MaisPage({ searchParams }: MaisPageProps) {
   const selectedLeague = await getSelectedLeague();
   const requestedTab = Array.isArray(params.aba) ? params.aba[0] : params.aba;
   const activeTab = account.isAdmin && requestedTab === "admin" ? "admin" : "geral";
-  const [identity, activeCallups, leagueConfig, stadiums, managerSourceLeagueId] = await Promise.all([
+  const [identity, activeCallups, leagueConfig, stadiums, managerSourceLeagueId, lastStadiumId] = await Promise.all([
     getCurrentAccountIdentity(),
     account.isAdmin ? getActiveCallups() : Promise.resolve([]),
     account.isAdmin ? getLeagueConfig() : Promise.resolve(null),
@@ -138,6 +138,7 @@ export default async function MaisPage({ searchParams }: MaisPageProps) {
     account.user && selectedLeague?.featureTier === "complete"
       ? readManagerSourceLeague(account.client).catch(() => null)
       : Promise.resolve(null),
+    account.isAdmin ? getLastCallupStadiumId() : Promise.resolve(null),
   ]);
   const accountName = identity.displayName;
   const playerAvatarUrl = identity.avatarUrl;
@@ -279,8 +280,10 @@ export default async function MaisPage({ searchParams }: MaisPageProps) {
           <CallupAdminCard
             callups={activeCallups}
             stadiums={stadiums}
+            lastStadiumId={lastStadiumId}
             playersPerTeam={leagueConfig?.players_per_team || 5}
             teamsPerRound={leagueConfig?.teams_per_round || 3}
+            defaultGoalsToFinish={leagueConfig?.goals_to_finish ?? 2}
             featureTier={selectedLeague?.featureTier}
           />
 

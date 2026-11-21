@@ -244,6 +244,7 @@ export function pgMatchRepository(pool: Pool, now: () => number = Date.now): Mat
              LEFT JOIN public.teams original_team ON original_team.id = mp.original_team_id
              WHERE mp.match_id = m.id)
              SELECT to_jsonb(m) || jsonb_build_object(
+             'referee', (SELECT jsonb_build_object('name', p.name) FROM public.players p WHERE p.id = m.referee_player_id),
              'team_a', (SELECT to_jsonb(team) FROM teams team WHERE team.id = m.team_a_id),
              'team_b', (SELECT to_jsonb(team) FROM teams team WHERE team.id = m.team_b_id),
              'match_players', COALESCE((SELECT jsonb_agg(to_jsonb(player)) FROM players player), '[]'::jsonb),
@@ -445,9 +446,9 @@ export function pgMatchRepository(pool: Pool, now: () => number = Date.now): Mat
         const prepared = prepareMatchLineup(input, snapshot);
         const idempotencyKey = input.idempotency_key?.trim() || randomUUID();
         const res = await client.query<{ receipt: any }>(
-          `SELECT public.create_live_match(
+          `SELECT public.${input.referee_choice === undefined ? "create_live_match" : "create_live_match_with_referee"}(
             $1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::uuid,
-            $6::int, $7::int, $8::jsonb, $9::text, $10::timestamptz
+            $6::int, $7::int, $8::jsonb, $9::text, $10::timestamptz${input.referee_choice === undefined ? "" : ", $11::text"}
           ) AS receipt`,
           [
             input.round_id,
@@ -460,8 +461,14 @@ export function pgMatchRepository(pool: Pool, now: () => number = Date.now): Mat
             JSON.stringify(prepared.lineup),
             idempotencyKey,
             input.client_started_at || null,
+            ...(input.referee_choice === undefined ? [] : [input.referee_choice]),
           ],
-        );
+        ).catch((error: unknown) => {
+          if (error instanceof Error && "code" in error && error.code === "P0368") {
+            throw new MatchPersistenceError(error.message, 409);
+          }
+          throw error;
+        });
         const receipt = res.rows[0]?.receipt;
         if (!receipt?.match_id && !receipt?.id) {
           throw new MatchPersistenceError("A abertura da partida não retornou um recibo válido.", 500);

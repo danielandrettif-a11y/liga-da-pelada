@@ -7,7 +7,7 @@ import { DeleteRoundButton } from "@/components/DeleteRoundButton";
 import { CallupAdminCard } from "@/components/CallupAdminCard";
 import { getActiveCallups, getAgendaCallups } from "@/lib/actions/callups";
 import { getLeagueConfig } from "@/lib/actions/league";
-import { getStadiums } from "@/lib/actions/stadiums";
+import { getLastCallupStadiumId, getStadiums } from "@/lib/actions/stadiums";
 import { isStandaloneCallupVisible } from "@/lib/callup-ui";
 import { getSelectedLeague } from "@/lib/league-context";
 
@@ -43,9 +43,9 @@ export default async function RodadasPage({
     getAgendaCallups(),
     getSelectedLeague(),
   ]);
-  const [activeCallups, leagueConfig, stadiums] = account.isAdmin
-    ? await Promise.all([getActiveCallups(), getLeagueConfig(), getStadiums()])
-    : [[], null, []];
+  const [activeCallups, leagueConfig, stadiums, lastStadiumId] = account.isAdmin
+    ? await Promise.all([getActiveCallups(), getLeagueConfig(), getStadiums(), getLastCallupStadiumId()])
+    : [[], null, [], null];
   const listedRoundIds = new Set(rounds.map((round: any) => round.id));
   const standaloneCallups = agendaCallups.filter((callup) =>
     isStandaloneCallupVisible(callup, listedRoundIds),
@@ -93,8 +93,10 @@ export default async function RodadasPage({
             <CallupAdminCard
               callups={activeCallups}
               stadiums={stadiums}
+              lastStadiumId={lastStadiumId}
               playersPerTeam={leagueConfig?.players_per_team || 5}
               teamsPerRound={leagueConfig?.teams_per_round || 3}
+              defaultGoalsToFinish={leagueConfig?.goals_to_finish ?? 2}
               initialShowCreate
               featureTier={selectedLeague?.featureTier}
             />

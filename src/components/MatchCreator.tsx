@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createMatch, findLiveMatchForTeams, setRoundTeamFixedGoalkeeper } from "@/lib/actions/matches";
+import { createMatch, findLiveMatchForTeams, getMatchRefereeOptions, setRoundTeamFixedGoalkeeper, type MatchRefereeOptions } from "@/lib/actions/matches";
 import { Swords, ArrowLeft, ChevronRight, AlertTriangle, Check, ArrowLeftRight, Crown } from "@/components/icons";
 import Link from "next/link";
 import { TeamCrest } from "./TeamCrest";
@@ -64,6 +64,9 @@ export function MatchCreator({
   const creationIntentRef = useRef<CreationIntent | null>(null);
   const restoringDraftRef = useRef(false);
   const [draftReady, setDraftReady] = useState(!draftStorageKey);
+  const [refereeRequest, setRefereeRequest] = useState<{ key: string; result: { options: MatchRefereeOptions } | { error: string } } | null>(null);
+  const [refereeSelection, setRefereeSelection] = useState<{ key: string; choice: string } | null>(null);
+  const [refereeRetry, setRefereeRetry] = useState(0);
 
   const teams = useMemo(() => round?.teams || [], [round?.teams]);
   const leagueConfig = Array.isArray(round?.league) ? round.league[0] : round?.league;
@@ -364,6 +367,28 @@ export function MatchCreator({
     return () => window.clearInterval(timer);
   }, [provisionalKickoffAt]);
 
+  const refereeExtras = [...new Set([
+    ...Object.values(replacementByAbsent).filter(Boolean),
+    ...structuralLoans.map((loan) => loan.playerId),
+  ])].sort().join(",");
+  const refereeKey = [round.id, teamAId, teamBId, refereeExtras, refereeRetry].join("|");
+  const refereeResult = refereeRequest?.key === refereeKey ? refereeRequest.result : null;
+  const refereeOptions = refereeResult && "options" in refereeResult ? refereeResult.options : null;
+  const refereeChoice = refereeSelection?.key === refereeKey ? refereeSelection.choice
+    : refereeOptions?.enabled && refereeOptions.suggestedId ? "auto" : "";
+  const refereeReady = refereeOptions !== null && (!refereeOptions.enabled || Boolean(refereeChoice));
+
+  useEffect(() => {
+    if (!teamAId || !teamBId || teamAId === teamBId) return;
+    let active = true;
+    getMatchRefereeOptions(round.id, teamAId, teamBId, refereeExtras ? refereeExtras.split(",") : [])
+      .then((result) => { if (active) setRefereeRequest({ key: refereeKey, result }); })
+      .catch(() => {
+        if (active) setRefereeRequest({ key: refereeKey, result: { error: "Não foi possível consultar a escala do juiz." } });
+      });
+    return () => { active = false; };
+  }, [round.id, teamAId, teamBId, refereeExtras, refereeKey]);
+
   async function handleStart() {
     if (!teamAId || !teamBId) {
       setError("Selecione os dois times para iniciar.");
@@ -387,6 +412,10 @@ export function MatchCreator({
       setError(`O time de fora não possui jogadores disponíveis suficientes para completar ${targetPlayersPerTeam}x${targetPlayersPerTeam}.`);
       return;
     }
+    if (!refereeReady) {
+      setError("Confirme a escolha do juiz antes de iniciar.");
+      return;
+    }
 
     // O match_order seria a quantidade de matches + 1
     const order = (round?.matches?.length || 0) + 1;
@@ -397,6 +426,7 @@ export function MatchCreator({
       match_order: order,
       goalkeeper_a_id: goalkeeperByTeam[teamAId],
       goalkeeper_b_id: goalkeeperByTeam[teamBId],
+      ...(refereeOptions?.enabled ? { referee_choice: refereeChoice } : {}),
       replacements: injuredPlayers
         .filter((entry: any) => replacementByAbsent[entry.playerId])
         .map((entry: any) => ({
@@ -948,9 +978,44 @@ export function MatchCreator({
         </section>
       )}
 
+      {selectedTeamIds.length === 2 && !refereeResult && <p role="status" className="text-sm text-muted">Consultando a escala do juiz…</p>}
+      {refereeResult && "error" in refereeResult && (
+        <div className="space-y-2 rounded-xl border border-danger/25 p-3 text-sm">
+          <p role="alert" className="text-danger">{refereeResult.error}</p>
+          <button type="button" className="font-bold text-accent" onClick={() => setRefereeRetry((value) => value + 1)}>Tentar novamente</button>
+        </div>
+      )}
+      {refereeOptions?.enabled && (
+        <section className="glass-card space-y-2 p-4">
+          <label htmlFor="match-referee" className="block text-sm font-black text-foreground">Quem vai apitar?</label>
+          {!refereeOptions.suggestedId && <p className="text-sm text-muted">Nenhum ADM está disponível no time de fora. Quer escolher alguém desse time para apitar?</p>}
+          <select
+            id="match-referee"
+            value={refereeChoice}
+            disabled={loading || creationUncertain}
+            onChange={(event) => setRefereeSelection({ key: refereeKey, choice: event.target.value })}
+            className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm text-foreground"
+          >
+            {refereeOptions.suggestedId ? (
+              <option value="auto">{refereeOptions.players.find((player) => player.id === refereeOptions.suggestedId)?.name} · sugerido pelo rodízio</option>
+            ) : (
+              <>
+                <option value="" disabled>Escolha uma opção</option>
+                <option value="none">Iniciar sem juiz</option>
+              </>
+            )}
+            <optgroup label="Time de fora">
+              {refereeOptions.players.filter((player) => player.waiting).map((player) => <option key={player.id} value={player.id}>{player.name}</option>)}
+            </optgroup>
+            <optgroup label="Outros jogadores na lista da rodada">
+              {refereeOptions.players.filter((player) => !player.waiting).map((player) => <option key={player.id} value={player.id}>{player.name}</option>)}
+            </optgroup>
+          </select>
+        </section>
+      )}
       <button
         onClick={handleStart}
-        disabled={loading || !teamAId || !teamBId || !goalkeeperByTeam[teamAId] || !goalkeeperByTeam[teamBId]}
+        disabled={loading || !refereeReady || !teamAId || !teamBId || !goalkeeperByTeam[teamAId] || !goalkeeperByTeam[teamBId]}
         className="w-full bg-accent hover:bg-accent-light text-background font-bold py-4 rounded-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-accent/20"
       >
         {loading ? "Criando..." : creationUncertain ? "Tentar confirmar novamente" : quickStart ? "Iniciar próxima partida" : "Apita o Árbitro!"}

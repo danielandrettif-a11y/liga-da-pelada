@@ -42,6 +42,8 @@ export type CallupHttpGateway = {
       roundType?: "friendly" | "official";
       playersPerTeam?: number | null;
       teamsPerRound?: number | null;
+      goalsToFinish?: number | null;
+      refereeEnabled?: boolean;
     },
   ): Promise<{ callupId: string; roundId: string }>;
   updateCallup(

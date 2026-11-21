@@ -30,6 +30,7 @@ describe("callup domain", () => {
       playersPerTeam: 6,
       teamsPerRound: 4,
       capacity: 24,
+      goalsToFinish: null,
     });
 
     expect(() => validateOpenCallupInput({ date: "01/11/2026" }))

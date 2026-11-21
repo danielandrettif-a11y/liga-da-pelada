@@ -77,6 +77,8 @@ export type OpenCallupInput = {
   roundType?: CallupRoundType;
   playersPerTeam?: number | null;
   teamsPerRound?: number | null;
+  goalsToFinish?: number | null;
+  refereeEnabled?: boolean;
 };
 
 export type UpdateCallupInput = {
@@ -125,6 +127,8 @@ export function validateOpenCallupInput(input: OpenCallupInput): {
   playersPerTeam: number;
   teamsPerRound: number;
   capacity: number;
+  goalsToFinish: number | null;
+  refereeEnabled?: boolean;
 } {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) {
     throw new InvalidCallupError("Informe uma data válida (AAAA-MM-DD).");
@@ -134,12 +138,19 @@ export function validateOpenCallupInput(input: OpenCallupInput): {
   const roundType: CallupRoundType = input.roundType === "friendly" ? "friendly" : "official";
   const playersPerTeam = input.playersPerTeam ?? 6;
   const teamsPerRound = input.teamsPerRound ?? 4;
+  const goalsToFinish = input.goalsToFinish ?? null;
 
   if (!Number.isInteger(playersPerTeam) || playersPerTeam < 5 || playersPerTeam > 7) {
     throw new InvalidCallupError("Escolha 5, 6 ou 7 jogadores por time.");
   }
   if (!Number.isInteger(teamsPerRound) || teamsPerRound < 2 || teamsPerRound > 6) {
     throw new InvalidCallupError("Escolha de 2 a 6 times.");
+  }
+  if (goalsToFinish !== null && (!Number.isInteger(goalsToFinish) || goalsToFinish < 0 || goalsToFinish > 20)) {
+    throw new InvalidCallupError("Escolha até 20 gols ou use a opção sem limite.");
+  }
+  if (input.refereeEnabled !== undefined && typeof input.refereeEnabled !== "boolean") {
+    throw new InvalidCallupError("Informe se a convocação terá juiz.");
   }
 
   return {
@@ -150,6 +161,8 @@ export function validateOpenCallupInput(input: OpenCallupInput): {
     playersPerTeam,
     teamsPerRound,
     capacity: playersPerTeam * teamsPerRound,
+    goalsToFinish,
+    ...(input.refereeEnabled === undefined ? {} : { refereeEnabled: input.refereeEnabled }),
   };
 }
 

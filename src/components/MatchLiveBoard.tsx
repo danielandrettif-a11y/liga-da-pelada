@@ -1261,6 +1261,7 @@ export function MatchLiveBoard({ match, matchDuration, goalsToFinish, canManage,
 
       {/* Cronômetro e Placar */}
       <div className="glass-card flex flex-col items-center p-4 animate-fade-in sm:p-6">
+        {match.referee?.name && <p className="mb-2 text-xs font-semibold text-muted">Juiz · {match.referee.name}</p>}
         {/* Timer Section (Isolado com memo) */}
         {!isFinished && (
           <MatchTimer

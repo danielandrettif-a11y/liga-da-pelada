@@ -265,6 +265,8 @@ export function pgCallupRepository(pool: Pool): CallupRepository {
         playersPerTeam: number;
         teamsPerRound: number;
         capacity: number;
+        goalsToFinish: number | null;
+        refereeEnabled?: boolean;
       },
       actor: Actor,
     ): Promise<{ callupId: string; roundId: string }> {
@@ -296,11 +298,12 @@ export function pgCallupRepository(pool: Pool): CallupRepository {
           }
         }
 
+        const hasRules = input.refereeEnabled === true || input.goalsToFinish != null;
         const result = await client.query<{ create_league_callup: string }>(
-          `SELECT public.create_league_callup(
+          `SELECT public.${hasRules ? "create_league_callup_with_rules" : "create_league_callup"}(
              $1::uuid, $2::date, $3::time, $4::uuid, $5::text, $6::text,
-             $7::text, $8::int, $9::int, $10::int
-           )`,
+             $7::text, $8::int, $9::int, $10::int${hasRules ? ", $11::int, $12::boolean" : ""}
+           ) AS create_league_callup`,
           [
             leagueId,
             input.date,
@@ -312,6 +315,7 @@ export function pgCallupRepository(pool: Pool): CallupRepository {
             input.capacity,
             input.playersPerTeam,
             input.teamsPerRound,
+            ...(hasRules ? [input.goalsToFinish ?? null, input.refereeEnabled === true] : []),
           ],
         );
 

@@ -19,6 +19,7 @@ export type CreateLiveMatchCommand = {
   lineup: MatchLineupCommand[];
   idempotencyKey: string;
   clientStartedAt: string | null;
+  refereeChoice?: string;
 };
 
 export type CreatedLiveMatchReceipt = {
@@ -37,7 +38,7 @@ export type CreatedLiveMatchReceipt = {
 export function supabaseCreateMatchGateway(client: SupabaseClient) {
   return {
     async create(command: CreateLiveMatchCommand): Promise<CreatedLiveMatchReceipt> {
-      const { data, error } = await client.rpc("create_live_match", {
+      const { data, error } = await client.rpc(command.refereeChoice === undefined ? "create_live_match" : "create_live_match_with_referee", {
         p_round_id: command.roundId,
         p_team_a_id: command.teamAId,
         p_team_b_id: command.teamBId,
@@ -48,12 +49,13 @@ export function supabaseCreateMatchGateway(client: SupabaseClient) {
         p_lineup: command.lineup,
         p_idempotency_key: command.idempotencyKey,
         p_client_started_at: command.clientStartedAt,
+        ...(command.refereeChoice === undefined ? {} : { p_referee_choice: command.refereeChoice }),
       });
       if (error) {
         const migrationMissing = error.code === "PGRST202"
           || /create_live_match/i.test(error.message || "") && /schema cache|function/i.test(error.message || "");
         if (migrationMissing) {
-          throw new Error("Atualização 347 do banco pendente. A partida não foi iniciada.");
+          throw new Error(`Atualização ${command.refereeChoice === undefined ? 347 : 368} do banco pendente. A partida não foi iniciada.`);
         }
         throw new Error(error.message);
       }

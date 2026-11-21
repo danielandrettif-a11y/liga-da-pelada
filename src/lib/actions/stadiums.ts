@@ -48,6 +48,25 @@ export async function getStadiums(): Promise<Stadium[]> {
   }
 }
 
+export async function getLastCallupStadiumId(): Promise<string | null> {
+  const league = await getSelectedLeague();
+  if (!league) return null;
+  const { client, user } = await getCurrentAccount();
+  if (!user) return null;
+  const { data, error } = await client.from("callups")
+    .select("stadium_id")
+    .eq("league_id", league.id)
+    .not("stadium_id", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    console.error("Erro ao buscar último campo da pelada:", error);
+    return null;
+  }
+  return data?.stadium_id || null;
+}
+
 export async function saveStadium(formData: FormData): Promise<
   { success: true; stadium: Stadium } | { success: false; error: string }
 > {

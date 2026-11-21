@@ -281,6 +281,12 @@ export async function openCallup(formData: FormData) {
     teamsPerRound: formData.get("teams_per_round") ? String(formData.get("teams_per_round")) : null,
   });
   if (!parsedRequest) return { success: false as const, error: "Informe uma data valida." };
+  const goalValue = formData.get("goals_to_finish");
+  const refereeEnabled = formData.get("referee_enabled") === "on";
+  const goalsToFinish = goalValue === null || goalValue === "" ? null : Number(goalValue);
+  if (goalsToFinish !== null && (!Number.isInteger(goalsToFinish) || goalsToFinish < 0 || goalsToFinish > 20)) {
+    return { success: false as const, error: "Escolha até 20 gols ou use a opção sem limite." };
+  }
   const league = await getActiveLeague();
   const request = league.feature_tier === "quick"
     ? { ...parsedRequest, roundType: "friendly" as const }
@@ -296,6 +302,8 @@ export async function openCallup(formData: FormData) {
         roundType: request.roundType,
         playersPerTeam: request.requestedPlayersPerTeam ? Number(request.requestedPlayersPerTeam) : null,
         teamsPerRound: request.requestedTeamsPerRound ? Number(request.requestedTeamsPerRound) : null,
+        goalsToFinish,
+        ...(refereeEnabled ? { refereeEnabled } : {}),
       });
       if (request.roundType !== "friendly" && league.feature_tier === "complete") {
         try {
@@ -320,7 +328,7 @@ export async function openCallup(formData: FormData) {
   const result = await openCallupWithPrelist(
     request,
     league.id,
-    supabaseCallupOpeningGateway(client),
+    supabaseCallupOpeningGateway(client, { refereeEnabled, goalsToFinish }),
     (callupId) => prepareSelectedCallupPrelist(callupId, client),
   );
   if (result.success) refreshCallups();

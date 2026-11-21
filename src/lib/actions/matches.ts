@@ -68,6 +68,28 @@ export async function findLiveMatchForTeams(roundId: string, teamAId: string, te
       || (item.team_a_id === teamBId && item.team_b_id === teamAId)))?.id || null;
 }
 
+export type MatchRefereeOptions = { enabled: false } | {
+  enabled: true;
+  suggestedId: string | null;
+  players: Array<{ id: string; name: string; waiting: boolean }>;
+};
+
+export async function getMatchRefereeOptions(
+  roundId: string, teamAId: string, teamBId: string, extraPlayerIds: string[],
+): Promise<{ options: MatchRefereeOptions } | { error: string }> {
+  const client = await getAdminClient();
+  const league = await getSelectedLeague();
+  if (!client || !league) return { error: ADMIN_ERROR };
+  const { data: round, error: roundError } = await client.from("rounds").select("id")
+    .eq("id", roundId).eq("league_id", league.id).maybeSingle();
+  if (roundError || !round) return { error: "Rodada fora da pelada selecionada." };
+  const { data, error } = await client.rpc("get_match_referee_options", {
+    p_round_id: roundId, p_team_a_id: teamAId, p_team_b_id: teamBId, p_lineup_extra_ids: extraPlayerIds,
+  });
+  if (error) return { error: error.message };
+  return { options: data as MatchRefereeOptions };
+}
+
 export async function createMatch(input: CreateMatchInput) {
   try {
     const client = await getAdminClient();
@@ -396,6 +418,7 @@ export async function createMatch(input: CreateMatchInput) {
         lineup: lineupRows,
         idempotencyKey,
         clientStartedAt: input.client_started_at || null,
+        refereeChoice: input.referee_choice,
       }),
     );
 
@@ -463,6 +486,7 @@ export async function getMatch(matchId: string) {
       timer_accumulated_seconds,
       duration_seconds,
       goals_to_finish,
+      referee:referee_player_id(name),
       eligibility_elapsed_offset_seconds,
       created_at,
       team_a:team_a_id (
