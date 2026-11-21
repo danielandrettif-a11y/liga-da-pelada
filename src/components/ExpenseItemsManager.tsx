@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Plus, Save } from "@/components/icons";
+import { ChevronDown, Plus, Save } from "@/components/icons";
 import { saveAppFeeConfig, saveExpenseItem, setExpenseItemPaidInstallments, setExpenseItemStatus, type AppFeeConfig, type ExpenseItem, type PaymentRecipient } from "@/lib/actions/payments";
 
 const money = (value: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -10,6 +10,7 @@ export function ExpenseItemsManager({ items, recipients, appFee }: { items: Expe
   const activeRecipients = recipients.filter((item) => item.is_active);
   const defaultRecipient = activeRecipients[0]?.id || "";
   const [appFeeValue, setAppFeeValue] = useState(appFee.amountPerPlayer ? String(appFee.amountPerPlayer) : "");
+  const [savedAppFee, setSavedAppFee] = useState(appFee.amountPerPlayer);
   const [appFeeRecipientId, setAppFeeRecipientId] = useState(appFee.recipientId || defaultRecipient);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -23,6 +24,7 @@ export function ExpenseItemsManager({ items, recipients, appFee }: { items: Expe
   function saveFixedFee() {
     start(async () => {
       const result = await saveAppFeeConfig(Number(appFeeValue || 0), appFeeRecipientId || null);
+      if (result.success) setSavedAppFee(Math.round(Number(appFeeValue || 0) * 100) / 100);
       setMessage(result.success ? (Number(appFeeValue || 0) > 0 ? "Custo do app salvo para as próximas peladas." : "Custo do app desativado.") : result.error || "Erro ao salvar o custo do app.");
     });
   }
@@ -36,22 +38,26 @@ export function ExpenseItemsManager({ items, recipients, appFee }: { items: Expe
   }
 
   return <div className="space-y-6">
-    <section className="glass-card space-y-3 p-4">
-      <div><h2 className="text-sm font-black text-foreground">Custo fixo do app</h2><p className="mt-1 text-xs leading-5 text-muted">Cobrado de cada jogador em toda pelada, sem parcelas.</p></div>
+    <details className="glass-card group p-4">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-black text-foreground"><span>Custo fixo do app <span className="block pt-1 text-xs font-medium text-muted">{savedAppFee > 0 ? `${money(savedAppFee)} por jogador` : "Não configurado"}</span></span><ChevronDown aria-hidden="true" className="h-5 w-5 shrink-0 text-accent transition-transform group-open:rotate-180" /></summary>
+      <div className="mt-4 space-y-3"><p className="text-xs leading-5 text-muted">Cobrado de cada jogador em toda pelada, sem parcelas.</p>
       <label className="block text-xs font-bold text-muted">Valor por jogador<div className="relative mt-1"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">R$</span><input aria-label="Valor do app por jogador" type="number" min="0" step="0.01" inputMode="decimal" value={appFeeValue} onChange={(event) => setAppFeeValue(event.target.value)} className="w-full rounded-xl border border-border bg-background py-3 pl-10 pr-3 text-sm text-foreground" /></div></label>
       <label className="block text-xs font-bold text-muted">PIX que recebe<select value={appFeeRecipientId} onChange={(event) => setAppFeeRecipientId(event.target.value)} className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-3 text-sm text-foreground"><option value="">Escolha um destinatário</option>{activeRecipients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
       <button disabled={pending || Number(appFeeValue || 0) < 0 || (Number(appFeeValue || 0) > 0 && !appFeeRecipientId)} onClick={saveFixedFee} className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3 text-sm font-black text-background disabled:opacity-40"><Save className="h-4 w-4" /> Salvar custo fixo</button>
-    </section>
+      </div>
+    </details>
 
-    <section className="glass-card space-y-3 p-4">
-      <div><h2 className="text-sm font-black text-foreground">Cadastrar compra ou despesa</h2><p className="mt-1 text-xs leading-5 text-muted">O valor total é dividido em parcelas e rateado nas rodadas escolhidas.</p></div>
+    <details className="glass-card group p-4">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-black text-foreground"><span>Cadastrar compra ou despesa</span><ChevronDown aria-hidden="true" className="h-5 w-5 shrink-0 text-accent transition-transform group-open:rotate-180" /></summary>
+      <div className="mt-4 space-y-3"><p className="text-xs leading-5 text-muted">O valor total é dividido em parcelas e rateado nas rodadas escolhidas.</p>
       <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Ex.: Bola nova" className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm text-foreground" />
       <textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Descrição opcional" rows={2} className="w-full resize-none rounded-xl border border-border bg-background px-3 py-3 text-sm text-foreground" />
       <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2"><label className="text-xs font-bold text-muted">Valor total<input type="number" min="0.01" step="0.01" value={total} onChange={(event) => setTotal(event.target.value)} className="mt-1 w-full min-w-0 rounded-xl border border-border bg-background px-3 py-3 text-sm text-foreground" /></label><label className="text-xs font-bold text-muted">Parcelas<input type="number" min="1" max="120" value={installments} onChange={(event) => setInstallments(event.target.value)} className="mt-1 w-full min-w-0 rounded-xl border border-border bg-background px-3 py-3 text-sm text-foreground" /></label></div>
       <label className="block text-xs font-bold text-muted">PIX que recebe<select value={recipientId} onChange={(event) => setRecipientId(event.target.value)} className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-3 text-sm text-foreground"><option value="">Escolha um destinatário</option>{activeRecipients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
       <button disabled={pending || !name.trim() || !recipientId || Number(total) <= 0} onClick={() => start(async () => { const result = await saveExpenseItem({ name, description, totalAmount: Number(total), installmentCount: Number(installments), recipientId }); setMessage(result.success ? "Item cadastrado e pronto para usar." : result.error || "Erro ao salvar."); if (result.success) { setName(""); setDescription(""); setTotal(""); setInstallments("1"); } })} className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3 text-sm font-black text-background disabled:opacity-40"><Plus className="h-4 w-4" /> Cadastrar item</button>
-      {message && <p role="status" className="text-xs font-bold text-muted">{message}</p>}
-    </section>
+      </div>
+    </details>
+    {message && <p role="status" className="text-xs font-bold text-muted">{message}</p>}
 
     <section><div className="mb-2"><h2 className="font-athletic text-xl font-black uppercase text-white">Itens da pelada</h2><p className="text-xs text-muted">Progresso e saldo transparentes para todos.</p></div><div className="space-y-3">{items.map((item) => <ExpenseItemCard key={item.id} item={item} pending={pending} historicValue={historicPaid[item.id] ?? String(item.paid_installments_before_app)} setHistoricValue={(value) => setHistoricPaid((current) => ({ ...current, [item.id]: value }))} saveHistoric={() => saveHistoricInstallments(item)} setMessage={setMessage} start={start} />)}{!items.length && <p className="rounded-2xl border border-border bg-surface p-5 text-sm text-muted">Nenhum item cadastrado.</p>}</div></section>
   </div>;

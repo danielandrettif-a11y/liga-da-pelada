@@ -155,11 +155,16 @@ export type PlayerAwardSeason = {
 };
 
 export type PlayerAchievementBelt = {
-  beltId: string;
+  slug: "top_scorer" | "top_assister" | "team_win_streak";
   name: string;
-  category: string;
-  icon?: string | null;
-  awardedAt?: string | null;
+  description: string;
+  recordValue: number;
+  unit: string;
+  scope: "player" | "team";
+  roundId: string | null;
+  roundNumber: number | null;
+  roundDate: string | null;
+  team: { id: string; name: string; color: string; crestUrl: string | null; members: Array<{ id: string; name: string; avatarUrl: string | null }> } | null;
 };
 
 export type PlayerEquippedCosmetics = {

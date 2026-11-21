@@ -324,13 +324,9 @@ export class PgSeasonRankingRepository implements SeasonRankingRepository {
       const achievementBeltsByPlayer = new Map<string, PlayerAchievementBelt[]>();
       for (const row of data.belts) {
         const beltsRaw = Array.isArray(row.belts) ? row.belts : [];
-        const parsed = beltsRaw.map((b: any) => ({
-          beltId: String(b.beltId || b.id || ""),
-          name: String(b.name || ""),
-          category: String(b.category || "achievement"),
-          icon: b.icon || null,
-          awardedAt: b.awardedAt || null,
-        }));
+        const parsed = beltsRaw.filter((belt: any) =>
+          ["top_scorer", "top_assister", "team_win_streak"].includes(belt.slug),
+        ) as PlayerAchievementBelt[];
         achievementBeltsByPlayer.set(String(row.player_id), parsed);
       }
 

@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Pelada BQ",
     short_name: "Pelada BQ",
     description: "Suas peladas, convocações, ranking e Cartola em um lugar.",
-    start_url: "/inicio",
+    start_url: "/lobby",
     scope: "/",
     display: "standalone",
     launch_handler: {

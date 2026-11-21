@@ -160,7 +160,7 @@ describe("PgSeasonRankingRepository", () => {
             def_overall: 70, ala_mei_overall: 80, ata_overall: 85, gol_overall: 50,
           }],
           speeds: [{ player_id: "p1", speed_rating: 3 }],
-          belts: [{ player_id: "p1", belts: [{ id: "b1", name: "Artilheiro Nato" }] }],
+          belts: [{ player_id: "p1", belts: [{ slug: "top_scorer", name: "Artilheiro Nato", recordValue: 7, unit: "gols na rodada" }] }],
         }] };
       }
       return { rows: [] };
@@ -176,6 +176,7 @@ describe("PgSeasonRankingRepository", () => {
     expect(enrichment.overallByPlayer.get("p1")?.overall).toBe(85);
     expect(enrichment.speedByPlayer.get("p1")).toBe(3);
     expect(enrichment.achievementBeltsByPlayer.get("p1")?.[0]?.name).toBe("Artilheiro Nato");
+    expect(enrichment.achievementBeltsByPlayer.get("p1")?.[0]?.recordValue).toBe(7);
   });
 
   it("findLeaguePlayer and findPlayerCosmetics return player and cosmetics data", async () => {
