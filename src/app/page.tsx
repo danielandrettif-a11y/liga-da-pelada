@@ -11,7 +11,9 @@ import { BQTheBestButton } from "@/components/BQTheBestButton";
 import { getEventWeather, type EventWeather } from "@/lib/weather";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getDashboardData, getHomeLastRound } from "@/lib/actions/dashboard";
+import { getHomeAgenda, getHomeLastRound } from "@/lib/actions/dashboard";
+import { homeTraceId } from "@/lib/home-performance";
+import { HomeReadyMarker } from "@/components/HomeReadyMarker";
 import { getLatestFinishedSeason } from "@/lib/actions/seasons";
 import { PreviousSeasonBanner } from "@/components/PreviousSeasonBanner";
 import { LiveMatchBanner, type HomeLiveMatch } from "@/components/LiveMatchBanner";
@@ -60,13 +62,13 @@ function IncompleteProfileBanner() {
   );
 }
 
-async function HomeSeasonPass({ pass }: { pass: Promise<Awaited<ReturnType<typeof getSeasonPassDashboard>> | null> }) {
-  const data = await pass;
+async function HomeSeasonPass() {
+  const data = await getSeasonPassDashboard().catch(() => null);
   return <SeasonPassBanner pass={data || undefined} compact />;
 }
 
-async function HomePreviousSeason({ season }: { season: ReturnType<typeof getLatestFinishedSeason> }) {
-  const summary = await season;
+async function HomePreviousSeason() {
+  const summary = await getLatestFinishedSeason().catch(() => null);
   return summary ? <PreviousSeasonBanner summary={summary} /> : null;
 }
 
@@ -99,13 +101,12 @@ async function readHomeWeather(event: HomeWeatherEvent | null, durationMinutes: 
   });
 }
 
-async function HomeWeather({ events, duration, location, initial }: {
+async function HomeWeather({ events, duration, location }: {
   events: Array<HomeWeatherEvent | null>;
   duration: number;
   location?: string | null;
-  initial?: EventWeather | null;
 }) {
-  let weather = initial;
+  let weather: EventWeather | null = null;
   for (const event of events) {
     if (weather) break;
     weather = await readHomeWeather(event, duration).catch(() => null);
@@ -126,16 +127,12 @@ async function HomeProfileReminder() {
   return avatarUrl === null || inherited.includes(avatarUrl) ? <IncompleteProfileBanner /> : null;
 }
 
-export default async function HomePage({ searchParams }: { searchParams: Promise<{ inviteError?: string }> }) {
+export default async function HomePage({ searchParams }: { searchParams: Promise<{ inviteError?: string; home_trace?: string }> }) {
   const query = await searchParams;
-  const accountPromise = getCurrentAccount();
-  const selectedLeaguePromise = getSelectedLeague();
-  const previousSeasonPromise = getLatestFinishedSeason().catch(() => null);
-  const seasonPassPromise = selectedLeaguePromise.then((league) => league?.featureTier === "complete" ? getSeasonPassDashboard() : null).catch(() => null);
-  const [{ data }, account, selectedLeague] = await Promise.all([
-    getDashboardData({ agendaOnly: true }),
-    accountPromise,
-    selectedLeaguePromise,
+  const [data, account, selectedLeague] = await Promise.all([
+    getHomeAgenda(homeTraceId(query.home_trace)).catch(() => null),
+    getCurrentAccount(),
+    getSelectedLeague(),
   ]);
   if (account.user && (!account.memberships.length || !selectedLeague)) redirect("/lobby");
   if (!data) {
@@ -147,28 +144,24 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           <div className="w-16 h-16 rounded-full bg-surface-hover flex items-center justify-center mb-4">
             <TrendingUp className="w-8 h-8 text-muted" />
           </div>
-          <h2 className="text-xl font-bold text-foreground mb-2">Bem-vindo à Liga</h2>
+          <h2 className="text-xl font-bold text-foreground mb-2">Agenda indisponível</h2>
           <p className="text-muted text-sm mb-6">
-            Comece criando a primeira rodada e chamando seus amigos!
+            A agenda não pôde ser carregada agora.
           </p>
-          <Link href="/rodadas" className="btn-primary w-full">
-            Ir para Rodadas
-          </Link>
+          <a href="/" className="btn-primary w-full">Tentar novamente</a>
         </div>
       </div>
     );
   }
 
-  const { nextRound, activeCallups = [], liveMatch, matchDuration, venue, nextRoundWeather, eventDurationMinutes, lastRound } = data;
+  const { nextRound, activeCallups, liveMatch, matchDuration, venue, eventDurationMinutes } = data;
 
-  const matchingCallup = activeCallups.find((callup: any) =>
+  const matchingCallup = activeCallups.find((callup) =>
     callup.roundType === "official" && (callup.roundId === nextRound?.id || callup.date === nextRound?.date),
   );
   const weatherForCallup = (callup: any): HomeWeatherEvent | null => callup
     ? { stadiumId: callup.stadiumId, date: callup.date, time: callup.startTime }
     : null;
-
-  const currentPlayerId = account.profile?.player_id || null;
 
   return (
     <div className="space-y-5 pt-1 sm:pt-0">
@@ -182,7 +175,8 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       />
 
       {/* Carrossel principal unificado: convocação e próxima rodada. */}
-      <section className="space-y-3">
+      <section className="space-y-3" data-home-agenda>
+        <HomeReadyMarker />
         <div className="px-1">
           <h2 className="font-athletic text-sm font-black uppercase italic tracking-wider text-foreground">
             {activeCallups.length > 0 || account.isAdmin ? "Agenda e gestão" : "Próxima Rodada"}
@@ -190,15 +184,13 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         </div>
 
         {(() => {
-          const callupSlides = activeCallups.map((callup: any) => {
-            const userEntry = currentPlayerId
-              ? (callup.entries || []).find((entry: any) => entry.playerId === currentPlayerId) || null
-              : null;
+          const callupSlides = activeCallups.map((callup) => {
+            const { userEntry } = callup;
             return {
               userEntry,
               slide: <OpenCallupBanner key={callup.id} callup={callup} userEntry={userEntry} weatherBadge={
                 <Suspense fallback={null}>
-                  <HomeWeather events={[weatherForCallup(callup)]} duration={eventDurationMinutes} location={callup.stadiumName} initial={callup.weather} />
+                  <HomeWeather events={[weatherForCallup(callup)]} duration={eventDurationMinutes} location={callup.stadiumName} />
                 </Suspense>
               } />,
             };
@@ -217,7 +209,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                     events={[weatherForCallup(matchingCallup), { stadiumId: nextRound.stadium_id, date: nextRound.date, time: nextRound.start_time }]}
                     duration={eventDurationMinutes}
                     location={venue?.name}
-                    initial={nextRoundWeather}
                   />
                 </Suspense>
               )}
@@ -246,17 +237,15 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         })()}
       </section>
 
-      {selectedLeague?.featureTier === "complete" && <Suspense fallback={null}><HomeSeasonPass pass={seasonPassPromise} /></Suspense>}
+      {selectedLeague?.featureTier === "complete" && <Suspense fallback={null}><HomeSeasonPass /></Suspense>}
 
-      {selectedLeague?.featureTier !== "quick" && <Suspense fallback={null}><HomePreviousSeason season={previousSeasonPromise} /></Suspense>}
+      {selectedLeague?.featureTier !== "quick" && <Suspense fallback={null}><HomePreviousSeason /></Suspense>}
 
       {selectedLeague?.featureTier !== "quick" && <Suspense fallback={<HomeRankingPreviewFallback />}>
         <HomeRankingPreview />
       </Suspense>}
 
-      {lastRound === undefined ? (
-        <Suspense fallback={null}><HomeLastRound /></Suspense>
-      ) : lastRound && <HomeLastRoundSummary round={lastRound} />}
+      <Suspense fallback={null}><HomeLastRound key={selectedLeague?.id} /></Suspense>
     </div>
   );
 }

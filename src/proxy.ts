@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { ENTRY_FLOW_DONE_COOKIE, ENTRY_FLOW_PENDING_COOKIE, ENTRY_FLOW_VERSION, isEntryFlowScreen } from '@/lib/entry-flow'
 import { requestOrigin } from '@/lib/siteUrl'
 import { supabaseServerConfig } from '@/lib/supabase/server-config'
+import { homeTraceId } from '@/lib/home-performance'
 
 export default async function proxy(request: NextRequest) {
   // O Fastify valida a sessão e o PostgreSQL aplica o escopo da liga nesta leitura.
@@ -42,6 +43,11 @@ export default async function proxy(request: NextRequest) {
   const authStartedAt = performance.now()
   const { data: { user } } = await supabase.auth.getUser()
   const authDuration = performance.now() - authStartedAt
+  const traceId = pathname === '/' ? homeTraceId(request.nextUrl.searchParams.get('home_trace')) : undefined
+  if (traceId) console.info(JSON.stringify({
+    event: 'match_step', operation: 'load_home', step: 'proxy_auth',
+    durationMs: Math.round(authDuration), success: Boolean(user), traceId,
+  }))
   let membershipDuration = 0
   const origin = requestOrigin(request)
   const isAdminRoute =

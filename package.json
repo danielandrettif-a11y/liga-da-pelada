@@ -26,7 +26,8 @@
     "audit:market:v11:self-test": "node scripts/analyze-market-v11.mjs --self-test",
     "benchmark:stats": "node scripts/benchmark-statistics.mjs",
     "benchmark:structures": "node scripts/benchmark-app-structures.mjs",
-    "benchmark:web": "node scripts/benchmark-web.mjs"
+    "benchmark:web": "node scripts/benchmark-web.mjs",
+    "benchmark:home": "node scripts/benchmark-home-entry.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",

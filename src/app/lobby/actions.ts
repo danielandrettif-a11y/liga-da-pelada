@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCurrentAccount } from "@/lib/auth";
+import { homeTraceId } from "@/lib/home-performance";
+import { measureMatchStep } from "@/lib/match-performance";
 import { ACTIVE_LEAGUE_COOKIE } from "@/lib/league-context";
 import {
   ENTRY_FLOW_DONE_COOKIE,
@@ -45,12 +47,15 @@ export async function continueEntryFlow() {
 
 export async function enterLeague(formData: FormData) {
   const leagueId = String(formData.get("league_id") || "");
-  const { client, user, memberships } = await getCurrentAccount();
+  const traceId = homeTraceId(formData.get("home_trace"));
+  const { client, user, memberships } = await measureMatchStep("load_home", "entry_account", getCurrentAccount, traceId);
   if (!user) redirect("/login?next=/lobby");
   try {
-    const api = await leagueApiFor(client);
-    if (api) await api.authorizeSelection(leagueId, "active");
-    else if (!memberships.some((membership) => membership.league_id === leagueId)) throw new Error("access");
+    await measureMatchStep("load_home", "entry_authorize", async () => {
+      const api = await leagueApiFor(client);
+      if (api) await api.authorizeSelection(leagueId, "active");
+      else if (!memberships.some((membership) => membership.league_id === leagueId)) throw new Error("access");
+    }, traceId);
   } catch {
     redirect("/lobby?error=access");
   }
@@ -58,7 +63,7 @@ export async function enterLeague(formData: FormData) {
     httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 365,
   });
   const destination = await completePendingEntryFlow(client);
-  redirect(destination || "/");
+  redirect(destination || (traceId ? `/?home_trace=${traceId}` : "/"));
 }
 
 export async function enterArchivedQuickLeague(formData: FormData) {

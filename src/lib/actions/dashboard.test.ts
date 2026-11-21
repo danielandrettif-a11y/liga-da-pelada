@@ -1,128 +1,76 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("server-only", () => ({}));
-
-const getStatisticsApiSessionMock = vi.fn();
-const getActiveSeasonMock = vi.fn();
-const getCurrentAccountMock = vi.fn();
-const getEventWeatherMock = vi.fn();
-
-vi.mock("@/modules/statistics/infrastructure/statistics-api-session", () => ({
-  getStatisticsApiSession: () => getStatisticsApiSessionMock(),
+const { getCurrentAccount, getSelectedLeague, readDashboardCallups } = vi.hoisted(() => ({
+  getCurrentAccount: vi.fn(), getSelectedLeague: vi.fn(), readDashboardCallups: vi.fn(),
+}));
+vi.mock("../auth", () => ({ getCurrentAccount }));
+vi.mock("../league-context", () => ({ getSelectedLeague }));
+vi.mock("../dashboard-callups", async (original) => ({
+  ...await original<typeof import("../dashboard-callups")>(), readDashboardCallups,
 }));
 
-vi.mock("./seasons", () => ({
-  getActiveSeason: () => getActiveSeasonMock(),
-}));
+import { getHomeAgenda, getHomeMatchGoals } from "./dashboard";
 
-vi.mock("../auth", () => ({
-  getCurrentAccount: () => getCurrentAccountMock(),
-}));
+function query(result: unknown) {
+  return {
+    select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(), maybeSingle: vi.fn().mockResolvedValue(result),
+  };
+}
 
-vi.mock("../weather", () => ({
-  getEventWeather: () => getEventWeatherMock(),
-}));
-
-import { getDashboardData } from "./dashboard";
-
-describe("Server Action: getDashboardData", () => {
+describe("home agenda", () => {
+  const client = { rpc: vi.fn(), from: vi.fn() };
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    getCurrentAccount.mockResolvedValue({ user: { id: "account" }, profile: { player_id: "me" }, client });
+    getSelectedLeague.mockResolvedValue({ id: "league" });
   });
   afterEach(() => vi.unstubAllEnvs());
 
-  it("delegates to statistics gateway when api session is enabled", async () => {
-    const mockGateway = {
-      getDashboardData: vi.fn().mockResolvedValue({
-        success: true,
-        data: { matchDuration: 10, preseasonEnabled: true },
-      }),
-    };
-    getStatisticsApiSessionMock.mockResolvedValue({
-      enabled: true,
-      gateway: mockGateway,
+  it("uses one agenda RPC and preserves the player's entry and the round count", async () => {
+    vi.stubEnv("HOME_AGENDA_V2_ENABLED", "true");
+    client.rpc.mockResolvedValue({ data: {
+      league: { match_duration: 10 },
+      rounds: [{ id: "round", round_type: "official", participant_count: 0 }],
+      callups: [{ id: "callup", round_id: "round", round_type: "official", confirmed: 9, waiting: 1, userEntry: { playerId: "me", status: "waitlist", position: 1 } }],
+      liveMatch: null,
+    } });
+    expect(await getHomeAgenda()).toMatchObject({
+      nextRound: { id: "round", confirmedPlayers: 9 },
+      activeCallups: [{ id: "callup", userEntry: { status: "waitlist", position: 1 } }],
     });
-    getActiveSeasonMock.mockResolvedValue({
-      id: "season-1",
-      league_id: "league-123",
-    });
-
-    const result = await getDashboardData();
-    expect(result).toEqual({
-      success: true,
-      data: { matchDuration: 10, preseasonEnabled: true },
-    });
-    expect(mockGateway.getDashboardData).toHaveBeenCalledWith("league-123");
+    expect(client.rpc).toHaveBeenCalledExactlyOnceWith("get_home_agenda_v2", { p_league_id: "league" });
+    expect(client.from).not.toHaveBeenCalled();
   });
 
-  it.each([false, true])("serves the home agenda before and after migration 366 (available: %s)", async (agendaAvailable) => {
-    vi.stubEnv("DASHBOARD_API_ENABLED", "false");
-    getStatisticsApiSessionMock.mockRejectedValue(new Error("dashboard API should not be called"));
-    getActiveSeasonMock.mockResolvedValue({
-      id: "season-1",
-      league_id: "league-123",
+  it("falls back to the agenda only and omits callups whose round has started", async () => {
+    vi.stubEnv("HOME_AGENDA_V2_ENABLED", "true");
+    client.from.mockReturnValue(query({ data: { id: "season" } }));
+    client.rpc.mockResolvedValueOnce({ error: { code: "PGRST202" } }).mockResolvedValueOnce({ data: { league: {} } });
+    readDashboardCallups.mockResolvedValue({ data: [
+      { id: "started", round: { matches: [{ started_at: "2026-11-21T08:00:00Z" }] } },
+      { id: "open", round: null, callup_entries: [{ player_id: "me", status: "confirmed", position: 1 }] },
+    ] });
+    expect(await getHomeAgenda()).toMatchObject({
+      activeCallups: [{ id: "open", confirmed: 1, userEntry: { status: "confirmed" } }],
     });
-    const callupsQuery: any = {
-      eq: vi.fn().mockReturnThis(),
-      in: vi.fn().mockReturnThis(),
-      order: vi.fn().mockReturnThis(),
-      then: (resolve: any) => Promise.resolve({ data: [] }).then(resolve),
-    };
-    const client = {
-      rpc: vi.fn().mockResolvedValue({
-        data: {
-          nextRound: { id: "r1", number: 1, stadium_id: "stadium", date: "2026-11-21", start_time: "08:00" },
-          league: { match_duration: 7 },
-          activeCallups: [],
-        },
-        error: null,
-      }).mockResolvedValueOnce(agendaAvailable
-        ? { data: { nextRound: { id: "r1" }, league: { match_duration: 7 } }, error: null }
-        : { data: null, error: { code: "PGRST202" } }),
-      from: vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue(callupsQuery),
-      }),
-    };
-    getCurrentAccountMock.mockResolvedValue({
-      user: { id: "u1" },
-      client,
-    });
-    getEventWeatherMock.mockResolvedValue(null);
-
-    const result = await getDashboardData({ agendaOnly: true });
-    expect(result).toMatchObject({ success: true, data: { nextRound: { id: "r1" } } });
-    expect(result.data?.lastRound).toBe(agendaAvailable ? undefined : null);
-    expect(getStatisticsApiSessionMock).not.toHaveBeenCalled();
-    expect(getEventWeatherMock).not.toHaveBeenCalled();
-    expect(client.rpc).toHaveBeenCalledWith("get_home_agenda_read_model", {
-      p_season_id: "season-1",
-      p_league_id: "league-123",
-    });
-    expect(client.rpc).toHaveBeenCalledTimes(agendaAvailable ? 1 : 2);
-    if (!agendaAvailable) expect(client.rpc).toHaveBeenNthCalledWith(2, "get_home_read_model", {
-      p_season_id: "season-1", p_league_id: "league-123",
-    });
+    expect(client.rpc.mock.calls.map(([name]) => name)).toEqual(["get_home_agenda_v2", "get_home_agenda_read_model"]);
+    expect(client.from).toHaveBeenCalledExactlyOnceWith("seasons");
   });
 
-  it("uses the authenticated reader when the dashboard endpoint is unavailable", async () => {
-    const error = Object.assign(new Error("Route not found"), { statusCode: 404 });
-    getStatisticsApiSessionMock.mockResolvedValue({ gateway: { getDashboardData: vi.fn().mockRejectedValue(error) } });
-    getActiveSeasonMock.mockResolvedValue({ id: "season-1", league_id: "league-123" });
-    const query: any = {
-      eq: vi.fn().mockReturnThis(), in: vi.fn().mockReturnThis(), order: vi.fn().mockReturnThis(),
-      then: (resolve: any) => Promise.resolve({ data: [] }).then(resolve),
-    };
-    const client = {
-      rpc: vi.fn().mockResolvedValue({ data: { league: { match_duration: 7 }, activeCallups: [] }, error: null }),
-      from: vi.fn().mockReturnValue({ select: vi.fn().mockReturnValue(query) }),
-    };
-    getCurrentAccountMock.mockResolvedValue({ user: { id: "u1" }, client });
-    getEventWeatherMock.mockResolvedValue(null);
+  it("propagates failed agenda reads instead of showing a false empty agenda", async () => {
+    vi.stubEnv("HOME_AGENDA_V2_ENABLED", "false");
+    client.from.mockReturnValue(query({ data: { id: "season" } }));
+    readDashboardCallups.mockResolvedValue({ error: { code: "42501" } });
+    await expect(getHomeAgenda()).rejects.toMatchObject({ code: "42501" });
+    expect(client.rpc).not.toHaveBeenCalled();
+  });
 
-    expect(await getDashboardData()).toMatchObject({ success: true });
-    expect(client.rpc).toHaveBeenCalledWith("get_home_read_model", {
-      p_season_id: "season-1", p_league_id: "league-123",
-    });
+  it("never loads match events for a round outside the selected league", async () => {
+    const rounds = query({ data: null });
+    client.from.mockReturnValue(rounds);
+    await expect(getHomeMatchGoals("other-round", "match")).rejects.toThrow("Rodada indisponível");
+    expect(rounds.eq).toHaveBeenCalledWith("league_id", "league");
+    expect(client.from).toHaveBeenCalledExactlyOnceWith("rounds");
   });
 });
-
