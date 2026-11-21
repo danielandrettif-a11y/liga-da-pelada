@@ -160,6 +160,8 @@ export function MatchSubstitutionManager({
                         onPlayerClick={(player) => selectOutgoing(team, player)}
                         team={{
                           ...team,
+                          fixed_goalkeeper_player_id: (match.match_goalkeeper_stints || []).find((entry: any) => entry.team_id === team.id && entry.left_elapsed_seconds == null)?.player_id
+                            || (match.match_goalkeepers || []).find((entry: any) => entry.team_id === team.id)?.player_id,
                           team_players: lineup.map((entry: any) => ({
                             player_id: entry.player_id,
                             goalkeeper_order: (team.team_players || []).find((teamPlayer: any) => teamPlayer.player_id === entry.player_id)?.goalkeeper_order ?? null,

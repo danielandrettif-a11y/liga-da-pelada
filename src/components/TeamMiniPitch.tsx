@@ -36,6 +36,7 @@ type TeamMiniPitchProps = {
     crest_url?: string | null;
     position?: number | null;
     captain_player_id?: string | null;
+    fixed_goalkeeper_player_id?: string | null;
     team_players: PitchPlayer[];
   };
   index: number;
@@ -53,7 +54,7 @@ const POSITIONS: Record<number, Array<[number, number]>> = {
   4: [[26, 28], [74, 28], [26, 72], [74, 72]],
   5: [[50, 17], [26, 48], [74, 48], [26, 79], [74, 79]],
   6: [[26, 18], [74, 18], [50, 42], [26, 66], [74, 66], [50, 85]],
-  7: [[50, 12], [25, 32], [75, 32], [25, 54], [75, 54], [25, 80], [75, 80]],
+  7: [[50, 10], [25, 29], [75, 29], [50, 49], [25, 69], [75, 69], [50, 89]],
   8: [[25, 12], [75, 12], [25, 36], [75, 36], [25, 60], [75, 60], [25, 84], [75, 84]],
   9: [[50, 9], [25, 28], [75, 28], [25, 48], [75, 48], [25, 68], [75, 68], [25, 87], [75, 87]],
   10: [[25, 9], [75, 9], [25, 28], [75, 28], [25, 48], [75, 48], [25, 68], [75, 68], [25, 87], [75, 87]],
@@ -128,7 +129,14 @@ export function TeamMiniPitch({ team, index, selectedPlayerId, onPlayerClick, sh
       if (b.cartolaPoints !== a.cartolaPoints) return b.cartolaPoints - a.cartolaPoints;
       return a.player.name.localeCompare(b.player.name, "pt-BR");
     })
-    : playerEntries;
+    : playerEntries.length === 7
+      ? [...playerEntries].sort((a, b) => {
+        const fixedA = a.player.id === team.fixed_goalkeeper_player_id;
+        const fixedB = b.player.id === team.fixed_goalkeeper_player_id;
+        if (fixedA !== fixedB) return fixedA ? -1 : 1;
+        return (a.goalkeeperOrder ?? Number.MAX_SAFE_INTEGER) - (b.goalkeeperOrder ?? Number.MAX_SAFE_INTEGER);
+      })
+      : playerEntries;
   const visiblePlayers = players.slice(0, 10);
   const positionAwareLayout = getPositionAwareCoordinates(visiblePlayers);
   const positions = showPositionDetails
