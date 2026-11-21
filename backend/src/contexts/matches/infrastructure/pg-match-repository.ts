@@ -247,7 +247,7 @@ export function pgMatchRepository(pool: Pool, now: () => number = Date.now): Mat
              'referee', (SELECT jsonb_build_object('name', p.name) FROM public.players p WHERE p.id = m.referee_player_id),
              'team_a', (SELECT to_jsonb(team) FROM teams team WHERE team.id = m.team_a_id),
              'team_b', (SELECT to_jsonb(team) FROM teams team WHERE team.id = m.team_b_id),
-             'match_players', COALESCE((SELECT jsonb_agg(to_jsonb(player)) FROM players player), '[]'::jsonb),
+             'match_players', COALESCE((SELECT jsonb_agg(to_jsonb(participant)) FROM players participant), '[]'::jsonb),
              'match_events', COALESCE((
                SELECT jsonb_agg(to_jsonb(event) ORDER BY event.created_at DESC)
                FROM (SELECT me.*, row_to_json(p) as player, row_to_json(ap) as assist_player
