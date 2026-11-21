@@ -11,7 +11,6 @@ export function ExpenseItemsManager({ items, recipients, appFee }: { items: Expe
   const defaultRecipient = activeRecipients[0]?.id || "";
   const [appFeeValue, setAppFeeValue] = useState(appFee.amountPerPlayer ? String(appFee.amountPerPlayer) : "");
   const [savedAppFee, setSavedAppFee] = useState(appFee.amountPerPlayer);
-  const [appFeeRecipientId, setAppFeeRecipientId] = useState(appFee.recipientId || defaultRecipient);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [total, setTotal] = useState("");
@@ -23,7 +22,7 @@ export function ExpenseItemsManager({ items, recipients, appFee }: { items: Expe
 
   function saveFixedFee() {
     start(async () => {
-      const result = await saveAppFeeConfig(Number(appFeeValue || 0), appFeeRecipientId || null);
+      const result = await saveAppFeeConfig(Number(appFeeValue || 0));
       if (result.success) setSavedAppFee(Math.round(Number(appFeeValue || 0) * 100) / 100);
       setMessage(result.success ? (Number(appFeeValue || 0) > 0 ? "Custo do app salvo para as próximas peladas." : "Custo do app desativado.") : result.error || "Erro ao salvar o custo do app.");
     });
@@ -42,8 +41,8 @@ export function ExpenseItemsManager({ items, recipients, appFee }: { items: Expe
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-black text-foreground"><span>Custo fixo do app <span className="block pt-1 text-xs font-medium text-muted">{savedAppFee > 0 ? `${money(savedAppFee)} por jogador` : "Não configurado"}</span></span><ChevronDown aria-hidden="true" className="h-5 w-5 shrink-0 text-accent transition-transform group-open:rotate-180" /></summary>
       <div className="mt-4 space-y-3"><p className="text-xs leading-5 text-muted">Cobrado de cada jogador em toda pelada, sem parcelas.</p>
       <label className="block text-xs font-bold text-muted">Valor por jogador<div className="relative mt-1"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">R$</span><input aria-label="Valor do app por jogador" type="number" min="0" step="0.01" inputMode="decimal" value={appFeeValue} onChange={(event) => setAppFeeValue(event.target.value)} className="w-full rounded-xl border border-border bg-background py-3 pl-10 pr-3 text-sm text-foreground" /></div></label>
-      <label className="block text-xs font-bold text-muted">PIX que recebe<select value={appFeeRecipientId} onChange={(event) => setAppFeeRecipientId(event.target.value)} className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-3 text-sm text-foreground"><option value="">Escolha um destinatário</option>{activeRecipients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-      <button disabled={pending || Number(appFeeValue || 0) < 0 || (Number(appFeeValue || 0) > 0 && !appFeeRecipientId)} onClick={saveFixedFee} className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3 text-sm font-black text-background disabled:opacity-40"><Save className="h-4 w-4" /> Salvar custo fixo</button>
+      <p className="text-xs leading-5 text-muted">O custo será enviado para o mesmo PIX que recebe o valor da rodada.</p>
+      <button disabled={pending || Number(appFeeValue || 0) < 0} onClick={saveFixedFee} className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3 text-sm font-black text-background disabled:opacity-40"><Save className="h-4 w-4" /> Salvar custo fixo</button>
       </div>
     </details>
 

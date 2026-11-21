@@ -70,17 +70,16 @@ export async function getAppFeeConfig(): Promise<AppFeeConfig> {
   };
 }
 
-export async function saveAppFeeConfig(amountPerPlayer: number, recipientId: string | null) {
+export async function saveAppFeeConfig(amountPerPlayer: number) {
   const client = await getAdminClient();
   if (!client) return { success: false as const, error: "Somente administradores podem configurar o custo do app." };
   const amount = Number(amountPerPlayer);
   if (!Number.isFinite(amount) || amount < 0) return { success: false as const, error: "Informe um valor válido por jogador." };
-  if (amount > 0 && !recipientId) return { success: false as const, error: "Escolha o PIX que recebe o custo do app." };
   const league = await getActiveLeague();
   const { error } = await client.rpc("set_league_app_fee", {
     p_league_id: league.id,
     p_amount_per_player: Math.round(amount * 100) / 100,
-    p_recipient_id: amount > 0 ? recipientId : null,
+    p_recipient_id: null,
   });
   if (error) return { success: false as const, error: error.message };
   revalidateExpenseManagement();
