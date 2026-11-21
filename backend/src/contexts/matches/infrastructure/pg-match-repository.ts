@@ -258,8 +258,12 @@ export function pgMatchRepository(pool: Pool, now: () => number = Date.now): Mat
              ORDER BY me.created_at DESC) event
              ), '[]'::jsonb),
              'match_goalkeeper_stints', COALESCE((
-               SELECT jsonb_agg(to_jsonb(stint) ORDER BY stint.selected_at)
-               FROM public.match_goalkeeper_stints stint WHERE stint.match_id = m.id
+               SELECT jsonb_agg(to_jsonb(stint) || jsonb_build_object('player',
+                 CASE WHEN goalkeeper.id IS NULL THEN NULL ELSE jsonb_build_object('id', goalkeeper.id, 'name', goalkeeper.name) END)
+                 ORDER BY stint.selected_at)
+               FROM public.match_goalkeeper_stints stint
+               LEFT JOIN public.players goalkeeper ON goalkeeper.id = stint.player_id
+               WHERE stint.match_id = m.id
              ), '[]'::jsonb),
              'match_substitutions', COALESCE((
                SELECT jsonb_agg(to_jsonb(substitution) ORDER BY substitution.created_at DESC)

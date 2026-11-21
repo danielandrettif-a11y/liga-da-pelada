@@ -532,7 +532,8 @@ export async function getMatch(matchId: string) {
         assist_player:assist_player_id (id, name, nickname, avatar_url)
       ),
       match_goalkeeper_stints (
-        id, match_id, team_id, player_id, entered_elapsed_seconds, left_elapsed_seconds, selected_at
+        id, match_id, team_id, player_id, entered_elapsed_seconds, left_elapsed_seconds, selected_at,
+        player:player_id (id, name)
       ),
       match_substitutions (
         id,
