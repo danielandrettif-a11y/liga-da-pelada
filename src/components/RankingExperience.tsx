@@ -369,7 +369,7 @@ export function RankingExperience({ data, currentPlayerId, initialView = "season
 
       {showPodium && (
         <section className="pt-7">
-          <div className="flex items-end justify-center gap-2 sm:gap-4">
+          <div className="mx-auto grid max-w-[368px] grid-cols-3 grid-rows-[auto_auto_auto] items-end gap-x-2 sm:gap-x-4">
             {podiumOrder.map((entry, visualIndex) => {
               const position = visualIndex === 0 ? 2 : visualIndex === 1 ? 1 : 3;
               const style = podiumStyle(position);
@@ -381,13 +381,13 @@ export function RankingExperience({ data, currentPlayerId, initialView = "season
                   key={entry.player.id}
                   type="button"
                   onClick={() => setSelected({ entry, position })}
-                  className={`relative isolate flex w-1/3 max-w-[112px] flex-col items-center rounded-t-2xl transition-transform hover:-translate-y-1 focus:outline-none animate-slide-in-bottom stagger-${position}`}
+                  className={`relative isolate row-span-3 grid min-w-0 grid-rows-subgrid items-start rounded-t-2xl focus:outline-none animate-slide-in-bottom stagger-${position}`}
                   aria-label={`Abrir carta de ${entry.player.name}, ${position}º lugar`}
                 >
-                  {position === 1 && (
-                    <Crown className="absolute z-40 -top-8 h-8 w-8 rotate-[-7deg] text-[#f5d45e] drop-shadow-lg" fill="currentColor" />
-                  )}
-                  <div className="relative z-10">
+                  <div className={`relative z-10 mx-auto ${position === 1 ? "mt-0" : position === 2 ? "mt-8" : "mt-12"}`}>
+                    {position === 1 && (
+                      <Crown className="absolute z-40 -top-8 left-1/2 h-8 w-8 -translate-x-1/2 rotate-[-7deg] text-[#f5d45e] drop-shadow-lg" fill="currentColor" />
+                    )}
                     <PlayerAvatar
                       name={entry.player.name}
                       avatarUrl={entry.player.avatar_url}
@@ -405,7 +405,7 @@ export function RankingExperience({ data, currentPlayerId, initialView = "season
                       </span>
                     )}
                   </div>
-                  <div className="mb-2 mt-4 w-full px-1 text-center">
+                  <div className="mb-2 mt-4 w-full self-end px-1 text-center">
                     {entry.cosmetics?.nameplateKey ? (
                       <CosmeticNameplate assetKey={entry.cosmetics.nameplateKey} playerName={entry.player.name} titleName={entry.cosmetics.titleName} compact className="ranking-podium-nameplate" />
                     ) : (
@@ -417,7 +417,7 @@ export function RankingExperience({ data, currentPlayerId, initialView = "season
                     <CombatBeltBadges belts={entry.achievementBelts} compact centered />
                     <p className={`mt-0.5 text-xs font-black ${style.label}`}>{metricDisplay(entry, filter)} <span className="text-[8px] uppercase opacity-70">{FILTER_LABELS[filter]}</span></p>
                   </div>
-                  <div className={`flex w-full flex-col items-center rounded-t-2xl border-x border-t bg-gradient-to-b px-1 pt-3 ${height} ${style.base}`}>
+                  <div className={`flex w-full flex-col items-center self-end rounded-t-2xl border-x border-t bg-gradient-to-b px-1 pt-3 ${height} ${style.base}`}>
                     <span className="font-athletic text-3xl font-black text-white/45">{position}</span>
                     {awardsTotal(entry) > 0 && <AwardBadges entry={entry} compact />}
                     {above && gap != null && (
