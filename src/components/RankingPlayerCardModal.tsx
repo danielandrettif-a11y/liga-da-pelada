@@ -511,7 +511,7 @@ export function RankingPlayerCardModal({ entry, position, onClose, scoringMode =
 
           <div
             aria-label={`Tag fixa ${cardContent.profile}`}
-            className="absolute z-20 flex items-center justify-center rounded-md border bg-[#020c08]/90 px-1 text-center text-[6px] font-black uppercase tracking-[.08em] shadow-[0_3px_10px_rgba(0,0,0,.85)]"
+            className="absolute z-20 flex items-center justify-center overflow-hidden whitespace-nowrap rounded-md border bg-[#020c08]/90 px-0.5 text-center text-[5px] font-black uppercase leading-none tracking-normal shadow-[0_3px_10px_rgba(0,0,0,.85)]"
             style={{ ...rankingCardBoxStyle(layout.profile), borderColor: theme.edge, color: theme.edge, textShadow: "0 1px 3px rgba(0,0,0,.95)" }}
           >
             TAG · {cardContent.profile}
@@ -528,11 +528,11 @@ export function RankingPlayerCardModal({ entry, position, onClose, scoringMode =
 
           <div className="absolute z-10 flex items-center justify-center px-1 text-center" style={rankingCardBoxStyle(layout.name)}>
             <div
-              className="ranking-card-nameplate-surface flex h-full min-w-0 w-full flex-col items-center justify-center overflow-hidden bg-[length:100%_100%] bg-center bg-no-repeat px-[14%] py-[3%]"
+              className="ranking-card-nameplate-surface flex h-full min-w-0 w-full flex-col items-center justify-center overflow-hidden bg-[length:100%_100%] bg-center bg-no-repeat py-[3%]"
               style={nameplateArtwork ? { backgroundImage: `url(${nameplateArtwork})` } : undefined}
             >
               <h2 className={`ranking-card-player-name max-h-[1.9em] overflow-hidden font-athletic font-black uppercase text-white drop-shadow-[0_2px_4px_rgba(0,0,0,.9)] ${displayName.length > 22 ? "text-[11px] leading-[.92] tracking-normal" : displayName.length > 13 ? "text-[13px] leading-[.95] tracking-normal" : "text-[17px] leading-none tracking-[.04em]"}`}>{displayName}</h2>
-              {cardContent.title && <p className="mt-0.5 max-w-full truncate text-[7px] font-black uppercase tracking-[.13em] drop-shadow-[0_1px_2px_rgba(0,0,0,.95)]" style={{ color: theme.ink }}>✦ {cardContent.title}</p>}
+              {cardContent.title && <p className="mt-0.5 w-full truncate text-[6px] font-black uppercase leading-none tracking-normal drop-shadow-[0_1px_2px_rgba(0,0,0,.95)]" style={{ color: theme.ink }}>✦ {cardContent.title}</p>}
             </div>
           </div>
 

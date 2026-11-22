@@ -591,7 +591,7 @@ textarea {
   letter-spacing: .075em;
   text-shadow: 0 1px 2px rgba(0, 0, 0, .7);
   box-shadow: inset 0 1px rgba(255,255,255,.12), 0 7px 18px rgba(0,0,0,.3);
-  min-width: 11rem;
+  min-width: 0;
   max-width: 22rem;
   padding: .55rem 1rem .6rem;
   text-align: left;
@@ -911,6 +911,38 @@ textarea {
 .cosmetic-nameplate--legend {
   border-color: rgba(253,224,71,.76);
   color: #fff1a8;
+}
+
+.cosmetic-nameplate--art.cosmetic-nameplate--legend:not(.ranking-podium-nameplate):not(.ranking-row-nameplate) {
+  padding: 1.25rem 24% 1.2rem;
+  text-align: center;
+}
+
+.cosmetic-nameplate--art.cosmetic-nameplate--legend .cosmetic-nameplate__header,
+.cosmetic-nameplate--art.cosmetic-nameplate--legend .cosmetic-nameplate__edge {
+  display: none;
+}
+
+.cosmetic-nameplate--art.cosmetic-nameplate--legend:not(.ranking-podium-nameplate):not(.ranking-row-nameplate) .cosmetic-nameplate__player {
+  max-width: 100%;
+  margin-top: 0;
+  font-size: clamp(.6rem, 3vw, .9rem);
+  letter-spacing: .025em;
+}
+
+.cosmetic-nameplate--art.cosmetic-nameplate--legend:not(.ranking-podium-nameplate):not(.ranking-row-nameplate) .cosmetic-nameplate__title {
+  max-width: 100%;
+  margin-top: .16rem;
+  font-size: .38rem;
+  letter-spacing: .04em;
+}
+
+.cosmetic-nameplate--art.cosmetic-nameplate--legend.cosmetic-nameplate--compact:not(.ranking-podium-nameplate):not(.ranking-row-nameplate) {
+  padding: .75rem 24%;
+}
+
+.ranking-card-nameplate-surface {
+  padding-inline: 24%;
 }
 
 .cosmetic-aura-host {
