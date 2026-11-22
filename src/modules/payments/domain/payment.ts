@@ -23,6 +23,11 @@ export type PaymentRecipient = {
   is_active: boolean;
 };
 
+export type AppFeeConfig = {
+  amountPerPlayer: number;
+  recipientId: string | null;
+};
+
 export type ExpenseItem = {
   id: string;
   name: string;

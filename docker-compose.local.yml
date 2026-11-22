@@ -1,0 +1,11 @@
+# Override para testes locais no WSL conectando à rede do Supabase
+services:
+  backend:
+    networks:
+      - supabase_default
+      - liga-network
+
+networks:
+  supabase_default:
+    external: true
+

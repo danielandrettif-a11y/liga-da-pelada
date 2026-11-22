@@ -192,6 +192,7 @@ export type Round = {
   payment_total: number | null;
   best_goalkeeper_player_id: string | null;
   created_at: string;
+  updated_at?: string | null;
 };
 
 export type Callup = {
@@ -544,6 +545,7 @@ export type CreateTeamInput = {
 };
 
 export type CreateMatchInput = {
+  referee_choice?: string;
   idempotency_key?: string;
   client_started_at?: string;
   round_id: string;

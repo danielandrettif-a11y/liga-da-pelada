@@ -20,6 +20,7 @@ import { registerLiveGoal } from "@/modules/matches/application/register-live-go
 import { finishSelectedMatch } from "@/modules/matches/application/finish-match";
 import { getMatchState } from "@/modules/matches/infrastructure/match-scope";
 import { GoalWriteError, supabaseGoalGateway } from "@/modules/matches/infrastructure/supabase-goal-gateway";
+import { httpGoalGateway } from "@/modules/matches/infrastructure/http-goal-gateway";
 import { supabaseFinishMatchGateway } from "@/modules/matches/infrastructure/supabase-finish-match-gateway";
 import { chooseFixedGoalkeeper, correctFinishedMatchGoalkeeper, switchMatchGoalkeeper } from "@/modules/matches/application/manage-goalkeepers";
 import { supabaseGoalkeeperGateway } from "@/modules/matches/infrastructure/supabase-goalkeeper-gateway";
@@ -34,12 +35,23 @@ import { supabaseFinishedGoalCorrectionGateway } from "@/modules/matches/infrast
 import type { FinishedGoalCorrectionInput } from "@/modules/matches/domain/finished-goal-correction";
 import { supabaseCreateMatchGateway, type MatchLineupCommand } from "@/modules/matches/infrastructure/supabase-create-match-gateway";
 import { measureMatchStep } from "../match-performance";
+import { matchApiFor } from "@/modules/matches/infrastructure/match-api-session";
+import {
+  dispatchSystemMatchTimerThreshold,
+  releaseSystemMatchTimerThreshold,
+  type MatchTimerNotificationClaim,
+} from "@/modules/matches/infrastructure/http-match-gateway";
 
 const ADMIN_ERROR = "Somente administradores podem alterar a partida.";
 
 export async function findLiveMatchForTeams(roundId: string, teamAId: string, teamBId: string) {
   const league = await getSelectedLeague();
   if (!league || !roundId || !teamAId || !teamBId || teamAId === teamBId) return null;
+  const api = await matchApiFor();
+  if (api) {
+    const res = await api.findLiveMatchForTeams(league.id, roundId, teamAId, teamBId);
+    return res?.matchId ?? null;
+  }
   const client = await createServerClient();
   const { data: round, error: roundError } = await client.from("rounds")
     .select("league_id").eq("id", roundId).single();
@@ -56,10 +68,57 @@ export async function findLiveMatchForTeams(roundId: string, teamAId: string, te
       || (item.team_a_id === teamBId && item.team_b_id === teamAId)))?.id || null;
 }
 
+export type MatchRefereeOptions = { enabled: false } | {
+  enabled: true;
+  suggestedId: string | null;
+  players: Array<{ id: string; name: string; waiting: boolean }>;
+};
+
+export async function getMatchRefereeOptions(
+  roundId: string, teamAId: string, teamBId: string, extraPlayerIds: string[],
+): Promise<{ options: MatchRefereeOptions } | { error: string }> {
+  const client = await getAdminClient();
+  const league = await getSelectedLeague();
+  if (!client || !league) return { error: ADMIN_ERROR };
+  const { data: round, error: roundError } = await client.from("rounds").select("id")
+    .eq("id", roundId).eq("league_id", league.id).maybeSingle();
+  if (roundError || !round) return { error: "Rodada fora da pelada selecionada." };
+  const { data, error } = await client.rpc("get_match_referee_options", {
+    p_round_id: roundId, p_team_a_id: teamAId, p_team_b_id: teamBId, p_lineup_extra_ids: extraPlayerIds,
+  });
+  if (error) return { error: error.message };
+  return { options: data as MatchRefereeOptions };
+}
+
 export async function createMatch(input: CreateMatchInput) {
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
+    const league = await getSelectedLeague();
+    const api = await matchApiFor(client);
+    if (api && league) {
+      const res = await api.createMatch(league.id, input);
+      const completeAfterCreation = async () => {
+        if (res.receipt?.duration_seconds && res.receipt?.kickoff_at) {
+          try {
+            await scheduleMatchTimerAlerts({
+              matchId: res.matchId,
+              durationSeconds: Number(res.receipt.duration_seconds),
+              accumulatedSeconds: 0,
+              startedAt: String(res.receipt.kickoff_at),
+            });
+          } catch (schedulingError) {
+            console.error("Erro ao agendar alertas da partida:", schedulingError);
+          }
+        }
+        revalidatePath(`/rodadas/${input.round_id}`);
+        revalidatePath("/");
+        revalidatePath("/convocacao");
+        revalidatePath("/mais");
+      };
+      try { after(completeAfterCreation); } catch { await completeAfterCreation(); }
+      return res;
+    }
 
     if (!input.round_id || !input.team_a_id || !input.team_b_id || input.team_a_id === input.team_b_id) {
       return { success: false, error: "Selecione dois times diferentes." };
@@ -359,6 +418,7 @@ export async function createMatch(input: CreateMatchInput) {
         lineup: lineupRows,
         idempotencyKey,
         clientStartedAt: input.client_started_at || null,
+        refereeChoice: input.referee_choice,
       }),
     );
 
@@ -383,7 +443,7 @@ export async function createMatch(input: CreateMatchInput) {
       }
       revalidatePath(`/rodadas/${input.round_id}`);
       // O primeiro apito encerra a janela de desistência da convocação.
-      revalidatePath("/", "layout");
+      revalidatePath("/");
       revalidatePath("/convocacao");
       revalidatePath("/mais");
     });
@@ -404,6 +464,10 @@ export async function createMatch(input: CreateMatchInput) {
 export async function getMatch(matchId: string) {
   const league = await getSelectedLeague();
   if (!league) return null;
+  const api = await matchApiFor();
+  if (api) {
+    return api.getMatch(league.id, matchId);
+  }
   const client = await createServerClient();
   const { data, error } = await client
     .from("matches")
@@ -422,6 +486,7 @@ export async function getMatch(matchId: string) {
       timer_accumulated_seconds,
       duration_seconds,
       goals_to_finish,
+      referee:referee_player_id(name),
       eligibility_elapsed_offset_seconds,
       created_at,
       team_a:team_a_id (
@@ -467,7 +532,8 @@ export async function getMatch(matchId: string) {
         assist_player:assist_player_id (id, name, nickname, avatar_url)
       ),
       match_goalkeeper_stints (
-        id, match_id, team_id, player_id, entered_elapsed_seconds, left_elapsed_seconds, selected_at
+        id, match_id, team_id, player_id, entered_elapsed_seconds, left_elapsed_seconds, selected_at,
+        player:player_id (id, name)
       ),
       match_substitutions (
         id,
@@ -591,6 +657,11 @@ export type MatchAdminAuditEntry = {
 export async function getFinishedMatchAudit(matchId: string): Promise<MatchAdminAuditEntry[]> {
   const account = await getCurrentAccount();
   if (!account.isAdmin || !matchId) return [];
+  const league = await getSelectedLeague();
+  const api = await matchApiFor(account.client);
+  if (api && league) {
+    return api.getFinishedMatchAudit(league.id, matchId);
+  }
   try { await getMatchState(account.client, matchId); } catch { return []; }
 
   const { data: rows, error } = await (account.client as any)
@@ -629,7 +700,19 @@ export async function registerGoal(input: RegisterGoalInput) {
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
-    const result = await registerLiveGoal(input, supabaseGoalGateway(client));
+    let gateway = supabaseGoalGateway(client);
+    if (process.env.MATCH_GOAL_API_ENABLED === "true" || process.env.MATCHES_API_ENABLED === "true") {
+      const backendUrl = process.env.MATCH_GOAL_BACKEND_URL;
+      if (!backendUrl) throw new GoalWriteError("API de gols não configurada.", false);
+      // getAdminClient validou o usuário com getUser. O backend verifica o
+      // access token novamente e aplica o escopo da pelada na própria RPC.
+      const { data: { session }, error } = await client.auth.getSession();
+      if (error || !session?.access_token) {
+        throw new GoalWriteError("Sessão expirada. Entre novamente.", false);
+      }
+      gateway = httpGoalGateway(backendUrl, session.access_token);
+    }
+    const result = await registerLiveGoal(input, gateway);
     if (!result.success) return result;
 
     // A tela ao vivo aplica o placar e o evento pelo resultado da ação e
@@ -668,6 +751,13 @@ export async function setRoundTeamFixedGoalkeeper(roundId: string, teamId: strin
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
     const league = await getSelectedLeague();
+    const api = await matchApiFor(client);
+    if (api && league) {
+      const res = await api.setRoundTeamFixedGoalkeeper(league.id, roundId, teamId, playerId);
+      revalidatePath(`/rodadas/${roundId}`);
+      revalidatePath(`/rodadas/${roundId}/nova-partida`);
+      return res;
+    }
     const result = await chooseFixedGoalkeeper(
       { roundId, teamId, playerId, leagueId: league?.id || null },
       supabaseGoalkeeperGateway(client),
@@ -691,6 +781,14 @@ export async function changeMatchGoalkeeper(
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
+    const league = await getSelectedLeague();
+    const api = await matchApiFor(client);
+    if (api && league) {
+      const res = await api.changeMatchGoalkeeper(league.id, matchId, teamId, playerId, elapsedSeconds);
+      if (res.roundId) revalidatePath(`/rodadas/${res.roundId}`);
+      revalidatePath("/cartola");
+      return res;
+    }
     const result = await switchMatchGoalkeeper(
       { matchId, teamId, playerId, elapsedSeconds },
       supabaseGoalkeeperGateway(client),
@@ -711,6 +809,41 @@ export async function correctFinishedGoalkeeper(
   playerId: string,
   confirmation: string,
 ) {
+  try {
+    const client = await getAdminClient();
+    if (!client) return { success: false as const, error: ADMIN_ERROR };
+    const api = await matchApiFor(client);
+    if (api) {
+      const league = await getSelectedLeague();
+      if (!league) return { success: false as const, error: "Pelada não selecionada." };
+      const apiResult = await api.correctFinishedGoalkeeper(league.id, matchId, teamId, playerId, confirmation);
+      const warnings: string[] = [];
+      const stats = await calculateRoundStats(apiResult.roundId);
+      if (!stats.success) warnings.push(stats.error || "Não foi possível recalcular as estatísticas.");
+      const { data: fantasyRound, error: fantasyRoundError } = await client
+        .from("fantasy_rounds").select("id").eq("round_id", apiResult.roundId).maybeSingle();
+      if (fantasyRoundError) warnings.push("Não foi possível localizar a rodada do Cartola.");
+      if (fantasyRound) {
+        const { error: fantasyError } = await client.rpc("reprocess_fantasy_from_round", { p_round_id: apiResult.roundId });
+        if (fantasyError) warnings.push(`O Cartola precisa ser reprocessado: ${fantasyError.message}`);
+      }
+      const overall = await refreshFluidOverallSafely(`correção de goleiro na rodada ${apiResult.roundId}`);
+      if (!overall.success) warnings.push(overall.error || "Não foi possível atualizar o Overall.");
+
+      revalidatePath(`/partidas/${matchId}`);
+      revalidatePath(`/rodadas/${apiResult.roundId}`);
+      revalidatePath("/ranking");
+      revalidatePath("/cartola", "layout");
+      return { success: true as const, warning: warnings.join(" ") || undefined };
+    }
+  } catch (error: any) {
+    console.error("Erro ao corrigir goleiro da partida via API:", error);
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "Não foi possível corrigir o goleiro.",
+    };
+  }
+
   try {
     const client = await getAdminClient();
     if (!client) return { success: false as const, error: ADMIN_ERROR };
@@ -748,6 +881,17 @@ export async function substituteMatchPlayer(input: SubstituteMatchPlayerInput) {
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
+    const league = await getSelectedLeague();
+    const api = await matchApiFor(client);
+    if (api && league) {
+      const res = await api.substituteMatchPlayer(league.id, input);
+      revalidatePath(`/partidas/${input.match_id}`);
+      if (res.roundId) {
+        revalidatePath(`/rodadas/${res.roundId}`);
+        revalidatePath(`/rodadas/${res.roundId}/nova-partida`);
+      }
+      return res;
+    }
     const result = await substitutePlayerInMatch(input, supabaseMatchSubstitutionGateway(client));
     if (!result.success) return result;
     revalidatePath(`/partidas/${input.match_id}`);
@@ -770,6 +914,19 @@ export async function deleteMatch(matchId: string) {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
     if (!matchId) return { success: false, error: "Partida inválida para exclusão." };
+    const league = await getSelectedLeague();
+    const api = await matchApiFor(client);
+    if (api && league) {
+      const res = await api.deleteMatch(league.id, matchId);
+      const derivedWarning = res.roundId ? await refreshDeletedMatchDerivedData(client, res.roundId) : undefined;
+      if (res.roundId) {
+        revalidatePath(`/rodadas/${res.roundId}`);
+        revalidatePath(`/rodadas/${res.roundId}/nova-partida`);
+      }
+      revalidatePath("/cartola");
+      revalidatePath("/ranking");
+      return { ...res, warning: joinWarnings(res.warning, derivedWarning) };
+    }
     await getMatchState(client, matchId);
 
     const { data: match, error: matchError } = await client
@@ -819,6 +976,17 @@ export async function undoLastMatchSubstitution(substitutionId: string, matchId:
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
+    const league = await getSelectedLeague();
+    const api = await matchApiFor(client);
+    if (api && league) {
+      const res = await api.undoLastMatchSubstitution(league.id, matchId, substitutionId);
+      revalidatePath(`/partidas/${matchId}`);
+      if (res.roundId) {
+        revalidatePath(`/rodadas/${res.roundId}`);
+        revalidatePath(`/rodadas/${res.roundId}/nova-partida`);
+      }
+      return res;
+    }
     const result = await undoMatchSubstitution(
       substitutionId, matchId, supabaseUndoMatchSubstitutionGateway(client),
     );
@@ -837,6 +1005,17 @@ export async function deleteEvent(eventId: string, matchId: string, teamId?: str
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
+    const league = await getSelectedLeague();
+    const api = await matchApiFor(client);
+    if (api && league) {
+      const res = await api.deleteEvent(league.id, matchId, eventId);
+      revalidatePath(`/partidas/${matchId}`);
+      if (res.roundId) {
+        revalidatePath(`/rodadas/${res.roundId}`);
+      }
+      revalidatePath("/cartola");
+      return res;
+    }
     const result = await deleteLiveGoal(eventId, matchId, supabaseDeleteGoalGateway(client));
     if (!result.success) return result;
 
@@ -881,10 +1060,66 @@ async function runFinishedGoalCorrection(client: SupabaseClient, input: Finished
   return { success: true as const, warning };
 }
 
+async function refreshFinishedGoalDerivedData(client: SupabaseClient, roundId: string) {
+  try {
+    const stats = await calculateRoundStats(roundId);
+    if (!stats.success) throw new Error(stats.error || "Não foi possível recalcular as estatísticas.");
+    const { data: fantasyRound, error: fantasyRoundError } = await client
+      .from("fantasy_rounds").select("id").eq("round_id", roundId).maybeSingle();
+    if (fantasyRoundError) throw new Error(`Não foi possível localizar a rodada do Cartola: ${fantasyRoundError.message}`);
+    if (fantasyRound) {
+      const { error: fantasyError } = await client.rpc("reprocess_fantasy_from_round", { p_round_id: roundId });
+      if (fantasyError) throw new Error(`O Cartola precisa ser reprocessado: ${fantasyError.message}`);
+    }
+    const overall = await refreshFluidOverallSafely(`correção de gol na rodada ${roundId}`);
+    if (!overall.success) throw new Error(overall.error || "Não foi possível atualizar o Overall.");
+    return undefined;
+  } catch (error) {
+    return error instanceof Error ? error.message : "Reprocessamento pendente.";
+  }
+}
+
+async function refreshDeletedMatchDerivedData(client: SupabaseClient, roundId: string) {
+  const warnings: string[] = [];
+  try {
+    const stats = await calculateRoundStats(roundId);
+    if (!stats.success) warnings.push(stats.error || "Não foi possível recalcular as estatísticas.");
+  } catch (error) {
+    warnings.push(error instanceof Error ? error.message : "Não foi possível recalcular as estatísticas.");
+  }
+  try {
+    const { data: fantasyRound, error: fantasyRoundError } = await client
+      .from("fantasy_rounds").select("id").eq("round_id", roundId).maybeSingle();
+    if (fantasyRoundError) warnings.push("A partida foi apagada, mas não foi possível localizar a rodada do Cartola.");
+    if (fantasyRound) {
+      const { error } = await client.rpc("reprocess_fantasy_from_round", { p_round_id: roundId });
+      if (error) warnings.push(`A partida foi apagada, mas o Cartola precisa ser reprocessado: ${error.message}`);
+    }
+  } catch (error) {
+    warnings.push(error instanceof Error ? error.message : "O Cartola precisa ser reprocessado.");
+  }
+  return warnings.join(" ") || undefined;
+}
+
+function joinWarnings(...warnings: Array<string | undefined>) {
+  return warnings.filter(Boolean).join(" ") || undefined;
+}
+
 export async function correctFinishedGoal(eventId: string, confirmation: string) {
   try {
     const client = await getAdminClient();
     if (!client) return { success: false as const, error: ADMIN_ERROR };
+    const league = await getSelectedLeague();
+    const api = await matchApiFor(client);
+    if (api && league) {
+      const res = await api.correctFinishedGoal(league.id, eventId, confirmation);
+      const derivedWarning = res.roundId ? await refreshFinishedGoalDerivedData(client, res.roundId) : undefined;
+      if (res.matchId) revalidatePath(`/partidas/${res.matchId}`);
+      if (res.roundId) revalidatePath(`/rodadas/${res.roundId}`);
+      revalidatePath("/ranking");
+      revalidatePath("/cartola", "layout");
+      return { ...res, warning: joinWarnings(res.warning, derivedWarning) };
+    }
     return await runFinishedGoalCorrection(client, { kind: "remove", eventId, confirmation });
   } catch (err: any) {
     console.error("Erro ao corrigir gol finalizado:", err);
@@ -896,6 +1131,17 @@ export async function correctFinishedGoalEvent(eventId: string, playerId: string
   try {
     const client = await getAdminClient();
     if (!client) return { success: false as const, error: ADMIN_ERROR };
+    const league = await getSelectedLeague();
+    const api = await matchApiFor(client);
+    if (api && league) {
+      const res = await api.correctFinishedGoalEvent(league.id, eventId, playerId, assistPlayerId, confirmation);
+      const derivedWarning = res.roundId ? await refreshFinishedGoalDerivedData(client, res.roundId) : undefined;
+      if (res.matchId) revalidatePath(`/partidas/${res.matchId}`);
+      if (res.roundId) revalidatePath(`/rodadas/${res.roundId}`);
+      revalidatePath("/ranking");
+      revalidatePath("/cartola", "layout");
+      return { ...res, warning: joinWarnings(res.warning, derivedWarning) };
+    }
     return await runFinishedGoalCorrection(client, {
       kind: "edit", eventId, playerId, assistPlayerId, confirmation,
     });
@@ -915,6 +1161,17 @@ export async function addFinishedGoalEvent(
   try {
     const client = await getAdminClient();
     if (!client) return { success: false as const, error: ADMIN_ERROR };
+    const league = await getSelectedLeague();
+    const api = await matchApiFor(client);
+    if (api && league) {
+      const res = await api.addFinishedGoalEvent(league.id, matchId, teamId, playerId, assistPlayerId, confirmation);
+      const derivedWarning = res.roundId ? await refreshFinishedGoalDerivedData(client, res.roundId) : undefined;
+      if (res.matchId) revalidatePath(`/partidas/${res.matchId}`);
+      if (res.roundId) revalidatePath(`/rodadas/${res.roundId}`);
+      revalidatePath("/ranking");
+      revalidatePath("/cartola", "layout");
+      return { ...res, warning: joinWarnings(res.warning, derivedWarning) };
+    }
     return await runFinishedGoalCorrection(client, {
       kind: "add", matchId, teamId, playerId, assistPlayerId, confirmation,
     });
@@ -924,10 +1181,60 @@ export async function addFinishedGoalEvent(
   }
 }
 
-export async function finishMatch(matchId: string) {
+export async function finishMatch(matchId: string, expectedScore?: { a: number; b: number }) {
   try {
     const client = await getAdminClient();
     if (!client) return { success: false as const, error: ADMIN_ERROR };
+    const league = await getSelectedLeague();
+    const api = await matchApiFor(client);
+    if (api && league) {
+      const res = await measureMatchStep("finish_match", "backend_finish", () =>
+        expectedScore ? api.finishMatch(league.id, matchId, expectedScore) : api.finishMatch(league.id, matchId),
+      );
+      const warnings: string[] = [];
+      const [statsResult, quickStartResult] = await Promise.allSettled([
+        measureMatchStep("finish_match", "recalculate_stats", () => calculateRoundStats(res.roundId)),
+        measureMatchStep("finish_match", "build_quick_start", () =>
+          supabaseFinishMatchGateway(client).buildQuickStart(res.roundId, matchId),
+        ),
+      ]);
+      if (statsResult.status === "rejected") {
+        warnings.push(statsResult.reason instanceof Error ? statsResult.reason.message : "Erro ao recalcular estatísticas.");
+      } else if (!statsResult.value.success) {
+        warnings.push(statsResult.value.error || "Erro ao recalcular estatísticas.");
+      }
+      let quickStart = null;
+      if (quickStartResult.status === "fulfilled") {
+        quickStart = quickStartResult.value;
+      } else {
+        warnings.push(quickStartResult.reason instanceof Error ? quickStartResult.reason.message : "Não foi possível preparar a próxima partida.");
+      }
+      if (!res.alreadyFinished && res.match) {
+        try {
+          after(async () => {
+            try { await sendMatchFinishedNotifications(client, res.match!); }
+            catch (notificationError) { console.error("Erro ao notificar fim de partida:", notificationError); }
+          });
+        } catch {
+          try { await sendMatchFinishedNotifications(client, res.match); }
+          catch (notificationError) { console.error("Erro ao notificar fim de partida:", notificationError); }
+        }
+      }
+      try {
+        after(() => {
+          revalidatePath(`/partidas/${matchId}`);
+          if (res.roundId) revalidatePath(`/rodadas/${res.roundId}`);
+          revalidatePath("/ranking");
+          revalidatePath("/cartola");
+        });
+      } catch {
+        revalidatePath(`/partidas/${matchId}`);
+        if (res.roundId) revalidatePath(`/rodadas/${res.roundId}`);
+        revalidatePath("/ranking");
+        revalidatePath("/cartola");
+      }
+      return { ...res, quickStart, warning: joinWarnings(res.warning, warnings.join(" ") || undefined) };
+    }
     return await finishSelectedMatch(matchId, supabaseFinishMatchGateway(client), {
       revalidate(id, roundId) {
         after(() => {
@@ -959,6 +1266,13 @@ export async function updateMatchTimer(matchId: string, action: "start" | "pause
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
+    const league = await getSelectedLeague();
+    const api = await matchApiFor(client);
+    if (api && league) {
+      const res = await api.updateMatchTimer(league.id, matchId, action);
+      revalidatePath(`/partidas/${matchId}`);
+      return res;
+    }
 
     const match = await getMatchState(client, matchId);
     if (match.status !== "live") return { success: false, error: "A partida nao esta em andamento." };
@@ -1012,6 +1326,13 @@ export async function resetMatchTimer(matchId: string) {
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
+    const league = await getSelectedLeague();
+    const api = await matchApiFor(client);
+    if (api && league) {
+      const res = await api.resetMatchTimer(league.id, matchId);
+      revalidatePath(`/partidas/${matchId}`);
+      return res;
+    }
 
     const match = await getMatchState(client, matchId);
     if (match.status !== "live") return { success: false, error: "A partida nao esta em andamento." };
@@ -1051,6 +1372,13 @@ export async function addMatchExtraTime(matchId: string, extraSeconds: number) {
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: ADMIN_ERROR };
+    const league = await getSelectedLeague();
+    const api = await matchApiFor(client);
+    if (api && league) {
+      const res = await api.addMatchExtraTime(league.id, matchId, extraSeconds);
+      revalidatePath(`/partidas/${matchId}`);
+      return res;
+    }
 
     const match = await getMatchState(client, matchId);
     if (match.status !== "live") return { success: false, error: "A partida não está em andamento." };
@@ -1095,7 +1423,39 @@ export async function notifyMatchTimerThreshold(
 ) {
   const client = await getAdminClient();
   if (!client) return { success: false, error: ADMIN_ERROR };
+  const league = await getSelectedLeague();
+  const api = await matchApiFor(client);
+  if (api && league) {
+    const claim = await api.notifyMatchTimerThreshold(league.id, matchId, threshold);
+    return deliverMatchTimerClaim(client, threshold, claim, () => claim.claimedAt
+      ? api.releaseMatchTimerThreshold(league.id, matchId, threshold, claim.claimedAt)
+      : Promise.resolve());
+  }
   return dispatchMatchTimerThreshold(client, matchId, threshold);
+}
+
+async function deliverMatchTimerClaim(
+  client: SupabaseClient,
+  threshold: "one_minute" | "thirty_seconds" | "finished",
+  claim: MatchTimerNotificationClaim,
+  release: () => Promise<void>,
+) {
+  if (claim.skipped) return { success: true as const, ...claim };
+  if (!claim.match || !claim.claimedAt) {
+    return { success: false as const, error: "O backend não devolveu uma trava válida para o alerta." };
+  }
+  try {
+    const delivery = await sendMatchTimerNotifications(client, claim.match, threshold);
+    if (delivery.disabled || (delivery.sent === 0 && delivery.failed > 0)) {
+      throw new Error(delivery.disabled
+        ? "As chaves VAPID não estão configuradas no servidor."
+        : "Nenhuma notificação pôde ser entregue.");
+    }
+    return { success: true as const, sent: true, secondsLeft: claim.secondsLeft };
+  } catch (error) {
+    try { await release(); } catch (releaseError) { console.error("Erro ao liberar trava do alerta:", releaseError); }
+    return { success: false as const, error: error instanceof Error ? error.message : "Falha ao enviar o alerta." };
+  }
 }
 
 /** Usado pelo webhook do agendador, sem depender de um navegador aberto. */
@@ -1105,6 +1465,22 @@ export async function dispatchMatchTimerThreshold(
   threshold: "one_minute" | "thirty_seconds" | "finished",
 ) {
   try {
+    if (process.env.MATCHES_API_ENABLED === "true") {
+      const backendUrl = process.env.MATCHES_BACKEND_URL || process.env.MATCH_GOAL_BACKEND_URL;
+      const webhookSecret = process.env.MATCH_TIMER_WEBHOOK_SECRET;
+      if (!backendUrl || !webhookSecret) {
+        return { success: false as const, error: "Backend ou segredo do cronômetro não configurado." };
+      }
+      const claim = await dispatchSystemMatchTimerThreshold(backendUrl, webhookSecret, matchId, threshold);
+      return deliverMatchTimerClaim(client, threshold, claim, () => claim.claimedAt
+        ? releaseSystemMatchTimerThreshold(backendUrl, webhookSecret, matchId, threshold, claim.claimedAt)
+        : Promise.resolve());
+    }
+    const league = await getSelectedLeague();
+    const api = await matchApiFor(client);
+    if (api && league) {
+      return await api.dispatchMatchTimerThreshold(league.id, matchId, threshold);
+    }
     const match = await getMatchState(client, matchId);
     if (match.status !== "live" || !match.timer_started_at) {
       return { success: true, skipped: true, reason: "inactive" as const };

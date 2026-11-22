@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { getCurrentAccount, getCurrentAccountIdentity } from "@/lib/auth";
 import styles from "./inicio.module.css";
+import { InstalledAppEntry } from "@/components/InstalledAppEntry";
 
 export const dynamic = "force-dynamic";
 
@@ -68,6 +69,7 @@ export default async function PublicHomePage() {
 
   return (
     <div className={styles.page}>
+      <InstalledAppEntry authenticated={isAuthenticated} />
       <header className={styles.header}>
         <div className={styles.headerInner}>
           <Link href="/inicio" className={styles.brand} aria-label="Pelada BQ — página inicial">

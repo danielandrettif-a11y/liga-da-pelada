@@ -6,8 +6,7 @@ import { ChevronDown, ClipboardList, Football, Target, X } from "@/components/ic
 import { TeamCrest } from "@/components/TeamCrest";
 import { TeamReferenceBadge } from "@/components/TeamReferenceBadge";
 import { formatGoalTime } from "@/lib/goal-time";
-
-const PREVIEW_MATCH_COUNT = 5;
+import { getHomeMatchGoals, getHomeRoundMoreMatches } from "@/lib/actions/dashboard";
 
 type MatchEvent = {
   id: string;
@@ -22,13 +21,34 @@ type MatchEvent = {
   assist_player?: { id: string; name: string; avatar_url?: string | null } | null;
 };
 
-export function HomeLastRoundSummary({ round }: { round: any }) {
+type HomeRoundPreview = NonNullable<Awaited<ReturnType<typeof import("@/lib/actions/dashboard").getHomeLastRound>>>;
+
+export function HomeLastRoundSummary({ round }: { round: HomeRoundPreview }) {
   const [expanded, setExpanded] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<any | null>(null);
+  const [allMatches, setAllMatches] = useState<typeof round.matches | null>(null);
+  const [loadingMatches, setLoadingMatches] = useState(false);
+  const [matchesError, setMatchesError] = useState(false);
 
-  const matches = round.matches || [];
-  const visibleMatches = expanded ? matches : matches.slice(0, PREVIEW_MATCH_COUNT);
-  const remainingMatches = Math.max(0, matches.length - PREVIEW_MATCH_COUNT);
+  const visibleMatches = expanded && allMatches ? allMatches : round.matches;
+  const remainingMatches = Math.max(0, round.totalMatches - round.matches.length);
+
+  async function toggleMatches() {
+    if (expanded || allMatches) {
+      setExpanded(!expanded);
+      return;
+    }
+    setLoadingMatches(true);
+    setMatchesError(false);
+    try {
+      setAllMatches(await getHomeRoundMoreMatches(round.id));
+      setExpanded(true);
+    } catch {
+      setMatchesError(true);
+    } finally {
+      setLoadingMatches(false);
+    }
+  }
 
   useEffect(() => {
     if (!selectedMatch) return;
@@ -51,7 +71,7 @@ export function HomeLastRoundSummary({ round }: { round: any }) {
           <span className="text-xs text-muted">{new Date(`${round.date}T00:00:00`).toLocaleDateString("pt-BR")}</span>
         </Link>
 
-        {matches.length ? (
+        {visibleMatches.length ? (
           <>
             <div className="space-y-1.5">
               {visibleMatches.map((match: any) => (
@@ -69,14 +89,16 @@ export function HomeLastRoundSummary({ round }: { round: any }) {
             {remainingMatches > 0 && (
               <button
                 type="button"
-                onClick={() => setExpanded((current) => !current)}
+                  onClick={toggleMatches}
+                  disabled={loadingMatches}
                 className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface/70 px-3 py-2.5 text-[11px] font-black uppercase tracking-wide text-accent transition-colors hover:bg-surface-hover"
                 aria-expanded={expanded}
               >
-                {expanded ? "Ver menos partidas" : `Ver mais ${remainingMatches} partidas`}
+                  {loadingMatches ? "Carregando partidas…" : expanded ? "Ver menos partidas" : `Ver mais ${remainingMatches} partidas`}
                 <ChevronDown className={`h-4 w-4 transition-transform ${expanded ? "rotate-180" : ""}`} />
               </button>
             )}
+              {matchesError && <p role="alert" className="mt-2 text-xs text-muted">Não foi possível carregar mais partidas. Tente novamente.</p>}
           </>
         ) : (
           <p className="py-2 text-center text-xs text-muted">Sem partidas registradas</p>
@@ -86,6 +108,7 @@ export function HomeLastRoundSummary({ round }: { round: any }) {
       {/* Modal de Detalhes da Partida (Gols e Assistências) */}
       {selectedMatch && (
         <MatchDetailsModal
+          key={selectedMatch.id}
           match={selectedMatch}
           roundNumber={round.number}
           roundId={round.id}
@@ -133,14 +156,18 @@ function MatchDetailsModal({
 }) {
   const teamA = match.teamA || { name: "Time A", color: "#22c55e" };
   const teamB = match.teamB || { name: "Time B", color: "#3b82f6" };
-  const events: MatchEvent[] = match.match_events || [];
+  const [events, setEvents] = useState<MatchEvent[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const matchId: string = match.id;
 
-  const teamAGoals = events.filter(
-    (ev) => ev.team_id === (match.team_a_id || teamA.id) || (ev.player && match.score_a > 0 && ev.team_id === teamA.id)
-  );
-  const teamBGoals = events.filter(
-    (ev) => ev.team_id === (match.team_b_id || teamB.id) || (ev.player && match.score_b > 0 && ev.team_id === teamB.id)
-  );
+  useEffect(() => {
+    let canceled = false;
+    getHomeMatchGoals(roundId, matchId)
+      .then((data) => { if (!canceled) setEvents(data as unknown as MatchEvent[]); })
+      .catch(() => { if (!canceled) setFailed(true); });
+    return () => { canceled = true; };
+  }, [roundId, matchId, attempt]);
 
   return (
     <div
@@ -198,7 +225,13 @@ function MatchDetailsModal({
             <h3 className="text-xs font-black uppercase tracking-wider text-foreground">Gols & Assistências</h3>
           </div>
 
-          {events.length > 0 ? (
+          {failed ? (
+            <button type="button" className="py-3 text-xs text-accent" onClick={() => { setFailed(false); setAttempt(attempt + 1); }}>
+              Tentar carregar os gols novamente
+            </button>
+          ) : events === null ? (
+            <p role="status" className="py-3 text-xs text-muted">Carregando gols e assistências…</p>
+          ) : events.length > 0 ? (
             <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
               {events.map((event) => {
                 const isTeamA = event.team_id === (match.team_a_id || teamA.id);

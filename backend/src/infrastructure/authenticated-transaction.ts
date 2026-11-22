@@ -1,0 +1,44 @@
+import type { Pool, PoolClient } from "pg";
+import type { Actor } from "../shared/actor.js";
+import { requestTiming } from "./request-timing.js";
+
+/**
+ * Executa uma operação PostgreSQL sob os claims verificados pelo Auth local.
+ * A conta do pool precisa poder SET ROLE authenticated, sem ser superusuária.
+ */
+export async function withAuthenticatedTransaction<T>(
+  pool: Pool,
+  actor: Actor,
+  operation: (client: PoolClient) => Promise<T>,
+): Promise<T> {
+  const timing = requestTiming.getStore();
+  const waitStarted = timing ? performance.now() : 0;
+  const client = await pool.connect();
+  const transactionStarted = timing ? performance.now() : 0;
+  if (timing) {
+    timing.poolWaitMs += transactionStarted - waitStarted;
+    timing.transactions++;
+  }
+  let inTransaction = false;
+  let discardConnection = false;
+  try {
+    await client.query("BEGIN");
+    inTransaction = true;
+    await client.query(
+      "SELECT set_config('role', 'authenticated', true), set_config('request.jwt.claim.sub', $1, true), set_config('request.jwt.claim.role', 'authenticated', true), set_config('request.jwt.claims', $2, true), set_config('search_path', 'public, auth', true)",
+      [actor.userId, JSON.stringify({ sub: actor.userId, role: "authenticated" })],
+    );
+    const result = await operation(client);
+    await client.query("COMMIT");
+    inTransaction = false;
+    return result;
+  } catch (error) {
+    if (inTransaction) {
+      try { await client.query("ROLLBACK"); } catch { discardConnection = true; }
+    }
+    throw error;
+  } finally {
+    if (timing) timing.transactionMs += performance.now() - transactionStarted;
+    client.release(discardConnection);
+  }
+}

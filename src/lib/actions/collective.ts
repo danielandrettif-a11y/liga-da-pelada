@@ -5,13 +5,13 @@ import { after } from "next/server";
 import { getCurrentAccount } from "../auth";
 import { sendPushNotificationsToUsers } from "../push-notifications";
 import { createServiceClient } from "../supabase/service";
-import { canUseCollective } from "../collective-access";
 import { getSelectedLeague } from "../league-context";
 import {
   readCollectivePage,
   type CollectivePageCursor,
   type CollectivePageMessage,
 } from "@/modules/collective/infrastructure/supabase-collective-reader";
+import { collectiveApiFor } from "@/modules/collective/infrastructure/collective-api-session";
 
 export type CollectiveSummary = {
   callupId: string;
@@ -41,18 +41,14 @@ async function listCollectiveCandidates() {
   if (!account.user) return { account, callups: [] as any[] };
   const league = await getSelectedLeague();
   if (!league || league.featureTier !== "complete") return { account, callups: [] as any[] };
-  const { data: player } = account.profile?.player_id
-    ? await account.client.from("players").select("member_category").eq("id", account.profile.player_id).maybeSingle()
-    : { data: null };
-  if (!canUseCollective(account.isAdmin, player?.member_category)) return { account, callups: [] as any[] };
-  const { data: callups } = await account.client
-    .from("callups")
-    .select("id, date, created_at, round_id, status, round:round_id(id, number, status, payment_pix, payment_total, round_players(player_id), round_payments(player_id, paid)), team_drafts(id, status)")
-    .eq("status", "converted")
-    .eq("league_id", league.id)
-    .order("date", { ascending: false })
-    .limit(12);
-  return { account, callups: callups || [] };
+  const api = await collectiveApiFor(account.client, "candidates");
+  if (!api) return { account, callups: [] as any[] };
+  try {
+    return { account, callups: await api.getCandidates(league.id) };
+  } catch (error) {
+    console.error("Falha ao carregar conversas da Coletiva:", error);
+    return { account, callups: [] as any[] };
+  }
 }
 
 function isCollectiveOpen(callup: any) {
@@ -87,19 +83,29 @@ function collectiveSummary(callup: any, unreadCount: number): CollectiveSummary 
   };
 }
 
+async function readSelectedCollectivePage(client: Parameters<typeof readCollectivePage>[0], userId: string, callupIds: string[], cursor: CollectivePageCursor | null = null, limit = 60) {
+  const api = await collectiveApiFor(client, "page");
+  const league = api ? await getSelectedLeague() : null;
+  if (!api || !league) return null;
+  return readCollectivePage(client, userId, callupIds, cursor, limit,
+    () => api.getPage(league.id, callupIds, cursor, limit));
+}
+
 export async function getActiveCollectiveSummary(): Promise<CollectiveSummary | null> {
-  const { account, callups } = await listCollectiveCandidates();
+  const account = await getCurrentAccount();
   if (!account.user) return null;
+  const { callups } = await listCollectiveCandidates();
   const visibleCallups = callups.filter(isCollectiveVisible);
   const callup = callups.find(isCollectiveOpen) || visibleCallups[0];
   if (!callup) return null;
-  const page = await readCollectivePage(account.client, account.user.id, visibleCallups.map((item) => item.id), null, 1);
+  const page = await readSelectedCollectivePage(account.client, account.user.id, visibleCallups.map((item) => item.id), null, 1);
   return collectiveSummary(callup, page?.unreadCount || 0);
 }
 
 export async function getCollectiveRoom(callupId?: string): Promise<CollectiveRoomData | null> {
-  const { account, callups } = await listCollectiveCandidates();
+  const account = await getCurrentAccount();
   if (!account.user) return null;
+  const { callups } = await listCollectiveCandidates();
   const visibleCallups = callups.filter(isCollectiveVisible);
   const activeCallup = callupId
     ? visibleCallups.find((callup) => callup.id === callupId)
@@ -107,7 +113,7 @@ export async function getCollectiveRoom(callupId?: string): Promise<CollectiveRo
   if (!activeCallup || !visibleCallups.length) return null;
   const summary = collectiveSummary(activeCallup, 0);
   const callupIds = visibleCallups.map((item) => item.id);
-  const page = await readCollectivePage(account.client, account.user.id, callupIds);
+  const page = await readSelectedCollectivePage(account.client, account.user.id, callupIds);
   if (!page) return null;
   summary.unreadCount = page.unreadCount;
   return {
@@ -127,13 +133,14 @@ export async function getOlderCollectiveMessages(
   callupId: string,
   cursor: CollectivePageCursor,
 ) {
-  const { account, callups } = await listCollectiveCandidates();
+  const account = await getCurrentAccount();
   if (!account.user) return { success: false as const, messages: [], error: "Entre para carregar a conversa." };
+  const { callups } = await listCollectiveCandidates();
   const visibleCallups = callups.filter(isCollectiveVisible);
   if (!visibleCallups.some((callup) => callup.id === callupId)) {
     return { success: false as const, messages: [], error: "Coletiva fora da pelada selecionada." };
   }
-  const page = await readCollectivePage(account.client, account.user.id, visibleCallups.map((item) => item.id), cursor);
+  const page = await readSelectedCollectivePage(account.client, account.user.id, visibleCallups.map((item) => item.id), cursor);
   if (!page) return { success: false as const, messages: [], error: "Não foi possível carregar mensagens anteriores." };
   return {
     success: true as const,
@@ -166,19 +173,21 @@ async function pushCollectiveMessage(callupId: string, senderUserId: string, sen
   }, "/coletiva");
 }
 
+async function cleanupCollectiveMedia(client: any, mediaPath: string | null) {
+  if (!mediaPath) return;
+  const cleanupClient = createServiceClient() || client;
+  const { error } = await cleanupClient.storage.from("collective-media").remove([mediaPath]);
+  if (error) console.error("Falha ao limpar upload rejeitado da Coletiva:", error);
+}
+
 export async function sendCollectiveMessage(formData: FormData) {
   const account = await getCurrentAccount();
   if (!account.user || !account.profile?.player_id) return { success: false, error: "Entre com um jogador vinculado para conversar." };
   const callupId = String(formData.get("callup_id") || "");
-  if (!(await isCallupInSelectedLeague(account.client, callupId))) {
-    return { success: false, error: "Esta Coletiva não pertence à pelada selecionada." };
-  }
-  const body = String(formData.get("body") || "").trim();
   const file = formData.get("media");
+  const body = String(formData.get("body") || "").trim();
   const duration = Math.trunc(Number(formData.get("duration") || 0));
   const replyToMessageId = String(formData.get("reply_to_message_id") || "").trim() || null;
-  const { data: allowed } = await account.client.rpc("can_access_collective_chat", { p_callup_id: callupId });
-  if (!allowed) return { success: false, error: "A Coletiva não está disponível para esta conta." };
   let kind: "text" | "image" | "audio" = "text";
   let mediaPath: string | null = null;
   let mediaMime: string | null = null;
@@ -190,116 +199,102 @@ export async function sendCollectiveMessage(formData: FormData) {
     if (kind === "audio" && (duration < 1 || duration > 60)) return { success: false, error: "O áudio pode ter no máximo 60 segundos." };
     const extension = file.name.split(".").pop()?.replace(/[^a-z0-9]/gi, "").toLowerCase() || (kind === "image" ? "webp" : "webm");
     mediaPath = `${callupId}/${account.user.id}/${crypto.randomUUID()}.${extension}`;
-    const { error: uploadError } = await account.client.storage.from("collective-media").upload(mediaPath, file, { contentType: file.type, upsert: false });
-    if (uploadError) return { success: false, error: uploadError.message };
     mediaMime = file.type;
     mediaSize = file.size;
   }
   if (!body && !mediaPath) return { success: false, error: "Escreva uma mensagem ou anexe uma mídia." };
   if (body.length > 1000) return { success: false, error: "A mensagem pode ter no máximo 1.000 caracteres." };
-  const { data: callup } = await account.client.from("callups").select("round_id").eq("id", callupId).maybeSingle();
-  if (replyToMessageId) {
-    const { data: replied } = await account.client.from("collective_messages").select("id").eq("id", replyToMessageId).eq("callup_id", callupId).maybeSingle();
-    if (!replied) return { success: false, error: "A mensagem respondida não pertence a esta Coletiva." };
+  const collectiveApi = await collectiveApiFor(account.client, "send");
+  const league = await getSelectedLeague();
+  if (!collectiveApi || !league) return { success: false, error: "O serviço da Coletiva está indisponível." };
+  if (mediaPath && file instanceof File) {
+    const { error: uploadError } = await account.client.storage.from("collective-media").upload(mediaPath, file, { contentType: file.type, upsert: false });
+    if (uploadError) return { success: false, error: uploadError.message };
   }
-  const { data: inserted, error } = await account.client.from("collective_messages").insert({
-    callup_id: callupId,
-    round_id: callup?.round_id || null,
-    sender_user_id: account.user.id,
-    sender_player_id: account.profile.player_id,
-    kind,
-    body: body || (kind === "image" ? "Imagem" : "Áudio"),
-    media_path: mediaPath,
-    media_mime: mediaMime,
-    media_size: mediaSize,
-    audio_duration_seconds: kind === "audio" ? duration : null,
-    reply_to_message_id: replyToMessageId,
-  }).select("id").single();
-  if (error) {
-    if (mediaPath) await account.client.storage.from("collective-media").remove([mediaPath]);
-    return { success: false, error: error.message };
+  let res: { success: boolean; messageId?: string; error?: string };
+  try {
+    res = await collectiveApi.sendCollectiveMessage(league.id, {
+      callupId,
+      body: body || (kind === "image" ? "Imagem" : "Áudio"),
+      kind,
+      mediaPath,
+      mediaMime,
+      mediaSize,
+      duration: kind === "audio" ? duration : null,
+      replyToMessageId,
+    });
+  } catch (error) {
+    await cleanupCollectiveMedia(account.client, mediaPath);
+    console.error("Falha na API da Coletiva:", error);
+    return { success: false, error: "O serviço da Coletiva está indisponível." };
   }
-  revalidatePath("/coletiva");
-  revalidatePath("/convocacao");
-  if (inserted?.id) {
+  if (!res.success) await cleanupCollectiveMedia(account.client, mediaPath);
+  if (res.success) {
+    revalidatePath("/coletiva");
+    revalidatePath("/convocacao");
+  }
+  if (res.success && res.messageId) {
     const fallbackSenderName = String(account.user.user_metadata?.name || account.user.user_metadata?.full_name || "Jogador");
     after(async () => { try { await pushCollectiveMessage(callupId, account.user!.id, account.profile!.player_id!, fallbackSenderName, kind, body); } catch (pushError) { console.error("Falha no push da Coletiva:", pushError); } });
   }
-  return { success: true };
+  return res.success ? { success: true } : res;
 }
 
 export async function editCollectiveMessage(messageId: string, body: string) {
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Entre para editar." };
-  const clean = body.trim();
-  if (!clean || clean.length > 1000) return { success: false, error: "Use entre 1 e 1.000 caracteres." };
-  if (!(await isMessageInSelectedLeague(account.client, messageId))) {
-    return { success: false, error: "Mensagem fora da pelada selecionada." };
+  const collectiveApi = await collectiveApiFor(account.client, "edit");
+  const league = await getSelectedLeague();
+  if (!collectiveApi || !league) return { success: false, error: "O serviço da Coletiva está indisponível." };
+  let res;
+  try {
+    res = await collectiveApi.editCollectiveMessage(league.id, messageId, body);
+  } catch {
+    return { success: false, error: "O serviço da Coletiva está indisponível." };
   }
-  const { error } = await account.client.from("collective_messages").update({ body: clean, edited_at: new Date().toISOString() }).eq("id", messageId).eq("sender_user_id", account.user.id).eq("kind", "text").is("deleted_at", null);
-  if (error) return { success: false, error: error.message };
-  revalidatePath("/coletiva");
-  return { success: true };
+  if (res.success) revalidatePath("/coletiva");
+  return res;
 }
 
 export async function deleteCollectiveMessage(messageId: string) {
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Entre para apagar." };
-  if (!(await isMessageInSelectedLeague(account.client, messageId))) {
-    return { success: false, error: "Mensagem fora da pelada selecionada." };
+  const collectiveApi = await collectiveApiFor(account.client, "delete");
+  const league = await getSelectedLeague();
+  if (!collectiveApi || !league) return { success: false, error: "O serviço da Coletiva está indisponível." };
+  let res;
+  try {
+    res = await collectiveApi.deleteCollectiveMessage(league.id, messageId);
+  } catch {
+    return { success: false, error: "O serviço da Coletiva está indisponível." };
   }
-  let query = account.client.from("collective_messages").update({ body: "Mensagem removida", deleted_at: new Date().toISOString() }).eq("id", messageId);
-  if ((await getSelectedLeague())?.role !== "admin") query = query.eq("sender_user_id", account.user.id);
-  const { error } = await query;
-  if (error) return { success: false, error: error.message };
-  revalidatePath("/coletiva");
-  return { success: true };
+  if (res.success) revalidatePath("/coletiva");
+  return res;
 }
 
 export async function markCollectiveRead(readTargets: Array<{ callupId: string; messageId: string }>) {
   const account = await getCurrentAccount();
   if (!account.user || !readTargets.length) return { success: false };
+  const collectiveApi = await collectiveApiFor(account.client, "read");
   const league = await getSelectedLeague();
-  if (!league) return { success: false };
-  const callupIds = [...new Set(readTargets.map((target) => target.callupId))];
-  const { data: selectedCallups } = await account.client.from("callups")
-    .select("id").eq("league_id", league.id).in("id", callupIds);
-  const allowedCallupIds = new Set((selectedCallups || []).map((callup) => callup.id));
-  const targetByMessageId = new Map(readTargets.map((target) => [target.messageId, target.callupId]));
-  const { data: messages } = await account.client.from("collective_messages").select("id, callup_id, created_at").in("id", [...targetByMessageId.keys()]);
-  const reads = (messages || [])
-    .filter((message: any) => allowedCallupIds.has(message.callup_id) && targetByMessageId.get(message.id) === message.callup_id)
-    .map((message: any) => ({ callup_id: message.callup_id, user_id: account.user!.id, read_at: message.created_at, last_read_message_id: message.id }));
-  if (!reads.length) return { success: false };
-  const { error } = await account.client.from("collective_reads").upsert(reads, { onConflict: "callup_id,user_id" });
-  return { success: !error };
+  if (!collectiveApi || !league) return { success: false };
+  try {
+    return await collectiveApi.markCollectiveRead(league.id, readTargets);
+  } catch {
+    return { success: false };
+  }
 }
 
 export async function getAdminPreviousCollective(): Promise<CollectiveRoomData | null> {
   const account = await getCurrentAccount();
   const league = await getSelectedLeague();
   if (!account.isAdmin || !league || league.role !== "admin") return null;
-  const { data } = await account.client
-    .from("callups")
-    .select("id, date, round:round_id!inner(id, status)")
-    .eq("round.status", "finished")
-    .eq("league_id", league.id)
-    .order("date", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  return data?.id ? getCollectiveRoom(data.id) : null;
-}
-
-async function isCallupInSelectedLeague(client: any, callupId: string) {
-  const league = await getSelectedLeague();
-  if (!league || league.featureTier !== "complete") return false;
-  const { data } = await client.from("callups").select("id")
-    .eq("id", callupId).eq("league_id", league.id).maybeSingle();
-  return Boolean(data);
-}
-
-async function isMessageInSelectedLeague(client: any, messageId: string) {
-  const { data } = await client.from("collective_messages")
-    .select("callup_id").eq("id", messageId).maybeSingle();
-  return Boolean(data?.callup_id && await isCallupInSelectedLeague(client, data.callup_id));
+  const collectiveApi = await collectiveApiFor(account.client, "previous-id");
+  if (!collectiveApi) return null;
+  try {
+    const { callupId } = await collectiveApi.getPreviousCallupId(league.id);
+    return callupId ? getCollectiveRoom(callupId) : null;
+  } catch {
+    return null;
+  }
 }

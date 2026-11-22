@@ -3,7 +3,10 @@ import type { CallupOpeningGateway } from "../application/open-callup";
 
 type AccountClient = Awaited<ReturnType<typeof getCurrentAccount>>["client"];
 
-export function supabaseCallupOpeningGateway(client: AccountClient): CallupOpeningGateway {
+export function supabaseCallupOpeningGateway(
+  client: AccountClient,
+  rules?: { refereeEnabled: boolean; goalsToFinish: number | null },
+): CallupOpeningGateway {
   return {
     async existsOnDate(leagueId, date) {
       const { data, error } = await client.from("callups").select("id")
@@ -32,7 +35,8 @@ export function supabaseCallupOpeningGateway(client: AccountClient): CallupOpeni
       return data ? { name: data.name, mapUrl: data.google_maps_url } : null;
     },
     async insert(record) {
-      const { data, error } = await client.rpc("create_league_callup", {
+      const hasRules = rules && (rules.refereeEnabled || rules.goalsToFinish !== null);
+      const { data, error } = await client.rpc(hasRules ? "create_league_callup_with_rules" : "create_league_callup", {
         p_league_id: record.leagueId,
         p_date: record.date,
         p_start_time: record.startTime,
@@ -43,6 +47,10 @@ export function supabaseCallupOpeningGateway(client: AccountClient): CallupOpeni
         p_capacity: record.capacity,
         p_players_per_team: record.playersPerTeam,
         p_teams_per_round: record.teamsPerRound,
+        ...(hasRules ? {
+          p_goals_to_finish: rules.goalsToFinish,
+          p_referee_enabled: rules.refereeEnabled,
+        } : {}),
       });
       if (error?.code === "23505") return { status: "duplicate" };
       if (error) return { status: "failed", error: error.message };

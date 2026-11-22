@@ -25,7 +25,14 @@ import {
   readPlayerRoundHistoryRows,
   readSeasonPlayerTotals,
 } from "@/modules/statistics/infrastructure/supabase-statistics-reader";
+import { rosterApiFor } from "@/modules/roster/infrastructure/roster-api-session";
+import type {
+  PlayerClubGoals,
+  PlayerPlaytime,
+} from "@/modules/roster/domain/player-profile-performance";
 import { canAdminAssignOfficialCategory } from "../player-member-category";
+
+export type { PlayerClubGoals, PlayerPlaytime } from "@/modules/roster/domain/player-profile-performance";
 
 const AVATAR_BUCKET = "player-avatars";
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
@@ -115,7 +122,16 @@ async function playerBelongsToSelectedLeague(playerId: string, client: Awaited<R
 export async function getPlayers(selectableOnly = false) {
   const league = await getSelectedLeague();
   if (!league) return [];
-  const client = await createServerClient();
+  const account = await getCurrentAccount();
+  if (account.user) {
+    try {
+      const api = await rosterApiFor(account.client);
+      if (api) return await api.getPlayers(league.id, selectableOnly);
+    } catch {
+      return [];
+    }
+  }
+  const client = account.client;
   const { data, error } = await client
     .from("league_members")
     .select("player_profile, initial_player_profile, overall_traits, overall_seed_mode, players(*)")
@@ -140,7 +156,16 @@ export async function getPlayers(selectableOnly = false) {
 export async function getSelectableLeaguePlayers(leagueId: string) {
   const league = await getSelectedLeague();
   if (!league || league.id !== leagueId) return [] as Player[];
-  const client = await createServerClient();
+  const account = await getCurrentAccount();
+  if (account.user) {
+    try {
+      const api = await rosterApiFor(account.client);
+      if (api) return await api.getPlayers(leagueId, true);
+    } catch {
+      return [] as Player[];
+    }
+  }
+  const client = account.client;
   const { data, error } = await client
     .from("league_members")
     .select("player_profile, initial_player_profile, overall_traits, overall_seed_mode, players(*)")
@@ -165,7 +190,16 @@ export async function getSelectableLeaguePlayers(leagueId: string) {
 export async function getPlayer(id: string) {
   const league = await getSelectedLeague();
   if (!league) return null;
-  const client = await createServerClient();
+  const account = await getCurrentAccount();
+  if (account.user) {
+    try {
+      const api = await rosterApiFor(account.client);
+      if (api) return await api.getPlayer(league.id, id);
+    } catch {
+      return null;
+    }
+  }
+  const client = account.client;
   const { data: membership } = await client.from("league_members")
     .select("player_id, player_profile, initial_player_profile, overall_traits, overall_seed_mode")
     .eq("league_id", league.id).eq("player_id", id).eq("is_active", true).maybeSingle();
@@ -207,6 +241,17 @@ const getPlayersForStatsCached = cache(async (selectableOnly: boolean) => {
 });
 
 export async function getPlayersWithStats(roundType: RoundType = "official", selectableOnly = false) {
+  const league = await getSelectedLeague();
+  if (!league) return [];
+  const account = await getCurrentAccount();
+  if (account.user) {
+    try {
+      const api = await rosterApiFor(account.client);
+      if (api) return await api.getPlayersWithStats(league.id, roundType, selectableOnly);
+    } catch {
+      return [];
+    }
+  }
   const season = await getActiveSeason();
   const client = await createServerClient();
 
@@ -309,9 +354,20 @@ export async function getPlayersWithStats(roundType: RoundType = "official", sel
 }
 
 export async function getPlayerRoundHistory(playerId: string, roundType: RoundType = "official") {
-  const roundIds = await getActiveSeasonRoundIds(undefined, roundType);
+  const league = await getSelectedLeague();
+  if (!league) return [];
+  const account = await getCurrentAccount();
+  if (account.user) {
+    try {
+      const api = await rosterApiFor(account.client);
+      if (api) return await api.getPlayerRoundHistory(league.id, playerId, roundType);
+    } catch {
+      return [];
+    }
+  }
+  const roundIds = await getActiveSeasonRoundIds(league.id, roundType);
   if (roundIds.length === 0) return [];
-  const client = await createServerClient();
+  const client = account.client;
   const { data, error } = await readPlayerRoundHistoryRows(client, playerId, roundIds);
 
   if (error) {
@@ -354,10 +410,19 @@ export async function getPlayerRoundHistory(playerId: string, roundType: RoundTy
   });
 }
 
-export async function getPlayerPlaytime(playerId: string) {
+export async function getPlayerPlaytime(playerId: string): Promise<PlayerPlaytime> {
   const league = await getSelectedLeague();
   if (!league) return { totalSeconds: 0, officialSeconds: 0, friendlySeconds: 0 };
-  const client = await createServerClient();
+  const account = await getCurrentAccount();
+  if (account.user) {
+    try {
+      const api = await rosterApiFor(account.client);
+      if (api) return await api.getPlayerPlaytime(league.id, playerId);
+    } catch {
+      return { totalSeconds: 0, officialSeconds: 0, friendlySeconds: 0 };
+    }
+  }
+  const client = account.client;
   const { data, error } = await client
     .from("match_players")
     .select("entered_elapsed_seconds, left_elapsed_seconds, matches!inner(started_at, finished_at, timer_started_at, timer_accumulated_seconds, rounds!inner(round_type, league_id))")
@@ -385,20 +450,19 @@ export async function getPlayerPlaytime(playerId: string) {
   return totals;
 }
 
-export type PlayerClubGoals = {
-  key: string;
-  name: string;
-  color: string;
-  crestUrl: string | null;
-  officialGoals: number;
-  friendlyGoals: number;
-  totalGoals: number;
-};
-
 export async function getPlayerGoalsByClub(playerId: string): Promise<PlayerClubGoals[]> {
   const league = await getSelectedLeague();
   if (!league) return [];
-  const client = await createServerClient();
+  const account = await getCurrentAccount();
+  if (account.user) {
+    try {
+      const api = await rosterApiFor(account.client);
+      if (api) return await api.getPlayerGoalsByClub(league.id, playerId);
+    } catch {
+      return [];
+    }
+  }
+  const client = account.client;
   const { data, error } = await client
     .from("match_events")
     .select(`
@@ -444,7 +508,16 @@ export async function getPlayerGoalsByClub(playerId: string): Promise<PlayerClub
 export async function getPlayerAwardSeasons(playerId: string) {
   const league = await getSelectedLeague();
   if (!league) return [];
-  const client = await createServerClient();
+  const account = await getCurrentAccount();
+  if (account.user) {
+    try {
+      const api = await rosterApiFor(account.client);
+      if (api) return await api.getPlayerAwardSeasons(league.id, playerId);
+    } catch {
+      return [];
+    }
+  }
+  const client = account.client;
   const [seasonsResult, roundsResult] = await Promise.all([
     client.from("seasons").select("id, number, status").eq("league_id", league.id),
     client
@@ -500,7 +573,16 @@ export async function getPlayerAwardSeasons(playerId: string) {
 export async function getPlayerMonthlyAwards(playerId: string) {
   const league = await getSelectedLeague();
   if (!league) return [];
-  const client = await createServerClient();
+  const account = await getCurrentAccount();
+  if (account.user) {
+    try {
+      const api = await rosterApiFor(account.client);
+      if (api) return await api.getPlayerMonthlyAwards(league.id, playerId);
+    } catch {
+      return [];
+    }
+  }
+  const client = account.client;
   const { data, error } = await client.rpc("get_monthly_awards_for_player_in_league", {
     p_league_id: league.id,
     p_player_id: playerId,
@@ -517,7 +599,16 @@ export async function getPlayerAchievementBelts(playerId: string): Promise<Playe
   const season = await getActiveSeason();
   if (!season) return [];
 
-  const client = await createServerClient();
+  const account = await getCurrentAccount();
+  if (account.user) {
+    try {
+      const api = await rosterApiFor(account.client);
+      if (api) return await api.getPlayerAchievementBelts(season.league_id, playerId);
+    } catch {
+      return [];
+    }
+  }
+  const client = account.client;
   const { data, error } = await client.rpc("get_player_achievement_belts", {
     p_player_id: playerId,
     p_league_id: season.league_id,
@@ -537,7 +628,16 @@ export async function getPreviousMonthAwardWinners() {
   const periodStart = previousMonthStart();
   const league = await getSelectedLeague();
   if (!league) return { periodStart, winners: [] };
-  const client = await createServerClient();
+  const account = await getCurrentAccount();
+  if (account.user) {
+    try {
+      const api = await rosterApiFor(account.client);
+      if (api) return { periodStart, winners: await api.getMonthlyAwardWinners(league.id, periodStart) };
+    } catch {
+      return { periodStart, winners: [] };
+    }
+  }
+  const client = account.client;
   const { data, error } = await client.rpc("get_monthly_award_winners_for_league", {
     p_league_id: league.id,
     p_period_start: periodStart,
@@ -560,6 +660,17 @@ export async function createPlayer(input: CreatePlayerInput) {
   const client = account.client;
   if (!input.member_category || input.member_category === "player") {
     return { success: false, error: "Jogadores oficiais precisam criar o próprio perfil ao entrar no app." };
+  }
+
+  try {
+    const api = await rosterApiFor(account.client);
+    if (api) {
+      const data = await api.createPlayer(league.id, input);
+      revalidatePlayerPaths(data.id);
+      return { success: true, data };
+    }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível criar o jogador." };
   }
 
   const { data, error } = await client
@@ -614,6 +725,16 @@ export async function updatePlayer(id: string, input: Partial<CreatePlayerInput>
     return { success: false, error: "Somente administradores desta pelada podem editar jogadores." };
   }
   const client = account.client;
+  try {
+    const api = await rosterApiFor(client);
+    if (api) {
+      const data = await api.updatePlayer(league.id, id, input);
+      revalidatePlayerPaths(id);
+      return { success: true, data };
+    }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível editar o jogador." };
+  }
   if (!(await playerBelongsToSelectedLeague(id, client))) {
     return { success: false, error: "Jogador não pertence à pelada selecionada." };
   }
@@ -666,6 +787,19 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
   }
   if (!playerId && !isLeagueAdmin) {
     return { success: false, error: "Somente administradores podem criar jogadores." };
+  }
+  if (!selectedLeague) {
+    return { success: false, error: "Selecione uma pelada antes de salvar o jogador." };
+  }
+  try {
+    const api = await rosterApiFor(account.client);
+    if (api) {
+      const id = await api.savePlayer(selectedLeague.id, playerId, formData);
+      revalidatePlayerPaths(id);
+      return { success: true, data: { id } };
+    }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível salvar o jogador." };
   }
   const client = account.client;
   if (playerId && !(await playerBelongsToSelectedLeague(playerId, client))) {
@@ -906,6 +1040,18 @@ export async function swapPlayerAvatars(playerId: string) {
   if (!account.isAdmin && !ownsPlayer) {
     return { success: false, error: "Você só pode trocar a foto do seu próprio perfil." };
   }
+  const selectedLeague = await getSelectedLeague();
+  if (!selectedLeague) return { success: false, error: "Selecione uma pelada antes de trocar a foto." };
+  try {
+    const api = await rosterApiFor(account.client);
+    if (api) {
+      await api.swapPlayerAvatars(selectedLeague.id, playerId);
+      revalidatePlayerPaths(playerId);
+      return { success: true };
+    }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível alternar as fotos." };
+  }
   if (!(await playerBelongsToSelectedLeague(playerId, account.client))) {
     return { success: false, error: "Jogador não pertence à pelada selecionada." };
   }
@@ -937,6 +1083,18 @@ export async function swapPlayerAvatars(playerId: string) {
 }
 
 export async function getRosterGroups(roundType: RoundType = "official") {
+  const league = await getSelectedLeague();
+  if (league) {
+    const account = await getCurrentAccount();
+    if (account.user) {
+      try {
+        const api = await rosterApiFor(account.client);
+        if (api) return await api.getRosterGroups(league.id, roundType);
+      } catch {
+        return { officialPlayers: [], activeGuests: [], wags: [], supporters: [] };
+      }
+    }
+  }
   const [players, overallByPlayer] = await Promise.all([
     getPlayersWithStats(roundType),
     roundType === "official" ? getLatestPlayerCardOverallMap() : Promise.resolve(new Map()),
@@ -955,6 +1113,21 @@ export async function getRosterGroups(roundType: RoundType = "official") {
 }
 
 export async function deletePlayer(id: string) {
+  const account = await getCurrentAccount();
+  const league = await getSelectedLeague();
+  if (!account.user || !league || league.role !== "admin") {
+    return { success: false, error: "Somente administradores podem excluir jogadores." };
+  }
+  try {
+    const api = await rosterApiFor(account.client);
+    if (api) {
+      await api.deletePlayer(league.id, id);
+      revalidatePlayerPaths(id);
+      return { success: true };
+    }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível excluir o jogador." };
+  }
   const client = await getAdminClient();
   if (!client) return { success: false, error: "Somente administradores podem excluir jogadores." };
   if (!(await playerBelongsToSelectedLeague(id, client))) {

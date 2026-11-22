@@ -7,7 +7,6 @@ import {
   ArrowUp,
   CalendarDays,
   Crown,
-  Medal,
   Share2,
   Sparkles,
   Target,
@@ -138,7 +137,6 @@ function podiumStyle(position: number) {
     return {
       ring: "border-[#f5cf52] shadow-[0_0_24px_rgba(245,207,82,.28)]",
       base: "from-[#866714]/80 via-[#4f3c08]/70 to-[#211a05]/80 border-[#d5ad38]/50",
-      medal: "from-[#fff0a8] via-[#e0b83d] to-[#9d7217] text-[#3b2b07]",
       label: "text-[#f5d45e]",
     };
   }
@@ -146,14 +144,12 @@ function podiumStyle(position: number) {
     return {
       ring: "border-slate-300 shadow-[0_0_20px_rgba(203,213,225,.18)]",
       base: "from-slate-400/40 via-slate-600/25 to-slate-900/40 border-slate-300/30",
-      medal: "from-white via-slate-300 to-slate-500 text-slate-800",
       label: "text-slate-300",
     };
   }
   return {
     ring: "border-[#c47a43] shadow-[0_0_20px_rgba(196,122,67,.18)]",
     base: "from-[#9b542a]/45 via-[#5b2c17]/35 to-[#271109]/60 border-[#b86d3b]/40",
-    medal: "from-[#efbc91] via-[#b96d39] to-[#713619] text-[#32160a]",
     label: "text-[#d98a50]",
   };
 }
@@ -368,66 +364,49 @@ export function RankingExperience({ data, currentPlayerId, initialView = "season
       )}
 
       {showPodium && (
-        <section className="pt-7">
-          <div className="flex items-end justify-center gap-2 sm:gap-4">
+        <section aria-label="Pódio do ranking" className="mx-auto grid w-full max-w-[368px] grid-cols-3 items-end gap-2 pt-7 sm:gap-3">
             {podiumOrder.map((entry, visualIndex) => {
               const position = visualIndex === 0 ? 2 : visualIndex === 1 ? 1 : 3;
               const style = podiumStyle(position);
-              const height = position === 1 ? "h-48" : position === 2 ? "h-40" : "h-36";
-              const above = position > 1 ? ranking[position - 2] : null;
-              const gap = metricGap(above, entry, filter);
+              const height = position === 1 ? "h-20" : position === 2 ? "h-[3.5rem]" : "h-10";
               return (
                 <button
                   key={entry.player.id}
                   type="button"
                   onClick={() => setSelected({ entry, position })}
-                  className={`relative isolate flex w-1/3 max-w-[112px] flex-col items-center rounded-t-2xl transition-transform hover:-translate-y-1 focus:outline-none animate-slide-in-bottom stagger-${position}`}
+                  className="flex w-full min-w-0 flex-col items-center gap-2 rounded-xl text-center focus-visible:outline-2 focus-visible:outline-accent"
                   aria-label={`Abrir carta de ${entry.player.name}, ${position}º lugar`}
                 >
-                  {position === 1 && (
-                    <Crown className="absolute z-40 -top-8 h-8 w-8 rotate-[-7deg] text-[#f5d45e] drop-shadow-lg" fill="currentColor" />
-                  )}
-                  <div className="relative z-10">
+                  <div className="relative mx-auto mb-1">
+                    {position === 1 && (
+                      <Crown className="absolute z-40 -top-8 left-1/2 h-8 w-8 -translate-x-1/2 rotate-[-7deg] text-[#f5d45e] drop-shadow-lg" fill="currentColor" />
+                    )}
                     <PlayerAvatar
                       name={entry.player.name}
                       avatarUrl={entry.player.avatar_url}
+                      clickable={false}
                       frameKey={entry.cosmetics?.frameKey}
                       auraKey={entry.cosmetics?.auraKey}
                       className={`h-16 w-16 rounded-full border-[3px] bg-background text-sm font-black text-muted ${style.ring}`}
                     />
-                    <span className={`pointer-events-none absolute -bottom-2 left-1/2 z-50 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full bg-gradient-to-br ${style.medal} shadow-lg`}>
-                      {position === 1 ? <Crown className="h-4 w-4" fill="currentColor" /> : <Medal className="h-4 w-4" fill="currentColor" />}
-                    </span>
-                    {view === "season" && entry.positionChange !== null && (
-                      <span className={`pointer-events-none absolute -right-3 top-0 z-[60] inline-flex min-w-6 items-center justify-center rounded-full border border-background bg-surface px-1 py-0.5 text-[8px] font-black ${entry.positionChange > 0 ? "text-success" : entry.positionChange < 0 ? "text-danger" : "text-muted"}`}>
-                        {entry.positionChange > 0 ? <ArrowUp className="h-2.5 w-2.5" /> : entry.positionChange < 0 ? <ArrowDown className="h-2.5 w-2.5" /> : "—"}
-                        {entry.positionChange !== 0 ? Math.abs(entry.positionChange) : ""}
-                      </span>
-                    )}
                   </div>
-                  <div className="mb-2 mt-4 w-full px-1 text-center">
+                  <div className="flex h-10 w-full min-w-0 items-center justify-center overflow-hidden">
                     {entry.cosmetics?.nameplateKey ? (
                       <CosmeticNameplate assetKey={entry.cosmetics.nameplateKey} playerName={entry.player.name} titleName={entry.cosmetics.titleName} compact className="ranking-podium-nameplate" />
                     ) : (
-                      <p className="truncate text-xs font-black text-foreground">{entry.player.name}</p>
+                      <p className="line-clamp-2 w-full break-words px-1 text-xs font-black leading-tight text-foreground">{entry.player.name}</p>
                     )}
-                    <p className="mt-1 truncate text-[8px] font-bold text-muted">
-                      {entry.wins}V · {entry.draws}E · {entry.losses}D · {entry.goals}G · {entry.assists}A
-                    </p>
-                    <CombatBeltBadges belts={entry.achievementBelts} compact centered />
-                    <p className={`mt-0.5 text-xs font-black ${style.label}`}>{metricDisplay(entry, filter)} <span className="text-[8px] uppercase opacity-70">{FILTER_LABELS[filter]}</span></p>
                   </div>
-                  <div className={`flex w-full flex-col items-center rounded-t-2xl border-x border-t bg-gradient-to-b px-1 pt-3 ${height} ${style.base}`}>
-                    <span className="font-athletic text-3xl font-black text-white/45">{position}</span>
-                    {awardsTotal(entry) > 0 && <AwardBadges entry={entry} compact />}
-                    {above && gap != null && (
-                      <span className="mt-auto block px-1 pb-2 text-[8px] font-black text-white/55">Faltam {gap} para subir</span>
-                    )}
+                  <p className={`w-full min-w-0 truncate px-0.5 text-xs font-black leading-4 ${style.label}`}>
+                    {metricDisplay(entry, filter)}
+                    <span className="block truncate text-[8px] font-bold uppercase leading-3 opacity-75">{FILTER_LABELS[filter]}</span>
+                  </p>
+                  <div aria-hidden="true" className={`flex w-full items-start justify-center rounded-t-xl border-x border-t bg-gradient-to-b pt-1 ${height} ${style.base}`}>
+                    <span className={`font-athletic text-2xl font-black ${style.label}`}>{position}</span>
                   </div>
                 </button>
               );
             })}
-          </div>
         </section>
       )}
 
@@ -529,7 +508,7 @@ export function RankingExperience({ data, currentPlayerId, initialView = "season
 
       {selected && (
         <RankingPlayerCardModal
-          entry={selected.entry}
+          entry={sourceEntries.find((entry) => entry.player.id === selected.entry.player.id) ?? selected.entry}
           position={selected.position}
           scoringMode={filter === "legacy" ? "legacy" : "official"}
           onClose={() => setSelected(null)}

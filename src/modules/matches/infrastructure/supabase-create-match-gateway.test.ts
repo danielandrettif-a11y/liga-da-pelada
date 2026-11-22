@@ -57,6 +57,17 @@ describe("gateway de abertura de partida", () => {
     await expect(gateway.create(command)).rejects.toThrow("Atualização 347 do banco pendente");
   });
 
+  it("envia a escolha de juiz com a mesma intenção de criação da partida", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: { match_id: "match-1" }, error: null });
+    const gateway = supabaseCreateMatchGateway({ rpc } as unknown as Parameters<typeof supabaseCreateMatchGateway>[0]);
+    await gateway.create({ ...command, refereeChoice: "none" });
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("create_live_match_with_referee", expect.objectContaining({
+      p_referee_choice: "none",
+      p_idempotency_key: command.idempotencyKey,
+      p_lineup: command.lineup,
+    }));
+  });
+
   it("rejeita resposta sem recibo", async () => {
     const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
     const gateway = supabaseCreateMatchGateway({ rpc } as unknown as Parameters<typeof supabaseCreateMatchGateway>[0]);

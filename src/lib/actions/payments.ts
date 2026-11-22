@@ -6,6 +6,7 @@ import { areRoundParticipantsPaid } from "../paymentStatus";
 import { createClient as createServerClient } from "../supabase/server";
 import { getActiveSeason } from "./seasons";
 import { getActiveLeague } from "./rounds";
+import { getFinanceApiSession } from "@/modules/finance/infrastructure/finance-api-session";
 import {
   changeExpenseItemStatus,
   changePaidInstallments,
@@ -32,6 +33,7 @@ import {
 } from "@/modules/payments/infrastructure/supabase-payment-reader";
 import type {
   ExpenseItem,
+  AppFeeConfig,
   ExpenseItemInput,
   PaymentAuditLogEntry,
   PaymentChargeLine,
@@ -45,6 +47,7 @@ import type {
 } from "@/modules/payments/domain/payment";
 
 export type {
+  AppFeeConfig,
   ExpenseItem,
   PaymentAuditLogEntry,
   PaymentChargeLine,
@@ -54,6 +57,35 @@ export type {
   PaymentRound,
   RoundExpenseSelection,
 } from "@/modules/payments/domain/payment";
+
+export async function getAppFeeConfig(): Promise<AppFeeConfig> {
+  const account = await getCurrentAccount();
+  if (!account.user) return { amountPerPlayer: 0, recipientId: null };
+  const league = await getActiveLeague();
+  const { data } = await account.client.from("leagues")
+    .select("app_fee_per_player, app_fee_recipient_id").eq("id", league.id).maybeSingle();
+  return {
+    amountPerPlayer: Number(data?.app_fee_per_player || 0),
+    recipientId: data?.app_fee_recipient_id || null,
+  };
+}
+
+export async function saveAppFeeConfig(amountPerPlayer: number) {
+  const client = await getAdminClient();
+  if (!client) return { success: false as const, error: "Somente administradores podem configurar o custo do app." };
+  const amount = Number(amountPerPlayer);
+  if (!Number.isFinite(amount) || amount < 0) return { success: false as const, error: "Informe um valor válido por jogador." };
+  const league = await getActiveLeague();
+  const { error } = await client.rpc("set_league_app_fee", {
+    p_league_id: league.id,
+    p_amount_per_player: Math.round(amount * 100) / 100,
+    p_recipient_id: null,
+  });
+  if (error) return { success: false as const, error: error.message };
+  revalidateExpenseManagement();
+  revalidatePaymentManagement();
+  return { success: true as const };
+}
 
 function revalidateExpenseManagement() {
   revalidatePath("/mais/caixinha");
@@ -74,6 +106,11 @@ function revalidateFullPaymentFlow() {
 }
 
 export async function getExpenseItems(includeArchived = false): Promise<ExpenseItem[]> {
+  const session = await getFinanceApiSession();
+  if (session) {
+    const league = await getActiveLeague();
+    return session.gateway.getExpenseItems(league.id, includeArchived);
+  }
   const account = await getCurrentAccount();
   if (!account.user) return [];
   const league = await getActiveLeague();
@@ -81,6 +118,13 @@ export async function getExpenseItems(includeArchived = false): Promise<ExpenseI
 }
 
 export async function saveExpenseItem(input: ExpenseItemInput) {
+  const session = await getFinanceApiSession();
+  if (session) {
+    const league = await getActiveLeague();
+    const result = await session.gateway.saveExpenseItem(league.id, input);
+    if (result.success) revalidateExpenseManagement();
+    return result;
+  }
   const client = await getAdminClient();
   if (!client) return { success: false as const, error: "Somente administradores podem cadastrar itens." };
   const [league, account] = await Promise.all([getActiveLeague(), getCurrentAccount()]);
@@ -91,6 +135,13 @@ export async function saveExpenseItem(input: ExpenseItemInput) {
 }
 
 export async function setExpenseItemStatus(id: string, status: "active" | "archived") {
+  const session = await getFinanceApiSession();
+  if (session) {
+    const league = await getActiveLeague();
+    const result = await session.gateway.setExpenseItemStatus(league.id, id, status);
+    if (result.success) revalidateExpenseManagement();
+    return result;
+  }
   const client = await getAdminClient();
   if (!client) return { success: false as const, error: "Acesso negado." };
   const league = await getActiveLeague();
@@ -100,6 +151,16 @@ export async function setExpenseItemStatus(id: string, status: "active" | "archi
 }
 
 export async function setExpenseItemPaidInstallments(id: string, paidInstallments: number) {
+  const session = await getFinanceApiSession();
+  if (session) {
+    const league = await getActiveLeague();
+    const result = await session.gateway.setExpenseItemPaidInstallments(league.id, id, paidInstallments);
+    if (result.success) {
+      revalidatePath("/mais/caixinha");
+      revalidatePaymentManagement();
+    }
+    return result;
+  }
   const client = await getAdminClient();
   if (!client) return { success: false as const, error: "Somente administradores podem editar parcelas." };
   const league = await getActiveLeague();
@@ -112,6 +173,11 @@ export async function setExpenseItemPaidInstallments(id: string, paidInstallment
 }
 
 export async function getRoundExpenseSelections(roundId: string): Promise<RoundExpenseSelection[]> {
+  const session = await getFinanceApiSession();
+  if (session) {
+    const league = await getActiveLeague();
+    return session.gateway.getRoundExpenseSelections(league.id, roundId);
+  }
   const account = await getCurrentAccount();
   if (!account.user) return [];
   const league = await getActiveLeague();
@@ -119,6 +185,11 @@ export async function getRoundExpenseSelections(roundId: string): Promise<RoundE
 }
 
 export async function getRoundPaymentChargeLines(roundId: string): Promise<PaymentChargeLine[]> {
+  const session = await getFinanceApiSession();
+  if (session) {
+    const league = await getActiveLeague();
+    return session.gateway.getRoundPaymentChargeLines(league.id, roundId);
+  }
   const account = await getCurrentAccount();
   if (!account.user) return [];
   const league = await getActiveLeague();
@@ -126,6 +197,13 @@ export async function getRoundPaymentChargeLines(roundId: string): Promise<Payme
 }
 
 export async function syncRoundExpenseItems(roundId: string, expenseItemIds: string[]) {
+  const session = await getFinanceApiSession();
+  if (session) {
+    const league = await getActiveLeague();
+    const result = await session.gateway.syncRoundExpenseItems(league.id, roundId, expenseItemIds);
+    if (result.success) revalidatePaymentManagement(roundId);
+    return result;
+  }
   const client = await getAdminClient();
   if (!client) return { success: false as const, error: "Somente administradores podem editar a cobrança." };
   const league = await getActiveLeague();
@@ -135,6 +213,11 @@ export async function syncRoundExpenseItems(roundId: string, expenseItemIds: str
 }
 
 export async function getRoundPaymentObligations(roundId: string): Promise<PaymentObligation[]> {
+  const session = await getFinanceApiSession();
+  if (session) {
+    const league = await getActiveLeague();
+    return session.gateway.getRoundPaymentObligations(league.id, roundId);
+  }
   const account = await getCurrentAccount();
   if (!account.user) return [];
   const league = await getActiveLeague();
@@ -142,6 +225,13 @@ export async function getRoundPaymentObligations(roundId: string): Promise<Payme
 }
 
 export async function setPaymentObligationPaid(id: string, amountPaid: number) {
+  const session = await getFinanceApiSession();
+  if (session) {
+    const league = await getActiveLeague();
+    const result = await session.gateway.setPaymentObligationPaid(league.id, id, amountPaid);
+    if (result.success) revalidatePaymentManagement();
+    return result;
+  }
   const account = await getCurrentAccount();
   if (!account.user) return { success: false as const, error: "Entre novamente." };
   const result = await markObligationPaid(id, amountPaid, supabasePaymentCommandGateway(account.client));
@@ -150,6 +240,11 @@ export async function setPaymentObligationPaid(id: string, amountPaid: number) {
 }
 
 export async function getPaymentRecipients(includeInactive = false): Promise<PaymentRecipient[]> {
+  const session = await getFinanceApiSession();
+  if (session) {
+    const league = await getActiveLeague();
+    return session.gateway.getPaymentRecipients(league.id, includeInactive);
+  }
   const client = await getAdminClient();
   if (!client) return [];
   const league = await getActiveLeague();
@@ -157,6 +252,13 @@ export async function getPaymentRecipients(includeInactive = false): Promise<Pay
 }
 
 export async function savePaymentRecipient(input: PaymentRecipientInput) {
+  const session = await getFinanceApiSession();
+  if (session) {
+    const league = await getActiveLeague();
+    const result = await session.gateway.savePaymentRecipient(league.id, input);
+    if (result.success) revalidatePath("/mais/pix");
+    return result;
+  }
   const client = await getAdminClient();
   if (!client) return { success: false as const, error: "Somente administradores podem gerenciar PIX." };
   const [league, account] = await Promise.all([getActiveLeague(), getCurrentAccount()]);
@@ -167,6 +269,13 @@ export async function savePaymentRecipient(input: PaymentRecipientInput) {
 }
 
 export async function setPaymentRecipientActive(id: string, active: boolean) {
+  const session = await getFinanceApiSession();
+  if (session) {
+    const league = await getActiveLeague();
+    const result = await session.gateway.setPaymentRecipientActive(league.id, id, active);
+    if (result.success) revalidatePath("/mais/pix");
+    return result;
+  }
   const client = await getAdminClient();
   if (!client) return { success: false as const, error: "Somente administradores podem gerenciar PIX." };
   const league = await getActiveLeague();
@@ -176,6 +285,11 @@ export async function setPaymentRecipientActive(id: string, active: boolean) {
 }
 
 export async function getPaymentRounds(): Promise<PaymentRound[]> {
+  const session = await getFinanceApiSession();
+  if (session) {
+    const league = await getActiveLeague();
+    return session.gateway.getPaymentRounds(league.id);
+  }
   const league = await getActiveLeague();
   const season = await getActiveSeason(league.id);
   if (!season) return [];
@@ -183,6 +297,11 @@ export async function getPaymentRounds(): Promise<PaymentRound[]> {
 }
 
 export async function hasPendingPaymentRound(): Promise<boolean> {
+  const session = await getFinanceApiSession();
+  if (session) {
+    const league = await getActiveLeague();
+    return session.gateway.hasPendingPaymentRound(league.id);
+  }
   const league = await getActiveLeague();
   const season = await getActiveSeason(league.id);
   if (!season) return false;
@@ -196,17 +315,32 @@ export async function hasPendingPaymentRound(): Promise<boolean> {
 }
 
 export async function getRoundPaymentPlayers(roundId: string): Promise<PaymentPlayer[]> {
+  const session = await getFinanceApiSession();
+  if (session) {
+    const league = await getActiveLeague();
+    return session.gateway.getRoundPaymentPlayers(league.id, roundId);
+  }
   const league = await getActiveLeague();
   return readRoundPaymentPlayers(await createServerClient(), league.id, roundId);
 }
 
 export async function getRoundPaymentWorkspace(roundId: string) {
+  const session = await getFinanceApiSession();
+  if (session) {
+    const league = await getActiveLeague();
+    return session.gateway.getRoundPaymentWorkspace(league.id, roundId);
+  }
   const account = await getCurrentAccount();
   if (!account.user) return null;
   return readRoundPaymentWorkspace(account.client, roundId);
 }
 
 export async function getPaymentAuditLog(): Promise<PaymentAuditLogEntry[]> {
+  const session = await getFinanceApiSession();
+  if (session) {
+    const league = await getActiveLeague();
+    return session.gateway.getPaymentAuditLog(league.id);
+  }
   const client = await getAdminClient();
   if (!client) return [];
   const league = await getActiveLeague();
@@ -214,6 +348,13 @@ export async function getPaymentAuditLog(): Promise<PaymentAuditLogEntry[]> {
 }
 
 export async function setPlayerPayment(roundId: string, playerId: string, paid: boolean) {
+  const session = await getFinanceApiSession();
+  if (session) {
+    const league = await getActiveLeague();
+    const result = await session.gateway.setPlayerPayment(league.id, roundId, playerId, paid);
+    if (result.success) revalidateFullPaymentFlow();
+    return result;
+  }
   const account = await getCurrentAccount();
   if (!account.user) return { success: false as const, error: "Entre na sua conta para confirmar pagamentos." };
   const league = await getActiveLeague();
@@ -223,6 +364,13 @@ export async function setPlayerPayment(roundId: string, playerId: string, paid: 
 }
 
 export async function updateRoundPaymentDetails(input: RoundPaymentDetailsInput) {
+  const session = await getFinanceApiSession();
+  if (session) {
+    const league = await getActiveLeague();
+    const result = await session.gateway.updateRoundPaymentDetails(league.id, input);
+    if (result.success) revalidateFullPaymentFlow();
+    return result;
+  }
   const client = await getAdminClient();
   if (!client) return { success: false as const, error: "Somente administradores podem editar os dados do PIX." };
   const league = await getActiveLeague();

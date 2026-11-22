@@ -1,0 +1,4188 @@
+{
+  "version": 1,
+  "states": [
+    "backend-pilot",
+    "frontend-migrated",
+    "verified",
+    "retired"
+  ],
+  "overrides": [
+    {
+      "context": "identity",
+      "source": "src/app/cadastro/actions.ts",
+      "name": "signup",
+      "state": "frontend-migrated",
+      "target": "POST /api/identity/signup + POST /api/identity/pkce/exchange",
+      "evidence": [
+        "backend/src/contexts/identity/domain/authentication.test.ts",
+        "backend/src/contexts/identity/application/manage-authentication.test.ts",
+        "backend/src/contexts/identity/infrastructure/supabase-identity-auth-provider.test.ts",
+        "backend/src/contexts/identity/presentation.test.ts",
+        "src/app/cadastro/actions.test.ts",
+        "src/app/auth/callback/route.test.ts",
+        "src/modules/identity/infrastructure/http-identity-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "identity",
+      "source": "src/app/login/actions.ts",
+      "name": "login",
+      "state": "frontend-migrated",
+      "target": "POST /api/identity/login",
+      "evidence": [
+        "backend/src/contexts/identity/application/manage-authentication.test.ts",
+        "backend/src/contexts/identity/infrastructure/supabase-identity-auth-provider.test.ts",
+        "backend/src/contexts/identity/infrastructure/pg-identity-profile-repository.test.ts",
+        "backend/src/contexts/identity/presentation.test.ts",
+        "src/app/login/actions.test.ts",
+        "src/modules/identity/infrastructure/http-identity-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "identity",
+      "source": "src/app/login/actions.ts",
+      "name": "logout",
+      "state": "frontend-migrated",
+      "target": "POST /api/identity/logout",
+      "evidence": [
+        "backend/src/contexts/identity/application/manage-authentication.test.ts",
+        "backend/src/contexts/identity/infrastructure/supabase-identity-auth-provider.test.ts",
+        "backend/src/contexts/identity/presentation.test.ts",
+        "src/app/login/actions.test.ts",
+        "src/modules/identity/infrastructure/http-identity-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "identity",
+      "source": "src/app/login/actions.ts",
+      "name": "requestPasswordReset",
+      "state": "frontend-migrated",
+      "target": "POST /api/identity/password-reset + POST /api/identity/pkce/exchange",
+      "evidence": [
+        "backend/src/contexts/identity/domain/authentication.test.ts",
+        "backend/src/contexts/identity/application/manage-authentication.test.ts",
+        "backend/src/contexts/identity/infrastructure/supabase-identity-auth-provider.test.ts",
+        "backend/src/contexts/identity/presentation.test.ts",
+        "src/app/login/actions.test.ts",
+        "src/app/auth/callback/route.test.ts",
+        "src/modules/identity/infrastructure/identity-pkce.test.ts"
+      ]
+    },
+    {
+      "context": "identity",
+      "source": "src/app/login/actions.ts",
+      "name": "signInWithGoogle",
+      "state": "frontend-migrated",
+      "target": "POST /api/identity/oauth/google + POST /api/identity/pkce/exchange",
+      "evidence": [
+        "backend/src/contexts/identity/domain/authentication.test.ts",
+        "backend/src/contexts/identity/application/manage-authentication.test.ts",
+        "backend/src/contexts/identity/infrastructure/supabase-identity-auth-provider.test.ts",
+        "backend/src/contexts/identity/presentation.test.ts",
+        "src/app/login/actions.test.ts",
+        "src/app/auth/callback/route.test.ts",
+        "src/modules/identity/infrastructure/identity-pkce.test.ts"
+      ]
+    },
+    {
+      "context": "identity",
+      "source": "src/app/login/actions.ts",
+      "name": "updatePassword",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/identity/password",
+      "evidence": [
+        "backend/src/contexts/identity/domain/authentication.test.ts",
+        "backend/src/contexts/identity/application/manage-authentication.test.ts",
+        "backend/src/contexts/identity/infrastructure/supabase-identity-auth-provider.test.ts",
+        "backend/src/contexts/identity/presentation.test.ts",
+        "src/app/login/actions.test.ts",
+        "src/modules/identity/infrastructure/http-identity-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "identity",
+      "source": "src/lib/actions/admins.ts",
+      "name": "getManagedAccounts",
+      "state": "frontend-migrated",
+      "target": "GET /api/identity/accounts",
+      "evidence": [
+        "backend/src/contexts/identity/domain/account-access.test.ts",
+        "backend/src/contexts/identity/application/manage-account-access.test.ts",
+        "backend/src/contexts/identity/infrastructure/pg-account-access-repository.test.ts",
+        "backend/src/contexts/identity/presentation.test.ts",
+        "src/lib/actions/admins.test.ts",
+        "src/modules/identity/infrastructure/http-identity-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "identity",
+      "source": "src/lib/actions/admins.ts",
+      "name": "setAccountAdminRole",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/identity/accounts/:userId/role",
+      "evidence": [
+        "backend/src/contexts/identity/domain/account-access.test.ts",
+        "backend/src/contexts/identity/application/manage-account-access.test.ts",
+        "backend/src/contexts/identity/infrastructure/pg-account-access-repository.test.ts",
+        "backend/src/contexts/identity/presentation.test.ts",
+        "src/lib/actions/admins.test.ts",
+        "src/modules/identity/infrastructure/http-identity-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/app/lobby/actions.ts",
+      "name": "continueEntryFlow",
+      "state": "frontend-migrated",
+      "target": "POST /api/account/entry-flow/complete",
+      "evidence": [
+        "backend/src/contexts/leagues/domain/league-entry.test.ts",
+        "backend/src/contexts/leagues/application/manage-league-entry.test.ts",
+        "backend/src/contexts/leagues/infrastructure/pg-league-entry-repository.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/app/lobby/actions.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/app/lobby/actions.ts",
+      "name": "enterLeague",
+      "state": "frontend-migrated",
+      "target": "POST /api/leagues/:leagueId/selection {mode: active}",
+      "evidence": [
+        "backend/src/contexts/leagues/domain/league-entry.test.ts",
+        "backend/src/contexts/leagues/application/manage-league-entry.test.ts",
+        "backend/src/contexts/leagues/infrastructure/pg-league-entry-repository.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/app/lobby/actions.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/app/lobby/actions.ts",
+      "name": "enterArchivedQuickLeague",
+      "state": "frontend-migrated",
+      "target": "POST /api/leagues/:leagueId/selection {mode: archived-quick}",
+      "evidence": [
+        "backend/src/contexts/leagues/domain/league-entry.test.ts",
+        "backend/src/contexts/leagues/application/manage-league-entry.test.ts",
+        "backend/src/contexts/leagues/infrastructure/pg-league-entry-repository.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/app/lobby/actions.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/league.ts",
+      "name": "updateLeagueBranding",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/leagues/:leagueId/branding",
+      "evidence": [
+        "backend/src/contexts/leagues/domain/league-branding.test.ts",
+        "backend/src/contexts/leagues/application/manage-league-branding.test.ts",
+        "backend/src/contexts/leagues/infrastructure/pg-league-branding-repository.test.ts",
+        "backend/src/contexts/leagues/infrastructure/supabase-league-branding-storage.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/lib/actions/league.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/stadiums.ts",
+      "name": "getStadiums",
+      "state": "frontend-migrated",
+      "target": "GET /api/leagues/:leagueId/stadiums",
+      "evidence": [
+        "backend/src/contexts/leagues/domain/stadium.test.ts",
+        "backend/src/contexts/leagues/application/manage-stadiums.test.ts",
+        "backend/src/contexts/leagues/infrastructure/pg-stadium-repository.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/lib/actions/stadiums.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/stadiums.ts",
+      "name": "saveStadium",
+      "state": "frontend-migrated",
+      "target": "POST|PATCH /api/leagues/:leagueId/stadiums/:stadiumId?",
+      "evidence": [
+        "backend/src/contexts/leagues/domain/stadium.test.ts",
+        "backend/src/contexts/leagues/application/manage-stadiums.test.ts",
+        "backend/src/contexts/leagues/infrastructure/pg-stadium-repository.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/lib/actions/stadiums.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/stadiums.ts",
+      "name": "deleteStadium",
+      "state": "frontend-migrated",
+      "target": "DELETE /api/leagues/:leagueId/stadiums/:stadiumId",
+      "evidence": [
+        "backend/src/contexts/leagues/application/manage-stadiums.test.ts",
+        "backend/src/contexts/leagues/infrastructure/pg-stadium-repository.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/lib/actions/stadiums.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/stadiums.ts",
+      "name": "reorderStadiums",
+      "state": "frontend-migrated",
+      "target": "PUT /api/leagues/:leagueId/stadiums/order",
+      "evidence": [
+        "backend/src/contexts/leagues/domain/stadium.test.ts",
+        "backend/src/contexts/leagues/application/manage-stadiums.test.ts",
+        "backend/src/contexts/leagues/infrastructure/pg-stadium-repository.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/lib/actions/stadiums.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/seasons.ts",
+      "name": "getActiveSeason",
+      "state": "frontend-migrated",
+      "target": "GET /api/leagues/:leagueId/seasons/active",
+      "evidence": [
+        "backend/src/contexts/leagues/application/manage-seasons.test.ts",
+        "backend/src/contexts/leagues/infrastructure/pg-season-repository.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/lib/actions/seasons.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/seasons.ts",
+      "name": "getActiveSeasonRoundIds",
+      "state": "frontend-migrated",
+      "target": "GET /api/leagues/:leagueId/seasons/active/rounds",
+      "evidence": [
+        "backend/src/contexts/leagues/domain/season.test.ts",
+        "backend/src/contexts/leagues/infrastructure/pg-season-repository.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/lib/actions/seasons.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/seasons.ts",
+      "name": "getLatestFinishedSeason",
+      "state": "frontend-migrated",
+      "target": "GET /api/leagues/:leagueId/seasons/latest-finished",
+      "evidence": [
+        "backend/src/contexts/leagues/infrastructure/pg-season-repository.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/lib/actions/seasons.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/seasons.ts",
+      "name": "finishSeason",
+      "state": "frontend-migrated",
+      "target": "POST /api/leagues/:leagueId/seasons/active/finish",
+      "evidence": [
+        "backend/src/contexts/leagues/domain/season.test.ts",
+        "backend/src/contexts/leagues/application/manage-seasons.test.ts",
+        "backend/src/contexts/leagues/infrastructure/pg-season-repository.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/lib/actions/seasons.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/app/lobby/actions.ts",
+      "name": "createLeague",
+      "state": "frontend-migrated",
+      "target": "POST /api/leagues",
+      "evidence": [
+        "backend/src/contexts/leagues/presentation/leagues-route.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/app/lobby/actions.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/app/lobby/actions.ts",
+      "name": "createQuickLeague",
+      "state": "frontend-migrated",
+      "target": "POST /api/quick-match-sessions",
+      "evidence": [
+        "backend/src/contexts/leagues/domain/quick-match.test.ts",
+        "backend/src/contexts/leagues/application/create-quick-match.test.ts",
+        "backend/src/contexts/leagues/infrastructure/pg-quick-match-repository.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/app/lobby/actions.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/app/lobby/actions.ts",
+      "name": "requestClosedLeague",
+      "state": "frontend-migrated",
+      "target": "POST /api/leagues/:leagueId/membership-requests",
+      "evidence": [
+        "backend/src/contexts/leagues/presentation/leagues-route.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "backend/src/contexts/leagues/infrastructure/pg-league-membership-request-repository.test.ts",
+        "src/app/lobby/actions.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/app/lobby/actions.ts",
+      "name": "joinOpenLeague",
+      "state": "frontend-migrated",
+      "target": "POST /api/leagues/:leagueId/memberships",
+      "evidence": [
+        "backend/src/contexts/leagues/application/manage-league-membership.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/app/lobby/actions.ts",
+      "name": "toggleFavorite",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/leagues/:leagueId/favorite",
+      "evidence": [
+        "backend/src/contexts/leagues/infrastructure/pg-league-lobby-repository.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/app/lobby/actions.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/app/lobby/actions.ts",
+      "name": "requestAccess",
+      "state": "frontend-migrated",
+      "target": "POST /api/league-invites/:inviteToken/membership-requests",
+      "evidence": [
+        "backend/src/contexts/leagues/application/manage-league-membership.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/app/lobby/actions.ts",
+      "name": "reviewAccess",
+      "state": "frontend-migrated",
+      "target": "POST /api/league-membership-requests/:requestId/review",
+      "evidence": [
+        "backend/src/contexts/leagues/application/manage-league-admin.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/app/lobby/actions.ts",
+      "name": "addExistingAccount",
+      "state": "frontend-migrated",
+      "target": "POST /api/leagues/:leagueId/members",
+      "evidence": [
+        "backend/src/contexts/leagues/infrastructure/pg-league-admin-repository.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/app/mais/league-mode-actions.ts",
+      "name": "upgradeCurrentLeague",
+      "state": "frontend-migrated",
+      "target": "POST /api/leagues/:leagueId/upgrade",
+      "evidence": [
+        "backend/src/contexts/leagues/application/manage-league-admin.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/app/mais/league-mode-actions.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/app/mais/league-mode-actions.ts",
+      "name": "deleteCurrentLeague",
+      "state": "frontend-migrated",
+      "target": "DELETE /api/leagues/:leagueId",
+      "evidence": [
+        "backend/src/contexts/leagues/infrastructure/pg-league-admin-repository.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/app/mais/league-mode-actions.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/league.ts",
+      "name": "getLeagueConfig",
+      "state": "frontend-migrated",
+      "target": "GET /api/leagues/:leagueId/config",
+      "evidence": [
+        "backend/src/contexts/leagues/presentation/league-config-route.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/lib/actions/league.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/league.ts",
+      "name": "updateLeagueName",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/leagues/:leagueId/name",
+      "evidence": [
+        "backend/src/contexts/leagues/application/manage-league-config.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/lib/actions/league.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/league.ts",
+      "name": "updateLeagueConfig",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/leagues/:leagueId/config",
+      "evidence": [
+        "backend/src/contexts/leagues/infrastructure/pg-league-config-repository.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/lib/actions/league.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/league.ts",
+      "name": "updatePreSeasonEnabled",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/leagues/:leagueId/preseason",
+      "evidence": [
+        "backend/src/contexts/leagues/application/manage-league-config.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/lib/actions/league.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "leagues",
+      "source": "src/lib/actions/league.ts",
+      "name": "updateLeagueVisibility",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/leagues/:leagueId/visibility",
+      "evidence": [
+        "backend/src/contexts/leagues/application/manage-league-admin.test.ts",
+        "backend/src/contexts/leagues/presentation.test.ts",
+        "src/lib/actions/league.test.ts",
+        "src/modules/leagues/infrastructure/http-league-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/account-career.ts",
+      "name": "getMyAccountCareer",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/me/career",
+      "evidence": [
+        "backend/src/contexts/roster/domain/account-career.test.ts",
+        "backend/src/contexts/roster/application/get-account-career.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-account-career-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/account-career.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/private-balance-tags.ts",
+      "name": "getPlayerPrivateBalanceTag",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/players/:playerId/private-balance-tag",
+      "evidence": [
+        "backend/src/contexts/roster/domain/private-balance-tag.test.ts",
+        "backend/src/contexts/roster/application/manage-private-balance-tag.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-private-balance-tag-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/private-balance-tags.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/private-balance-tags.ts",
+      "name": "setPlayerPrivateBalanceTag",
+      "state": "frontend-migrated",
+      "target": "PUT /api/roster/players/:playerId/private-balance-tag",
+      "evidence": [
+        "backend/src/contexts/roster/domain/private-balance-tag.test.ts",
+        "backend/src/contexts/roster/application/manage-private-balance-tag.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-private-balance-tag-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/private-balance-tags.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/fitness.ts",
+      "name": "getMyFitnessRounds",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/players/:playerId/fitness-rounds",
+      "evidence": [
+        "backend/src/contexts/roster/domain/fitness.test.ts",
+        "backend/src/contexts/roster/application/manage-fitness.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-fitness-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/fitness.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/fitness.ts",
+      "name": "saveMyFitness",
+      "state": "frontend-migrated",
+      "target": "PUT /api/roster/rounds/:roundId/my-fitness",
+      "evidence": [
+        "backend/src/contexts/roster/domain/fitness.test.ts",
+        "backend/src/contexts/roster/application/manage-fitness.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-fitness-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/fitness.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/fitness.ts",
+      "name": "setFitnessVisibility",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/roster/me/fitness-visibility",
+      "evidence": [
+        "backend/src/contexts/roster/domain/fitness.test.ts",
+        "backend/src/contexts/roster/application/manage-fitness.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-fitness-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/fitness.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/fitness.ts",
+      "name": "getPlayerFitnessSummaries",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/players/:playerId/fitness-summary",
+      "evidence": [
+        "backend/src/contexts/roster/domain/fitness.test.ts",
+        "backend/src/contexts/roster/application/manage-fitness.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-fitness-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/fitness.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/speed-draw.ts",
+      "name": "drawTeamsBySpeedOnServer",
+      "state": "frontend-migrated",
+      "target": "POST /api/roster/leagues/:leagueId/speed-draw",
+      "evidence": [
+        "backend/src/contexts/roster/domain/speed-draw.test.ts",
+        "backend/src/contexts/roster/application/manage-speed-ratings.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-speed-rating-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/speed-draw.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/speed-draw.ts",
+      "name": "getPlayerSpeedRatings",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/speed-ratings",
+      "evidence": [
+        "backend/src/contexts/roster/domain/speed-draw.test.ts",
+        "backend/src/contexts/roster/application/manage-speed-ratings.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-speed-rating-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/speed-draw.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/speed-draw.ts",
+      "name": "setPlayerSpeedRating",
+      "state": "frontend-migrated",
+      "target": "PUT /api/roster/leagues/:leagueId/players/:playerId/speed-rating",
+      "evidence": [
+        "backend/src/contexts/roster/domain/speed-draw.test.ts",
+        "backend/src/contexts/roster/application/manage-speed-ratings.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-speed-rating-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/speed-draw.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/registrations.ts",
+      "name": "getRosterUnreadState",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/activity/unread-state",
+      "evidence": [
+        "backend/src/contexts/roster/domain/roster-activity.test.ts",
+        "backend/src/contexts/roster/application/manage-roster-activity.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-roster-activity-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/registrations.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/registrations.ts",
+      "name": "getUnreadRosterPlayers",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/activity/unread-players",
+      "evidence": [
+        "backend/src/contexts/roster/domain/roster-activity.test.ts",
+        "backend/src/contexts/roster/application/manage-roster-activity.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-roster-activity-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/registrations.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/registrations.ts",
+      "name": "markRosterActivitySeenThrough",
+      "state": "frontend-migrated",
+      "target": "PUT /api/roster/leagues/:leagueId/activity/read-through",
+      "evidence": [
+        "backend/src/contexts/roster/domain/roster-activity.test.ts",
+        "backend/src/contexts/roster/application/manage-roster-activity.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-roster-activity-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/registrations.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/registrations.ts",
+      "name": "markRosterActivitySeen",
+      "state": "frontend-migrated",
+      "target": "PUT /api/roster/leagues/:leagueId/activity/read",
+      "evidence": [
+        "backend/src/contexts/roster/domain/roster-activity.test.ts",
+        "backend/src/contexts/roster/application/manage-roster-activity.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-roster-activity-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/registrations.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getPlayers",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/players",
+      "evidence": [
+        "backend/src/contexts/roster/domain/player-catalog.test.ts",
+        "backend/src/contexts/roster/application/get-player-catalog.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-catalog-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-catalog.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getSelectableLeaguePlayers",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/players?selectable_only=true",
+      "evidence": [
+        "backend/src/contexts/roster/domain/player-catalog.test.ts",
+        "backend/src/contexts/roster/application/get-player-catalog.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-catalog-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-catalog.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getPlayer",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/players/:playerId",
+      "evidence": [
+        "backend/src/contexts/roster/domain/player-catalog.test.ts",
+        "backend/src/contexts/roster/application/get-player-catalog.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-catalog-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-catalog.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/registrations.ts",
+      "name": "getRegistrationHistory",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/registrations",
+      "evidence": [
+        "backend/src/contexts/roster/domain/roster-registration.test.ts",
+        "backend/src/contexts/roster/application/get-roster-registration.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-roster-registration-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/registrations.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/registrations.ts",
+      "name": "getRegisteredMergeCandidates",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/players/:guestId/merge-candidates",
+      "evidence": [
+        "backend/src/contexts/roster/domain/roster-registration.test.ts",
+        "backend/src/contexts/roster/application/get-roster-registration.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-roster-registration-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/registrations.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/registrations.ts",
+      "name": "mergeGuestWithRegistered",
+      "state": "frontend-migrated",
+      "target": "POST /api/roster/leagues/:leagueId/players/:guestId/merge",
+      "evidence": [
+        "backend/src/contexts/roster/domain/roster-registration.test.ts",
+        "backend/src/contexts/roster/application/get-roster-registration.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-roster-registration-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/registrations.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getPlayerPlaytime",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/players/:playerId/playtime",
+      "evidence": [
+        "backend/src/contexts/roster/domain/player-profile-performance.test.ts",
+        "backend/src/contexts/roster/application/get-player-profile-performance.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-profile-performance-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-profile-performance.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getPlayerGoalsByClub",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/players/:playerId/club-goals",
+      "evidence": [
+        "backend/src/contexts/roster/domain/player-profile-performance.test.ts",
+        "backend/src/contexts/roster/application/get-player-profile-performance.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-profile-performance-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-profile-performance.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getPlayerMonthlyAwards",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/players/:playerId/monthly-awards",
+      "evidence": [
+        "backend/src/contexts/roster/domain/player-awards.test.ts",
+        "backend/src/contexts/roster/application/get-player-awards.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-awards-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-awards.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getPlayerAchievementBelts",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/players/:playerId/achievement-belts",
+      "evidence": [
+        "backend/src/contexts/roster/domain/player-awards.test.ts",
+        "backend/src/contexts/roster/application/get-player-awards.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-awards-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-awards.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getPreviousMonthAwardWinners",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/monthly-awards/winners",
+      "evidence": [
+        "backend/src/contexts/roster/domain/player-awards.test.ts",
+        "backend/src/contexts/roster/application/get-player-awards.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-awards-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-awards.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getPlayerRoundHistory",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/players/:playerId/round-history",
+      "evidence": [
+        "backend/src/contexts/roster/domain/player-history.test.ts",
+        "backend/src/contexts/roster/application/get-player-history.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-history-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-awards.test.ts",
+        "src/modules/roster/domain/player-history.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getPlayerAwardSeasons",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/players/:playerId/award-seasons",
+      "evidence": [
+        "backend/src/contexts/roster/domain/player-history.test.ts",
+        "backend/src/contexts/roster/application/get-player-history.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-history-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-awards.test.ts",
+        "src/modules/roster/domain/player-history.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "createPlayer",
+      "state": "frontend-migrated",
+      "target": "POST /api/roster/leagues/:leagueId/players",
+      "evidence": [
+        "backend/src/contexts/roster/domain/player-management.test.ts",
+        "backend/src/contexts/roster/application/manage-players.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-management-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-catalog.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "updatePlayer",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/roster/leagues/:leagueId/players/:playerId",
+      "evidence": [
+        "backend/src/contexts/roster/domain/player-management.test.ts",
+        "backend/src/contexts/roster/application/manage-players.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-management-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-catalog.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "swapPlayerAvatars",
+      "state": "frontend-migrated",
+      "target": "POST /api/roster/leagues/:leagueId/players/:playerId/swap-avatars",
+      "evidence": [
+        "backend/src/contexts/roster/application/manage-players.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-management-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-catalog.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/app/admin/importar-lista/actions.ts",
+      "name": "importGuestRoster",
+      "state": "frontend-migrated",
+      "target": "POST /api/roster/leagues/:leagueId/guest-imports",
+      "evidence": [
+        "backend/src/contexts/roster/domain/player-management.test.ts",
+        "backend/src/contexts/roster/application/manage-players.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-management-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/app/admin/importar-lista/actions.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts",
+        "supabase/migrations/352_fix_guest_roster_import_profile.sql",
+        "scripts/verify-local-roster.sh"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getPlayersWithStats",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/player-statistics",
+      "evidence": [
+        "backend/src/contexts/roster/domain/player-statistics.test.ts",
+        "backend/src/contexts/roster/application/get-player-statistics.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-statistics-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-statistics.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts",
+        "scripts/verify-local-roster.sh"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "getRosterGroups",
+      "state": "frontend-migrated",
+      "target": "GET /api/roster/leagues/:leagueId/roster-groups",
+      "evidence": [
+        "backend/src/contexts/roster/domain/player-statistics.test.ts",
+        "backend/src/contexts/roster/application/get-player-statistics.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-statistics-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-statistics.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts",
+        "scripts/verify-local-roster.sh"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "savePlayer",
+      "state": "frontend-migrated",
+      "target": "POST /api/roster/leagues/:leagueId/player-profiles + PATCH /api/roster/leagues/:leagueId/players/:playerId/profile",
+      "evidence": [
+        "backend/src/contexts/roster/domain/player-profile.test.ts",
+        "backend/src/contexts/roster/application/save-player-profile.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-profile-repository.test.ts",
+        "backend/src/contexts/roster/infrastructure/supabase-player-avatar-storage.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-catalog.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts",
+        "scripts/verify-local-roster.sh"
+      ]
+    },
+    {
+      "context": "roster",
+      "source": "src/lib/actions/players.ts",
+      "name": "deletePlayer",
+      "state": "frontend-migrated",
+      "target": "DELETE /api/roster/leagues/:leagueId/players/:playerId",
+      "evidence": [
+        "backend/src/contexts/roster/application/save-player-profile.test.ts",
+        "backend/src/contexts/roster/infrastructure/pg-player-profile-repository.test.ts",
+        "backend/src/contexts/roster/presentation.test.ts",
+        "src/lib/actions/player-catalog.test.ts",
+        "src/modules/roster/infrastructure/http-roster-gateway.test.ts",
+        "scripts/verify-local-roster.sh"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "addRosterPlayersToCallup",
+      "state": "frontend-migrated",
+      "target": "POST /api/callups/leagues/:leagueId/:callupId/players",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "addRosterPlayerToCallup",
+      "state": "frontend-migrated",
+      "target": "POST /api/callups/leagues/:leagueId/:callupId/players",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "adminAddCallupPlayer",
+      "state": "frontend-migrated",
+      "target": "POST /api/callups/leagues/:leagueId/:callupId/players",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "adminRemoveCallupPlayer",
+      "state": "frontend-migrated",
+      "target": "DELETE /api/callups/leagues/:leagueId/:callupId/players/:playerId",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "closeCallup",
+      "state": "frontend-migrated",
+      "target": "POST /api/callups/leagues/:leagueId/:callupId/close",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "createCallupPrelist",
+      "state": "frontend-migrated",
+      "target": "POST /api/callups/leagues/:leagueId/:callupId/prelist",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "getActiveCallup",
+      "state": "frontend-migrated",
+      "target": "GET /api/callups/leagues/:leagueId/active",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "getActiveCallupById",
+      "state": "frontend-migrated",
+      "target": "GET /api/callups/leagues/:leagueId/active",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "getActiveCallups",
+      "state": "frontend-migrated",
+      "target": "GET /api/callups/leagues/:leagueId/active",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "getAgendaCallups",
+      "state": "frontend-migrated",
+      "target": "GET /api/callups/leagues/:leagueId/agenda",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "hasActiveCallup",
+      "state": "frontend-migrated",
+      "target": "GET /api/callups/leagues/:leagueId/active",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "inviteGuestListToCallup",
+      "state": "frontend-migrated",
+      "target": "POST /api/callups/leagues/:leagueId/:callupId/guest-list",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "inviteGuestToCallup",
+      "state": "frontend-migrated",
+      "target": "POST /api/callups/leagues/:leagueId/:callupId/guests",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "joinActiveCallup",
+      "state": "frontend-migrated",
+      "target": "POST /api/callups/leagues/:leagueId/:callupId/join",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "leaveActiveCallup",
+      "state": "frontend-migrated",
+      "target": "POST /api/callups/leagues/:leagueId/:callupId/leave",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "lockCallupForRound",
+      "state": "frontend-migrated",
+      "target": "POST /api/callups/leagues/:leagueId/:callupId/lock",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "openCallup",
+      "state": "frontend-migrated",
+      "target": "POST /api/callups/leagues/:leagueId",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "removeCallupEntry",
+      "state": "frontend-migrated",
+      "target": "DELETE /api/callups/leagues/:leagueId/:callupId/players/:playerId",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "repairMyPlayerAccount",
+      "state": "frontend-migrated",
+      "target": "POST /api/callups/repair-player",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "setCallupMatchRules",
+      "state": "frontend-migrated",
+      "target": "PUT /api/callups/leagues/:leagueId/:callupId/match-rules",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "setCallupVisibility",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/callups/leagues/:leagueId/:callupId/visibility",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "callups",
+      "source": "src/lib/actions/callups.ts",
+      "name": "updateCallup",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/callups/leagues/:leagueId/:callupId",
+      "evidence": [
+        "backend/src/contexts/callups/domain/callup.test.ts",
+        "backend/src/contexts/callups/application/manage-callups.test.ts",
+        "backend/src/contexts/callups/infrastructure/pg-callup-repository.test.ts",
+        "backend/src/contexts/callups/presentation.test.ts",
+        "src/modules/callups/infrastructure/http-callup-gateway.test.ts",
+        "src/modules/callups/infrastructure/callup-api-session.test.ts",
+        "src/lib/actions/callups.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/adaptive-draw.ts",
+      "name": "drawTeamsAdaptiveOnServer",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/draw-teams-adaptive",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/adaptive-draw.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "applyDraftSwap",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/drafts/:draftId/swap",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/draft.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "createTeamDraft",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/draft",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/draft.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "finalizeTeamDraft",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/drafts/:draftId/finalize",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/draft.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "getDraftWorkspace",
+      "state": "frontend-migrated",
+      "target": "GET /api/rounds/leagues/:leagueId/callups/:callupId/draft-workspace",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/draft.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "getDraftWorkspaceByRound",
+      "state": "frontend-migrated",
+      "target": "GET /api/rounds/leagues/:leagueId/:roundId/draft-workspace",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/draft.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "makeTeamDraftPick",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/drafts/:draftId/pick",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/draft.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "replaceTeamDraftCaptain",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/drafts/:draftId/replace-captain",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/draft.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "restartTeamDraft",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/drafts/:draftId/restart",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/draft.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/draft.ts",
+      "name": "startTeamDraft",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/drafts/:draftId/start",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/draft.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "addRoundEmergencySubstitute",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/emergency-substitute",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "applyPermanentRoundTeamFormation",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/formation",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "applyRoundTeamShuffle",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/shuffle/apply",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "createRoundWithTeams",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "deleteRound",
+      "state": "frontend-migrated",
+      "target": "DELETE /api/rounds/leagues/:leagueId/:roundId",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "finishRound",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/finish",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "getActiveLeague",
+      "state": "frontend-migrated",
+      "target": "GET /api/rounds/leagues/:leagueId/active-league",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "getAdminRoundPrelist",
+      "state": "frontend-migrated",
+      "target": "GET /api/rounds/leagues/:leagueId/prelists/:roundId",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "getAdminRoundPrelists",
+      "state": "frontend-migrated",
+      "target": "GET /api/rounds/leagues/:leagueId/prelists",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "getNextTeamPresetOffset",
+      "state": "frontend-migrated",
+      "target": "GET /api/rounds/leagues/:leagueId/next-team-preset-offset?roundType=...",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "getRound",
+      "state": "frontend-migrated",
+      "target": "GET /api/rounds/leagues/:leagueId/:roundId",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "getRoundMatchSetup",
+      "state": "frontend-migrated",
+      "target": "GET /api/rounds/leagues/:leagueId/:roundId/match-setup",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "getRounds",
+      "state": "frontend-migrated",
+      "target": "GET /api/rounds/seasons/:seasonId",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "markRoundTeamArrived",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/teams/:teamId/arrived",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "openCallupReplacementVacancy",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/replacement-vacancy",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "previewRoundTeamShuffle",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/shuffle/preview",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "saveRoundPrelist",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/prelist",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "setCallupFormat",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/rounds/leagues/:leagueId/callups/:callupId/format",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "setCallupMatchSize",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/rounds/leagues/:leagueId/callups/:callupId/match-size",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "setRoundAttendanceBulk",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/attendance/bulk",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "setRoundPlayerAttendance",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/attendance",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "setRoundPlayerAvailability",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/availability",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "setRoundTeamCaptain",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/teams/:teamId/captain",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "setRoundTeamVestColor",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/teams/:teamId/vest-color",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "shuffleRoundTeams",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/shuffle",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "swapRoundTeamPlayers",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/swap-players",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "transferRoundPlayerIdentity",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/transfer-player-identity",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "rounds",
+      "source": "src/lib/actions/rounds.ts",
+      "name": "zeroPlayerRoundPoints",
+      "state": "frontend-migrated",
+      "target": "POST /api/rounds/leagues/:leagueId/:roundId/players/:playerId/zero-points",
+      "evidence": [
+        "backend/src/contexts/rounds/domain/round.test.ts",
+        "backend/src/contexts/rounds/application/manage-rounds.test.ts",
+        "backend/src/contexts/rounds/infrastructure/pg-round-repository.test.ts",
+        "backend/src/contexts/rounds/presentation.test.ts",
+        "src/modules/rounds/infrastructure/http-round-gateway.test.ts",
+        "src/modules/rounds/infrastructure/round-api-session.test.ts",
+        "src/lib/actions/rounds.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/goalkeeper.ts",
+      "name": "selectBestGoalkeeper",
+      "state": "frontend-migrated",
+      "target": "POST /api/matches/leagues/:leagueId/rounds/:roundId/best-goalkeeper",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/goalkeeper.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "addFinishedGoalEvent",
+      "state": "frontend-migrated",
+      "target": "POST /api/matches/leagues/:leagueId/:matchId/events/add-goal",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "addMatchExtraTime",
+      "state": "frontend-migrated",
+      "target": "POST /api/matches/leagues/:leagueId/:matchId/extra-time",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "changeMatchGoalkeeper",
+      "state": "frontend-migrated",
+      "target": "POST /api/matches/leagues/:leagueId/:matchId/goalkeeper",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "correctFinishedGoal",
+      "state": "frontend-migrated",
+      "target": "POST /api/matches/leagues/:leagueId/events/:eventId/correct-goal",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "correctFinishedGoalEvent",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/matches/leagues/:leagueId/events/:eventId/correct-goal-event",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "correctFinishedGoalkeeper",
+      "state": "frontend-migrated",
+      "target": "POST /api/matches/leagues/:leagueId/:matchId/teams/:teamId/correct-goalkeeper",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "createMatch",
+      "state": "frontend-migrated",
+      "target": "POST /api/matches/leagues/:leagueId",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "deleteEvent",
+      "state": "frontend-migrated",
+      "target": "DELETE /api/matches/leagues/:leagueId/:matchId/events/:eventId",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "deleteMatch",
+      "state": "frontend-migrated",
+      "target": "DELETE /api/matches/leagues/:leagueId/:matchId",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "dispatchMatchTimerThreshold",
+      "state": "frontend-migrated",
+      "target": "POST /api/matches/leagues/:leagueId/:matchId/timer/dispatch",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "findLiveMatchForTeams",
+      "state": "frontend-migrated",
+      "target": "GET /api/matches/leagues/:leagueId/live",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "finishMatch",
+      "state": "frontend-migrated",
+      "target": "POST /api/matches/leagues/:leagueId/:matchId/finish",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "getFinishedMatchAudit",
+      "state": "frontend-migrated",
+      "target": "GET /api/matches/leagues/:leagueId/:matchId/audit",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "getMatch",
+      "state": "frontend-migrated",
+      "target": "GET /api/matches/leagues/:leagueId/:matchId",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "notifyMatchTimerThreshold",
+      "state": "frontend-migrated",
+      "target": "POST /api/matches/leagues/:leagueId/:matchId/timer/notify",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "registerGoal",
+      "state": "frontend-migrated",
+      "target": "POST /api/matches/:matchId/goals",
+      "evidence": [
+        "backend/src/contexts/matches/presentation/goals-route.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "backend/src/presentation/app.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-goal-gateway.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "resetMatchTimer",
+      "state": "frontend-migrated",
+      "target": "POST /api/matches/leagues/:leagueId/:matchId/timer/reset",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "setRoundTeamFixedGoalkeeper",
+      "state": "frontend-migrated",
+      "target": "POST /api/matches/leagues/:leagueId/rounds/:roundId/teams/:teamId/fixed-goalkeeper",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "substituteMatchPlayer",
+      "state": "frontend-migrated",
+      "target": "POST /api/matches/leagues/:leagueId/substitutions",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "undoLastMatchSubstitution",
+      "state": "frontend-migrated",
+      "target": "POST /api/matches/leagues/:leagueId/:matchId/substitutions/:substitutionId/undo",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "matches",
+      "source": "src/lib/actions/matches.ts",
+      "name": "updateMatchTimer",
+      "state": "frontend-migrated",
+      "target": "POST /api/matches/leagues/:leagueId/:matchId/timer",
+      "evidence": [
+        "backend/src/contexts/matches/domain/match.test.ts",
+        "backend/src/contexts/matches/application/manage-matches.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "backend/src/contexts/matches/presentation.test.ts",
+        "src/lib/actions/matches.test.ts",
+        "src/modules/matches/infrastructure/http-match-gateway.test.ts"
+      ]
+    },
+    {
+      "context": "notifications",
+      "source": "src/lib/actions/inbox.ts",
+      "name": "getMyInboxPreview",
+      "state": "frontend-migrated",
+      "target": "GET /api/notifications/inbox/preview",
+      "evidence": [
+        "backend/src/contexts/notifications/domain/inbox-notification.test.ts",
+        "backend/src/contexts/notifications/application/manage-inbox.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-inbox-repository.test.ts",
+        "backend/src/contexts/notifications/presentation/inbox-route.test.ts",
+        "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+        "src/modules/notifications/infrastructure/notification-api-session.test.ts",
+        "src/lib/actions/inbox.test.ts"
+      ]
+    },
+    {
+      "context": "notifications",
+      "source": "src/lib/actions/inbox.ts",
+      "name": "markInboxRead",
+      "state": "frontend-migrated",
+      "target": "POST /api/notifications/inbox/read",
+      "evidence": [
+        "backend/src/contexts/notifications/domain/inbox-notification.test.ts",
+        "backend/src/contexts/notifications/application/manage-inbox.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-inbox-repository.test.ts",
+        "backend/src/contexts/notifications/presentation/inbox-route.test.ts",
+        "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+        "src/modules/notifications/infrastructure/notification-api-session.test.ts",
+        "src/lib/actions/inbox.test.ts"
+      ]
+    },
+    {
+      "context": "notifications",
+      "source": "src/lib/actions/inbox.ts",
+      "name": "getMyInboxNotifications",
+      "state": "frontend-migrated",
+      "target": "POST /api/notifications/inbox/sync",
+      "evidence": [
+        "backend/src/contexts/notifications/domain/inbox-notification.test.ts",
+        "backend/src/contexts/notifications/application/manage-inbox.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-inbox-repository.test.ts",
+        "backend/src/contexts/notifications/presentation/inbox-route.test.ts",
+        "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+        "src/modules/notifications/infrastructure/notification-api-session.test.ts",
+        "src/lib/actions/inbox.test.ts"
+      ]
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "getPushPublicKey",
+      "state": "frontend-migrated",
+      "target": "GET /api/notifications/push/public-key",
+      "evidence": [
+        "backend/src/contexts/notifications/domain/push-subscription.test.ts",
+        "backend/src/contexts/notifications/domain/notification-preferences.test.ts",
+        "backend/src/contexts/notifications/application/manage-preferences.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-push-subscription-repository.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-notification-preferences-repository.test.ts",
+        "backend/src/contexts/notifications/infrastructure/env-push-configuration-provider.test.ts",
+        "backend/src/contexts/notifications/presentation/preferences-route.test.ts",
+        "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+        "src/modules/notifications/infrastructure/notification-api-session.test.ts",
+        "src/app/mais/notification-actions.test.ts"
+      ]
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "getPushSystemStatus",
+      "state": "frontend-migrated",
+      "target": "GET /api/notifications/push/status",
+      "evidence": [
+        "backend/src/contexts/notifications/domain/push-subscription.test.ts",
+        "backend/src/contexts/notifications/domain/notification-preferences.test.ts",
+        "backend/src/contexts/notifications/application/manage-preferences.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-push-subscription-repository.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-notification-preferences-repository.test.ts",
+        "backend/src/contexts/notifications/infrastructure/env-push-configuration-provider.test.ts",
+        "backend/src/contexts/notifications/presentation/preferences-route.test.ts",
+        "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+        "src/modules/notifications/infrastructure/notification-api-session.test.ts",
+        "src/app/mais/notification-actions.test.ts"
+      ]
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "subscribeToPush",
+      "state": "frontend-migrated",
+      "target": "POST /api/notifications/push/subscribe",
+      "evidence": [
+        "backend/src/contexts/notifications/domain/push-subscription.test.ts",
+        "backend/src/contexts/notifications/domain/notification-preferences.test.ts",
+        "backend/src/contexts/notifications/application/manage-preferences.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-push-subscription-repository.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-notification-preferences-repository.test.ts",
+        "backend/src/contexts/notifications/infrastructure/env-push-configuration-provider.test.ts",
+        "backend/src/contexts/notifications/presentation/preferences-route.test.ts",
+        "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+        "src/modules/notifications/infrastructure/notification-api-session.test.ts",
+        "src/app/mais/notification-actions.test.ts"
+      ]
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "unsubscribeFromPush",
+      "state": "frontend-migrated",
+      "target": "POST /api/notifications/push/unsubscribe",
+      "evidence": [
+        "backend/src/contexts/notifications/domain/push-subscription.test.ts",
+        "backend/src/contexts/notifications/domain/notification-preferences.test.ts",
+        "backend/src/contexts/notifications/application/manage-preferences.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-push-subscription-repository.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-notification-preferences-repository.test.ts",
+        "backend/src/contexts/notifications/infrastructure/env-push-configuration-provider.test.ts",
+        "backend/src/contexts/notifications/presentation/preferences-route.test.ts",
+        "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+        "src/modules/notifications/infrastructure/notification-api-session.test.ts",
+        "src/app/mais/notification-actions.test.ts"
+      ]
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "getNotificationPreferences",
+      "state": "frontend-migrated",
+      "target": "GET /api/notifications/preferences/:leagueId",
+      "evidence": [
+        "backend/src/contexts/notifications/domain/push-subscription.test.ts",
+        "backend/src/contexts/notifications/domain/notification-preferences.test.ts",
+        "backend/src/contexts/notifications/application/manage-preferences.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-push-subscription-repository.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-notification-preferences-repository.test.ts",
+        "backend/src/contexts/notifications/infrastructure/env-push-configuration-provider.test.ts",
+        "backend/src/contexts/notifications/presentation/preferences-route.test.ts",
+        "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+        "src/modules/notifications/infrastructure/notification-api-session.test.ts",
+        "src/app/mais/notification-actions.test.ts"
+      ]
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "updateNotificationPreferences",
+      "state": "frontend-migrated",
+      "target": "PUT /api/notifications/preferences",
+      "evidence": [
+        "backend/src/contexts/notifications/domain/push-subscription.test.ts",
+        "backend/src/contexts/notifications/domain/notification-preferences.test.ts",
+        "backend/src/contexts/notifications/application/manage-preferences.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-push-subscription-repository.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-notification-preferences-repository.test.ts",
+        "backend/src/contexts/notifications/infrastructure/env-push-configuration-provider.test.ts",
+        "backend/src/contexts/notifications/presentation/preferences-route.test.ts",
+        "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+        "src/modules/notifications/infrastructure/notification-api-session.test.ts",
+        "src/app/mais/notification-actions.test.ts"
+      ]
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "sendPushTest",
+      "state": "frontend-migrated",
+      "target": "POST /api/notifications/test-push",
+      "evidence": [
+        "backend/src/contexts/notifications/domain/push-delivery.test.ts",
+        "backend/src/contexts/notifications/application/manage-delivery.test.ts",
+        "backend/src/contexts/notifications/infrastructure/qstash-push-alert-scheduler.test.ts",
+        "backend/src/contexts/notifications/presentation/delivery-route.test.ts",
+        "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+        "src/app/mais/notification-actions.test.ts"
+      ]
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "sendCartolaEmailTest",
+      "state": "frontend-migrated",
+      "target": "POST /api/notifications/test-cartola-email",
+      "evidence": [
+        "backend/src/contexts/notifications/domain/push-delivery.test.ts",
+        "backend/src/contexts/notifications/application/manage-delivery.test.ts",
+        "backend/src/contexts/notifications/infrastructure/resend-cartola-email-sender.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-league-notification-settings-repository.test.ts",
+        "backend/src/contexts/notifications/presentation/delivery-route.test.ts",
+        "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+        "src/app/mais/notification-actions.test.ts"
+      ]
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/api/internal/push-test-alert/route.ts",
+      "name": "POST",
+      "state": "frontend-migrated",
+      "target": "POST /api/internal/notifications/push-test-alert",
+      "evidence": [
+        "backend/src/contexts/notifications/domain/push-delivery.test.ts",
+        "backend/src/contexts/notifications/application/manage-delivery.test.ts",
+        "backend/src/contexts/notifications/infrastructure/web-push-notification-sender.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-push-subscription-repository.test.ts",
+        "backend/src/contexts/notifications/presentation/delivery-route.test.ts",
+        "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+        "src/app/api/internal/push-test-alert/route.test.ts"
+      ]
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notification-actions.ts",
+      "name": "setCartolaRemindersEnabled",
+      "state": "frontend-migrated",
+      "target": "POST /api/notifications/cartola/reminders/toggle",
+      "evidence": [
+        "backend/src/contexts/notifications/domain/cartola-reminder.test.ts",
+        "backend/src/contexts/notifications/application/manage-cartola-reminders.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-cartola-reminder-repository.test.ts",
+        "backend/src/contexts/notifications/presentation/cartola-reminder-route.test.ts",
+        "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+        "src/app/mais/notification-actions.test.ts"
+      ]
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/mais/notificacoes/cancelar/actions.ts",
+      "name": "cancelCartolaEmailReminders",
+      "state": "frontend-migrated",
+      "target": "POST /api/notifications/cartola/reminders/cancel",
+      "evidence": [
+        "backend/src/contexts/notifications/domain/cartola-reminder.test.ts",
+        "backend/src/contexts/notifications/application/manage-cartola-reminders.test.ts",
+        "backend/src/contexts/notifications/infrastructure/pg-cartola-reminder-repository.test.ts",
+        "backend/src/contexts/notifications/presentation/cartola-reminder-route.test.ts",
+        "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+        "src/app/mais/notificacoes/cancelar/actions.test.ts"
+      ]
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/api/internal/cartola-reminder/route.ts",
+      "name": "POST",
+      "state": "frontend-migrated",
+      "target": "POST /api/internal/notifications/cartola-reminder",
+      "evidence": [
+        "backend/src/contexts/notifications/domain/cartola-reminder.test.ts",
+        "backend/src/contexts/notifications/application/manage-cartola-reminders.test.ts",
+        "backend/src/contexts/notifications/infrastructure/qstash-cartola-reminder-scheduler.test.ts",
+        "backend/src/contexts/notifications/infrastructure/resend-cartola-reminder-email-sender.test.ts",
+        "backend/src/contexts/notifications/presentation/cartola-reminder-route.test.ts",
+        "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+        "src/app/api/internal/cartola-reminder/route.test.ts"
+      ]
+    },
+    {
+      "context": "notifications",
+      "source": "src/app/api/internal/match-timer-alert/route.ts",
+      "name": "POST",
+      "state": "frontend-migrated",
+      "target": "POST /api/internal/matches/:matchId/timer/dispatch",
+      "evidence": [
+        "backend/src/contexts/matches/presentation.test.ts",
+        "backend/src/contexts/matches/infrastructure/pg-match-repository.test.ts",
+        "src/modules/notifications/infrastructure/http-notification-gateway.test.ts",
+        "src/app/api/internal/match-timer-alert/route.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/bq-scoring.ts",
+      "name": "getBQScoringRules",
+      "state": "frontend-migrated",
+      "target": "GET /api/statistics/leagues/:leagueId/scoring/bq",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/scoring-policy.test.ts",
+        "backend/src/contexts/statistics/application/manage-scoring-rules.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-scoring-rules-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/scoring-rules-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/bq-scoring.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/bq-scoring.ts",
+      "name": "getColumnCScoringRules",
+      "state": "frontend-migrated",
+      "target": "GET /api/statistics/leagues/:leagueId/scoring/column-c",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/scoring-policy.test.ts",
+        "backend/src/contexts/statistics/application/manage-scoring-rules.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-scoring-rules-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/scoring-rules-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/bq-scoring.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/bq-scoring.ts",
+      "name": "saveBQScoringRules",
+      "state": "frontend-migrated",
+      "target": "PUT /api/statistics/leagues/:leagueId/scoring/bq",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/scoring-policy.test.ts",
+        "backend/src/contexts/statistics/application/manage-scoring-rules.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-scoring-rules-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/scoring-rules-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/bq-scoring.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/bq-scoring.ts",
+      "name": "saveColumnCScoringRules",
+      "state": "frontend-migrated",
+      "target": "PUT /api/statistics/leagues/:leagueId/scoring/column-c",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/scoring-policy.test.ts",
+        "backend/src/contexts/statistics/application/manage-scoring-rules.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-scoring-rules-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/scoring-rules-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/bq-scoring.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "getPlayerRankingEntry",
+      "state": "frontend-migrated",
+      "target": "GET /api/statistics/leagues/:leagueId/ranking/players/:playerId",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/season-ranking.test.ts",
+        "backend/src/contexts/statistics/application/manage-season-ranking.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-season-ranking-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/season-ranking-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/stats.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "getRanking",
+      "state": "frontend-migrated",
+      "target": "GET /api/statistics/leagues/:leagueId/ranking",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/season-ranking.test.ts",
+        "backend/src/contexts/statistics/application/manage-season-ranking.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-season-ranking-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/season-ranking-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/stats.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "getRankingEnrichmentForPlayers",
+      "state": "frontend-migrated",
+      "target": "POST /api/statistics/leagues/:leagueId/ranking/enrichment",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/season-ranking.test.ts",
+        "backend/src/contexts/statistics/application/manage-season-ranking.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-season-ranking-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/season-ranking-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/stats.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "getRankingEssentialData",
+      "state": "frontend-migrated",
+      "target": "GET /api/statistics/leagues/:leagueId/ranking/experience?includeEnrichment=false",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/season-ranking.test.ts",
+        "backend/src/contexts/statistics/application/manage-season-ranking.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-season-ranking-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/season-ranking-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/stats.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "getRankingExperienceData",
+      "state": "frontend-migrated",
+      "target": "GET /api/statistics/leagues/:leagueId/ranking/experience?includeEnrichment=true",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/season-ranking.test.ts",
+        "backend/src/contexts/statistics/application/manage-season-ranking.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-season-ranking-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/season-ranking-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/stats.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "calculateRoundStats",
+      "state": "frontend-migrated",
+      "target": "POST /api/statistics/leagues/:leagueId/rounds/:roundId/recalculate",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/round-statistics.test.ts",
+        "backend/src/contexts/statistics/application/manage-round-statistics.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-round-statistics-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/round-statistics-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/stats.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "getRoundStatistics",
+      "state": "frontend-migrated",
+      "target": "GET /api/statistics/leagues/:leagueId/rounds/:roundId",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/round-statistics.test.ts",
+        "backend/src/contexts/statistics/application/manage-round-statistics.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-round-statistics-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/round-statistics-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/stats.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "getFriendlyStats",
+      "state": "frontend-migrated",
+      "target": "GET /api/statistics/leagues/:leagueId/friendlies",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/round-statistics.test.ts",
+        "backend/src/contexts/statistics/application/manage-round-statistics.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-round-statistics-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/round-statistics-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/stats.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "getLatestPlayerCardOverallMap",
+      "state": "frontend-migrated",
+      "target": "GET /api/statistics/leagues/:leagueId/player-card-overalls",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/season-operations.test.ts",
+        "backend/src/contexts/statistics/application/manage-season-operations.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-season-operations-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/season-operations-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/stats.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/team-standings.ts",
+      "name": "getSeasonTeamStandings",
+      "state": "frontend-migrated",
+      "target": "GET /api/statistics/leagues/:leagueId/team-standings",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/season-operations.test.ts",
+        "backend/src/contexts/statistics/application/manage-season-operations.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-season-operations-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/season-operations-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/team-standings.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/reprocess.ts",
+      "name": "previewReprocessSeason",
+      "state": "frontend-migrated",
+      "target": "GET /api/statistics/leagues/:leagueId/reprocess/preview",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/season-operations.test.ts",
+        "backend/src/contexts/statistics/application/manage-season-operations.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-season-operations-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/season-operations-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/reprocess.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/reprocess.ts",
+      "name": "executeReprocessSeason",
+      "state": "frontend-migrated",
+      "target": "POST /api/statistics/leagues/:leagueId/reprocess",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/season-operations.test.ts",
+        "backend/src/contexts/statistics/application/manage-season-operations.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-season-operations-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/season-operations-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/reprocess.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/dashboard.ts",
+      "name": "getDashboardData",
+      "state": "frontend-migrated",
+      "target": "GET /api/statistics/leagues/:leagueId/dashboard",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/dashboard.test.ts",
+        "backend/src/contexts/statistics/application/manage-dashboard.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-dashboard-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/dashboard-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/dashboard.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/overall.ts",
+      "name": "getOverallShadowAdminData",
+      "state": "frontend-migrated",
+      "target": "GET /api/statistics/leagues/:leagueId/overall/shadow",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/overall-shadow.test.ts",
+        "backend/src/contexts/statistics/application/manage-overall-shadow.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-overall-shadow-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/overall-shadow-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/overall.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/overall.ts",
+      "name": "recalculateOverallShadow",
+      "state": "frontend-migrated",
+      "target": "POST /api/statistics/leagues/:leagueId/overall/shadow/recalculate",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/overall-shadow.test.ts",
+        "backend/src/contexts/statistics/application/manage-overall-shadow.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-overall-shadow-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/overall-shadow-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/overall.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/overall.ts",
+      "name": "publishOverallShadow",
+      "state": "frontend-migrated",
+      "target": "POST /api/statistics/leagues/:leagueId/overall/shadow/publish",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/overall-shadow.test.ts",
+        "backend/src/contexts/statistics/application/manage-overall-shadow.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-overall-shadow-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/overall-shadow-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/overall.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/overall.ts",
+      "name": "recalculateAndPublishFluidOverall",
+      "state": "frontend-migrated",
+      "target": "POST /api/statistics/leagues/:leagueId/overall/fluid/recalculate-and-publish",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/overall-shadow.test.ts",
+        "backend/src/contexts/statistics/application/manage-overall-shadow.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-overall-shadow-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/overall-shadow-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/overall.test.ts"
+      ]
+    },
+    {
+      "context": "statistics",
+      "source": "src/lib/actions/overall.ts",
+      "name": "refreshFluidOverallSafely",
+      "state": "frontend-migrated",
+      "target": "POST /api/statistics/leagues/:leagueId/overall/fluid/refresh",
+      "evidence": [
+        "backend/src/contexts/statistics/domain/overall-shadow.test.ts",
+        "backend/src/contexts/statistics/application/manage-overall-shadow.test.ts",
+        "backend/src/contexts/statistics/infrastructure/pg-overall-shadow-repository.test.ts",
+        "backend/src/contexts/statistics/presentation/overall-shadow-route.test.ts",
+        "src/modules/statistics/infrastructure/http-statistics-gateway.test.ts",
+        "src/lib/actions/overall.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getExpenseItems",
+      "state": "frontend-migrated",
+      "target": "GET /api/finance/leagues/:leagueId/expenses",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "saveExpenseItem",
+      "state": "frontend-migrated",
+      "target": "POST /api/finance/leagues/:leagueId/expenses",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "setExpenseItemStatus",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/finance/leagues/:leagueId/expenses/:id/status",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "setExpenseItemPaidInstallments",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/finance/leagues/:leagueId/expenses/:id/paid-installments",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getPaymentRecipients",
+      "state": "frontend-migrated",
+      "target": "GET /api/finance/leagues/:leagueId/recipients",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "savePaymentRecipient",
+      "state": "frontend-migrated",
+      "target": "POST /api/finance/leagues/:leagueId/recipients",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "setPaymentRecipientActive",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/finance/leagues/:leagueId/recipients/:id/active",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getPaymentRounds",
+      "state": "frontend-migrated",
+      "target": "GET /api/finance/leagues/:leagueId/rounds",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "hasPendingPaymentRound",
+      "state": "frontend-migrated",
+      "target": "GET /api/finance/leagues/:leagueId/rounds/has-pending",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getRoundPaymentWorkspace",
+      "state": "frontend-migrated",
+      "target": "GET /api/finance/leagues/:leagueId/rounds/:roundId/workspace",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getRoundPaymentPlayers",
+      "state": "frontend-migrated",
+      "target": "GET /api/finance/leagues/:leagueId/rounds/:roundId/players",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getRoundPaymentObligations",
+      "state": "frontend-migrated",
+      "target": "GET /api/finance/leagues/:leagueId/rounds/:roundId/obligations",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "setPaymentObligationPaid",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/finance/leagues/:leagueId/obligations/:id/paid",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "setPlayerPayment",
+      "state": "frontend-migrated",
+      "target": "POST /api/finance/leagues/:leagueId/rounds/:roundId/payments",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getRoundExpenseSelections",
+      "state": "frontend-migrated",
+      "target": "GET /api/finance/leagues/:leagueId/rounds/:roundId/expense-selections",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "syncRoundExpenseItems",
+      "state": "frontend-migrated",
+      "target": "POST /api/finance/leagues/:leagueId/rounds/:roundId/expense-selections",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "updateRoundPaymentDetails",
+      "state": "frontend-migrated",
+      "target": "PUT /api/finance/leagues/:leagueId/rounds/:roundId/details",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getRoundPaymentChargeLines",
+      "state": "frontend-migrated",
+      "target": "GET /api/finance/leagues/:leagueId/rounds/:roundId/charge-lines",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "finance",
+      "source": "src/lib/actions/payments.ts",
+      "name": "getPaymentAuditLog",
+      "state": "frontend-migrated",
+      "target": "GET /api/finance/leagues/:leagueId/audit-log",
+      "evidence": [
+        "backend/src/contexts/finance/domain/finance.test.ts",
+        "backend/src/contexts/finance/application/manage-finance.test.ts",
+        "backend/src/contexts/finance/infrastructure/pg-finance-repository.test.ts",
+        "backend/src/contexts/finance/presentation/finance-route.test.ts",
+        "src/modules/finance/infrastructure/http-finance-gateway.test.ts",
+        "src/modules/finance/infrastructure/finance-api-session.test.ts",
+        "src/lib/actions/payments.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyDashboard",
+      "state": "frontend-migrated",
+      "target": "GET /api/fantasy/leagues/:leagueId/dashboard",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/market-lineup.test.ts",
+        "backend/src/contexts/fantasy/application/manage-market-lineup.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-market-lineup-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/market-lineup-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyPlayerDetail",
+      "state": "frontend-migrated",
+      "target": "GET /api/fantasy/leagues/:leagueId/players/:playerId",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/market-lineup.test.ts",
+        "backend/src/contexts/fantasy/application/manage-market-lineup.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-market-lineup-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/market-lineup-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyPlayerSummary",
+      "state": "frontend-migrated",
+      "target": "GET /api/fantasy/leagues/:leagueId/players/:playerId",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/market-lineup.test.ts",
+        "backend/src/contexts/fantasy/application/manage-market-lineup.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-market-lineup-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/market-lineup-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyQuickHighlights",
+      "state": "frontend-migrated",
+      "target": "GET /api/fantasy/leagues/:leagueId/quick-highlights",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/market-lineup.test.ts",
+        "backend/src/contexts/fantasy/application/manage-market-lineup.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-market-lineup-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/market-lineup-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getMyFantasySummary",
+      "state": "frontend-migrated",
+      "target": "GET /api/fantasy/leagues/:leagueId/my-summary",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/market-lineup.test.ts",
+        "backend/src/contexts/fantasy/application/manage-market-lineup.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-market-lineup-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/market-lineup-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getMyFantasyHistory",
+      "state": "frontend-migrated",
+      "target": "GET /api/fantasy/leagues/:leagueId/my-history",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/market-lineup.test.ts",
+        "backend/src/contexts/fantasy/application/manage-market-lineup.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-market-lineup-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/market-lineup-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getRevealedLineups",
+      "state": "frontend-migrated",
+      "target": "GET /api/fantasy/leagues/:leagueId/rounds/:roundId/revealed-lineups",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/market-lineup.test.ts",
+        "backend/src/contexts/fantasy/application/manage-market-lineup.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-market-lineup-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/market-lineup-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyRoundLineupOverview",
+      "state": "frontend-migrated",
+      "target": "GET /api/fantasy/leagues/:leagueId/rounds/:roundId/overview",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/market-lineup.test.ts",
+        "backend/src/contexts/fantasy/application/manage-market-lineup.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-market-lineup-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/market-lineup-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "saveFantasyLineup",
+      "state": "frontend-migrated",
+      "target": "POST /api/fantasy/leagues/:leagueId/rounds/:roundId/lineup",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/market-lineup.test.ts",
+        "backend/src/contexts/fantasy/application/manage-market-lineup.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-market-lineup-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/market-lineup-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "previewFantasyMarketV11",
+      "state": "frontend-migrated",
+      "target": "POST /api/fantasy/leagues/:leagueId/preview-market",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/market-lineup.test.ts",
+        "backend/src/contexts/fantasy/application/manage-market-lineup.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-market-lineup-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/market-lineup-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "repairLegacySavedFantasyLineups",
+      "state": "frontend-migrated",
+      "target": "POST /api/fantasy/leagues/:leagueId/repair-lineups",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/market-lineup.test.ts",
+        "backend/src/contexts/fantasy/application/manage-market-lineup.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-market-lineup-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/market-lineup-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyRanking",
+      "state": "frontend-migrated",
+      "target": "GET /api/fantasy/leagues/:leagueId/ranking",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/application/manage-fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-fantasy-admin-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/fantasy-admin-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyUserHistory",
+      "state": "frontend-migrated",
+      "target": "GET /api/fantasy/leagues/:leagueId/users/:userId/history",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/application/manage-fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-fantasy-admin-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/fantasy-admin-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyUserRoundHistory",
+      "state": "frontend-migrated",
+      "target": "GET /api/fantasy/leagues/:leagueId/users/:userId/rounds/:roundId/history",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/application/manage-fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-fantasy-admin-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/fantasy-admin-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getSeasonPassDashboard",
+      "state": "frontend-migrated",
+      "target": "GET /api/fantasy/leagues/:leagueId/season-pass",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/application/manage-fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-fantasy-admin-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/fantasy-admin-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "getFantasyAdminData",
+      "state": "frontend-migrated",
+      "target": "GET /api/fantasy/leagues/:leagueId/admin-data",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/application/manage-fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-fantasy-admin-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/fantasy-admin-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "updateFantasySettings",
+      "state": "frontend-migrated",
+      "target": "POST /api/fantasy/leagues/:leagueId/settings",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/application/manage-fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-fantasy-admin-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/fantasy-admin-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "reprocessFantasyRound",
+      "state": "frontend-migrated",
+      "target": "POST /api/fantasy/leagues/:leagueId/rounds/:roundId/reprocess",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/application/manage-fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-fantasy-admin-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/fantasy-admin-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "reprocessFantasyRoundWithCurrentRules",
+      "state": "frontend-migrated",
+      "target": "POST /api/fantasy/leagues/:leagueId/rounds/:roundId/reprocess",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/application/manage-fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-fantasy-admin-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/fantasy-admin-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "createFantasyTestSession",
+      "state": "frontend-migrated",
+      "target": "POST /api/fantasy/leagues/:leagueId/rounds/:roundId/test-session/create",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/application/manage-fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-fantasy-admin-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/fantasy-admin-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "processFantasyTestSession",
+      "state": "frontend-migrated",
+      "target": "POST /api/fantasy/leagues/:leagueId/rounds/:roundId/test-session/process",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/application/manage-fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-fantasy-admin-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/fantasy-admin-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "fantasy",
+      "source": "src/lib/actions/fantasy.ts",
+      "name": "resetFantasyTestSession",
+      "state": "frontend-migrated",
+      "target": "POST /api/fantasy/leagues/:leagueId/rounds/:roundId/test-session/reset",
+      "evidence": [
+        "backend/src/contexts/fantasy/domain/fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/application/manage-fantasy-admin.test.ts",
+        "backend/src/contexts/fantasy/infrastructure/pg-fantasy-admin-repository.test.ts",
+        "backend/src/contexts/fantasy/presentation/fantasy-admin-route.test.ts",
+        "src/modules/fantasy/infrastructure/http-fantasy-gateway.test.ts",
+        "src/modules/fantasy/infrastructure/fantasy-api-session.test.ts",
+        "src/lib/actions/fantasy.test.ts"
+      ]
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "getMyPacks",
+      "state": "frontend-migrated",
+      "target": "GET /api/cards/leagues/:leagueId/packs",
+      "evidence": [
+        "backend/src/contexts/cards/domain/cards.test.ts",
+        "backend/src/contexts/cards/application/manage-cards.test.ts",
+        "backend/src/contexts/cards/infrastructure/pg-cards-repository.test.ts",
+        "backend/src/contexts/cards/presentation/cards-route.test.ts",
+        "src/modules/cards/infrastructure/http-cards-gateway.test.ts",
+        "src/modules/cards/infrastructure/cards-api-session.test.ts",
+        "src/lib/actions/fantasy-cards.test.ts"
+      ]
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "restoreMyPassPacks",
+      "state": "frontend-migrated",
+      "target": "POST /api/cards/leagues/:leagueId/packs/restore-pass",
+      "evidence": [
+        "backend/src/contexts/cards/domain/cards.test.ts",
+        "backend/src/contexts/cards/application/manage-cards.test.ts",
+        "backend/src/contexts/cards/infrastructure/pg-cards-repository.test.ts",
+        "backend/src/contexts/cards/presentation/cards-route.test.ts",
+        "src/modules/cards/infrastructure/http-cards-gateway.test.ts",
+        "src/modules/cards/infrastructure/cards-api-session.test.ts",
+        "src/lib/actions/fantasy-cards.test.ts"
+      ]
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "openPack",
+      "state": "frontend-migrated",
+      "target": "POST /api/cards/leagues/:leagueId/packs/:packId/open",
+      "evidence": [
+        "backend/src/contexts/cards/domain/cards.test.ts",
+        "backend/src/contexts/cards/application/manage-cards.test.ts",
+        "backend/src/contexts/cards/infrastructure/pg-cards-repository.test.ts",
+        "backend/src/contexts/cards/presentation/cards-route.test.ts",
+        "src/modules/cards/infrastructure/http-cards-gateway.test.ts",
+        "src/modules/cards/infrastructure/cards-api-session.test.ts",
+        "src/lib/actions/fantasy-cards.test.ts"
+      ]
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "claimPackCard",
+      "state": "frontend-migrated",
+      "target": "POST /api/cards/leagues/:leagueId/packs/:packId/claim",
+      "evidence": [
+        "backend/src/contexts/cards/domain/cards.test.ts",
+        "backend/src/contexts/cards/application/manage-cards.test.ts",
+        "backend/src/contexts/cards/infrastructure/pg-cards-repository.test.ts",
+        "backend/src/contexts/cards/presentation/cards-route.test.ts",
+        "src/modules/cards/infrastructure/http-cards-gateway.test.ts",
+        "src/modules/cards/infrastructure/cards-api-session.test.ts",
+        "src/lib/actions/fantasy-cards.test.ts"
+      ]
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "getMyInventory",
+      "state": "frontend-migrated",
+      "target": "GET /api/cards/leagues/:leagueId/inventory",
+      "evidence": [
+        "backend/src/contexts/cards/domain/cards.test.ts",
+        "backend/src/contexts/cards/application/manage-cards.test.ts",
+        "backend/src/contexts/cards/infrastructure/pg-cards-repository.test.ts",
+        "backend/src/contexts/cards/presentation/cards-route.test.ts",
+        "src/modules/cards/infrastructure/http-cards-gateway.test.ts",
+        "src/modules/cards/infrastructure/cards-api-session.test.ts",
+        "src/lib/actions/fantasy-cards.test.ts"
+      ]
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "getMyInventoryCount",
+      "state": "frontend-migrated",
+      "target": "GET /api/cards/leagues/:leagueId/inventory/count",
+      "evidence": [
+        "backend/src/contexts/cards/domain/cards.test.ts",
+        "backend/src/contexts/cards/application/manage-cards.test.ts",
+        "backend/src/contexts/cards/infrastructure/pg-cards-repository.test.ts",
+        "backend/src/contexts/cards/presentation/cards-route.test.ts",
+        "src/modules/cards/infrastructure/http-cards-gateway.test.ts",
+        "src/modules/cards/infrastructure/cards-api-session.test.ts",
+        "src/lib/actions/fantasy-cards.test.ts"
+      ]
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "getActiveCardForRound",
+      "state": "frontend-migrated",
+      "target": "GET /api/cards/leagues/:leagueId/rounds/:roundId/active",
+      "evidence": [
+        "backend/src/contexts/cards/domain/cards.test.ts",
+        "backend/src/contexts/cards/application/manage-cards.test.ts",
+        "backend/src/contexts/cards/infrastructure/pg-cards-repository.test.ts",
+        "backend/src/contexts/cards/presentation/cards-route.test.ts",
+        "src/modules/cards/infrastructure/http-cards-gateway.test.ts",
+        "src/modules/cards/infrastructure/cards-api-session.test.ts",
+        "src/lib/actions/fantasy-cards.test.ts"
+      ]
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "activateCardForRound",
+      "state": "frontend-migrated",
+      "target": "POST /api/cards/leagues/:leagueId/rounds/:roundId/activate",
+      "evidence": [
+        "backend/src/contexts/cards/domain/cards.test.ts",
+        "backend/src/contexts/cards/application/manage-cards.test.ts",
+        "backend/src/contexts/cards/infrastructure/pg-cards-repository.test.ts",
+        "backend/src/contexts/cards/presentation/cards-route.test.ts",
+        "src/modules/cards/infrastructure/http-cards-gateway.test.ts",
+        "src/modules/cards/infrastructure/cards-api-session.test.ts",
+        "src/lib/actions/fantasy-cards.test.ts"
+      ]
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "removeActiveCardForRound",
+      "state": "frontend-migrated",
+      "target": "DELETE /api/cards/leagues/:leagueId/rounds/:roundId/active",
+      "evidence": [
+        "backend/src/contexts/cards/domain/cards.test.ts",
+        "backend/src/contexts/cards/application/manage-cards.test.ts",
+        "backend/src/contexts/cards/infrastructure/pg-cards-repository.test.ts",
+        "backend/src/contexts/cards/presentation/cards-route.test.ts",
+        "src/modules/cards/infrastructure/http-cards-gateway.test.ts",
+        "src/modules/cards/infrastructure/cards-api-session.test.ts",
+        "src/lib/actions/fantasy-cards.test.ts"
+      ]
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "generatePacksForFinishedRound",
+      "state": "frontend-migrated",
+      "target": "POST /api/cards/leagues/:leagueId/rounds/:roundId/generate-packs",
+      "evidence": [
+        "backend/src/contexts/cards/domain/cards.test.ts",
+        "backend/src/contexts/cards/application/manage-cards.test.ts",
+        "backend/src/contexts/cards/infrastructure/pg-cards-repository.test.ts",
+        "backend/src/contexts/cards/presentation/cards-route.test.ts",
+        "src/modules/cards/infrastructure/http-cards-gateway.test.ts",
+        "src/modules/cards/infrastructure/cards-api-session.test.ts",
+        "src/lib/actions/fantasy-cards.test.ts"
+      ]
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "giveMyAccountTestPack",
+      "state": "frontend-migrated",
+      "target": "POST /api/cards/leagues/:leagueId/packs/test-pack",
+      "evidence": [
+        "backend/src/contexts/cards/domain/cards.test.ts",
+        "backend/src/contexts/cards/application/manage-cards.test.ts",
+        "backend/src/contexts/cards/infrastructure/pg-cards-repository.test.ts",
+        "backend/src/contexts/cards/presentation/cards-route.test.ts",
+        "src/modules/cards/infrastructure/http-cards-gateway.test.ts",
+        "src/modules/cards/infrastructure/cards-api-session.test.ts",
+        "src/lib/actions/fantasy-cards.test.ts"
+      ]
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "resetMyAccountCards",
+      "state": "frontend-migrated",
+      "target": "POST /api/cards/leagues/:leagueId/reset-my-cards",
+      "evidence": [
+        "backend/src/contexts/cards/domain/cards.test.ts",
+        "backend/src/contexts/cards/application/manage-cards.test.ts",
+        "backend/src/contexts/cards/infrastructure/pg-cards-repository.test.ts",
+        "backend/src/contexts/cards/presentation/cards-route.test.ts",
+        "src/modules/cards/infrastructure/http-cards-gateway.test.ts",
+        "src/modules/cards/infrastructure/cards-api-session.test.ts",
+        "src/lib/actions/fantasy-cards.test.ts"
+      ]
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "distributePackToAllLineupUsers",
+      "state": "frontend-migrated",
+      "target": "POST /api/cards/leagues/:leagueId/packs/distribute-all",
+      "evidence": [
+        "backend/src/contexts/cards/domain/cards.test.ts",
+        "backend/src/contexts/cards/application/manage-cards.test.ts",
+        "backend/src/contexts/cards/infrastructure/pg-cards-repository.test.ts",
+        "backend/src/contexts/cards/presentation/cards-route.test.ts",
+        "src/modules/cards/infrastructure/http-cards-gateway.test.ts",
+        "src/modules/cards/infrastructure/cards-api-session.test.ts",
+        "src/lib/actions/fantasy-cards.test.ts"
+      ]
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "auditAndRepairCurrentSeasonPacks",
+      "state": "frontend-migrated",
+      "target": "POST /api/cards/leagues/:leagueId/packs/audit-repair",
+      "evidence": [
+        "backend/src/contexts/cards/domain/cards.test.ts",
+        "backend/src/contexts/cards/application/manage-cards.test.ts",
+        "backend/src/contexts/cards/infrastructure/pg-cards-repository.test.ts",
+        "backend/src/contexts/cards/presentation/cards-route.test.ts",
+        "src/modules/cards/infrastructure/http-cards-gateway.test.ts",
+        "src/modules/cards/infrastructure/cards-api-session.test.ts",
+        "src/lib/actions/fantasy-cards.test.ts"
+      ]
+    },
+    {
+      "context": "cards",
+      "source": "src/lib/actions/fantasy-cards.ts",
+      "name": "grantFantasyPackToUser",
+      "state": "frontend-migrated",
+      "target": "POST /api/cards/leagues/:leagueId/packs/grant-user",
+      "evidence": [
+        "backend/src/contexts/cards/domain/cards.test.ts",
+        "backend/src/contexts/cards/application/manage-cards.test.ts",
+        "backend/src/contexts/cards/infrastructure/pg-cards-repository.test.ts",
+        "backend/src/contexts/cards/presentation/cards-route.test.ts",
+        "src/modules/cards/infrastructure/http-cards-gateway.test.ts",
+        "src/modules/cards/infrastructure/cards-api-session.test.ts",
+        "src/lib/actions/fantasy-cards.test.ts"
+      ]
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "getMyCosmeticsDashboard",
+      "state": "frontend-migrated",
+      "target": "GET /api/cosmetics/dashboard",
+      "evidence": [
+        "backend/src/contexts/cosmetics/domain/cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/application/manage-cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/infrastructure/pg-cosmetics-repository.test.ts",
+        "backend/src/contexts/cosmetics/presentation/cosmetics-route.test.ts",
+        "src/modules/cosmetics/infrastructure/http-cosmetics-gateway.test.ts",
+        "src/modules/cosmetics/infrastructure/cosmetics-api-session.test.ts",
+        "src/lib/actions/cosmetics.test.ts"
+      ]
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "cleanupMyLegacyCosmeticsPreview",
+      "state": "frontend-migrated",
+      "target": "POST /api/cosmetics/admin/cleanup-legacy",
+      "evidence": [
+        "backend/src/contexts/cosmetics/domain/cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/application/manage-cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/infrastructure/pg-cosmetics-repository.test.ts",
+        "backend/src/contexts/cosmetics/presentation/cosmetics-route.test.ts",
+        "src/modules/cosmetics/infrastructure/http-cosmetics-gateway.test.ts",
+        "src/modules/cosmetics/infrastructure/cosmetics-api-session.test.ts",
+        "src/lib/actions/cosmetics.test.ts"
+      ]
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "dismissMyUnopenedBronzePassPack",
+      "state": "frontend-migrated",
+      "target": "POST /api/cosmetics/admin/dismiss-bronze-pack",
+      "evidence": [
+        "backend/src/contexts/cosmetics/domain/cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/application/manage-cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/infrastructure/pg-cosmetics-repository.test.ts",
+        "backend/src/contexts/cosmetics/presentation/cosmetics-route.test.ts",
+        "src/modules/cosmetics/infrastructure/http-cosmetics-gateway.test.ts",
+        "src/modules/cosmetics/infrastructure/cosmetics-api-session.test.ts",
+        "src/lib/actions/cosmetics.test.ts"
+      ]
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "resetMyTestPassRewardClaims",
+      "state": "frontend-migrated",
+      "target": "POST /api/cosmetics/admin/reset-test-claims",
+      "evidence": [
+        "backend/src/contexts/cosmetics/domain/cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/application/manage-cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/infrastructure/pg-cosmetics-repository.test.ts",
+        "backend/src/contexts/cosmetics/presentation/cosmetics-route.test.ts",
+        "src/modules/cosmetics/infrastructure/http-cosmetics-gateway.test.ts",
+        "src/modules/cosmetics/infrastructure/cosmetics-api-session.test.ts",
+        "src/lib/actions/cosmetics.test.ts"
+      ]
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "claimPassCosmetic",
+      "state": "frontend-migrated",
+      "target": "POST /api/cosmetics/claim-pass",
+      "evidence": [
+        "backend/src/contexts/cosmetics/domain/cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/application/manage-cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/infrastructure/pg-cosmetics-repository.test.ts",
+        "backend/src/contexts/cosmetics/presentation/cosmetics-route.test.ts",
+        "src/modules/cosmetics/infrastructure/http-cosmetics-gateway.test.ts",
+        "src/modules/cosmetics/infrastructure/cosmetics-api-session.test.ts",
+        "src/lib/actions/cosmetics.test.ts"
+      ]
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "purchaseSeasonPassShopItem",
+      "state": "frontend-migrated",
+      "target": "POST /api/cosmetics/purchase-shop",
+      "evidence": [
+        "backend/src/contexts/cosmetics/domain/cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/application/manage-cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/infrastructure/pg-cosmetics-repository.test.ts",
+        "backend/src/contexts/cosmetics/presentation/cosmetics-route.test.ts",
+        "src/modules/cosmetics/infrastructure/http-cosmetics-gateway.test.ts",
+        "src/modules/cosmetics/infrastructure/cosmetics-api-session.test.ts",
+        "src/lib/actions/cosmetics.test.ts"
+      ]
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "equipCosmetic",
+      "state": "frontend-migrated",
+      "target": "POST /api/cosmetics/equip",
+      "evidence": [
+        "backend/src/contexts/cosmetics/domain/cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/application/manage-cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/infrastructure/pg-cosmetics-repository.test.ts",
+        "backend/src/contexts/cosmetics/presentation/cosmetics-route.test.ts",
+        "src/modules/cosmetics/infrastructure/http-cosmetics-gateway.test.ts",
+        "src/modules/cosmetics/infrastructure/cosmetics-api-session.test.ts",
+        "src/lib/actions/cosmetics.test.ts"
+      ]
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "getAdminCosmeticsPreview",
+      "state": "frontend-migrated",
+      "target": "POST /api/cosmetics/admin-preview",
+      "evidence": [
+        "backend/src/contexts/cosmetics/domain/cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/application/manage-cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/infrastructure/pg-cosmetics-repository.test.ts",
+        "backend/src/contexts/cosmetics/presentation/cosmetics-route.test.ts",
+        "src/modules/cosmetics/infrastructure/http-cosmetics-gateway.test.ts",
+        "src/modules/cosmetics/infrastructure/cosmetics-api-session.test.ts",
+        "src/lib/actions/cosmetics.test.ts"
+      ]
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "getMyEquippedCosmetics",
+      "state": "frontend-migrated",
+      "target": "GET /api/cosmetics/equipped/me",
+      "evidence": [
+        "backend/src/contexts/cosmetics/domain/cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/application/manage-cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/infrastructure/pg-cosmetics-repository.test.ts",
+        "backend/src/contexts/cosmetics/presentation/cosmetics-route.test.ts",
+        "src/modules/cosmetics/infrastructure/http-cosmetics-gateway.test.ts",
+        "src/modules/cosmetics/infrastructure/cosmetics-api-session.test.ts",
+        "src/lib/actions/cosmetics.test.ts"
+      ]
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "getPlayerEquippedCosmetics",
+      "state": "frontend-migrated",
+      "target": "GET /api/cosmetics/equipped/players/:playerId",
+      "evidence": [
+        "backend/src/contexts/cosmetics/domain/cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/application/manage-cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/infrastructure/pg-cosmetics-repository.test.ts",
+        "backend/src/contexts/cosmetics/presentation/cosmetics-route.test.ts",
+        "src/modules/cosmetics/infrastructure/http-cosmetics-gateway.test.ts",
+        "src/modules/cosmetics/infrastructure/cosmetics-api-session.test.ts",
+        "src/lib/actions/cosmetics.test.ts"
+      ]
+    },
+    {
+      "context": "cosmetics",
+      "source": "src/lib/actions/cosmetics.ts",
+      "name": "getAllPlayersEquippedCosmeticsMap",
+      "state": "frontend-migrated",
+      "target": "POST /api/cosmetics/equipped/players-map",
+      "evidence": [
+        "backend/src/contexts/cosmetics/domain/cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/application/manage-cosmetics.test.ts",
+        "backend/src/contexts/cosmetics/infrastructure/pg-cosmetics-repository.test.ts",
+        "backend/src/contexts/cosmetics/presentation/cosmetics-route.test.ts",
+        "src/modules/cosmetics/infrastructure/http-cosmetics-gateway.test.ts",
+        "src/modules/cosmetics/infrastructure/cosmetics-api-session.test.ts",
+        "src/lib/actions/cosmetics.test.ts"
+      ]
+    },
+    {
+      "context": "collective",
+      "source": "src/lib/actions/collective.ts",
+      "name": "getActiveCollectiveSummary",
+      "state": "frontend-migrated",
+      "target": "GET /api/collective/leagues/:leagueId/summary",
+      "evidence": [
+        "backend/src/contexts/collective/domain/collective.test.ts",
+        "backend/src/contexts/collective/application/manage-collective.test.ts",
+        "backend/src/contexts/collective/infrastructure/pg-collective-repository.test.ts",
+        "backend/src/contexts/collective/presentation/collective-route.test.ts",
+        "src/modules/collective/infrastructure/http-collective-gateway.test.ts",
+        "src/modules/collective/infrastructure/collective-api-session.test.ts",
+        "src/lib/actions/collective.test.ts"
+      ]
+    },
+    {
+      "context": "collective",
+      "source": "src/lib/actions/collective.ts",
+      "name": "getCollectiveRoom",
+      "state": "frontend-migrated",
+      "target": "GET /api/collective/leagues/:leagueId/room",
+      "evidence": [
+        "backend/src/contexts/collective/domain/collective.test.ts",
+        "backend/src/contexts/collective/application/manage-collective.test.ts",
+        "backend/src/contexts/collective/infrastructure/pg-collective-repository.test.ts",
+        "backend/src/contexts/collective/presentation/collective-route.test.ts",
+        "src/modules/collective/infrastructure/http-collective-gateway.test.ts",
+        "src/modules/collective/infrastructure/collective-api-session.test.ts",
+        "src/lib/actions/collective.test.ts"
+      ]
+    },
+    {
+      "context": "collective",
+      "source": "src/lib/actions/collective.ts",
+      "name": "getOlderCollectiveMessages",
+      "state": "frontend-migrated",
+      "target": "POST /api/collective/leagues/:leagueId/callups/:callupId/messages",
+      "evidence": [
+        "backend/src/contexts/collective/domain/collective.test.ts",
+        "backend/src/contexts/collective/application/manage-collective.test.ts",
+        "backend/src/contexts/collective/infrastructure/pg-collective-repository.test.ts",
+        "backend/src/contexts/collective/presentation/collective-route.test.ts",
+        "src/modules/collective/infrastructure/http-collective-gateway.test.ts",
+        "src/modules/collective/infrastructure/collective-api-session.test.ts",
+        "src/lib/actions/collective.test.ts"
+      ]
+    },
+    {
+      "context": "collective",
+      "source": "src/lib/actions/collective.ts",
+      "name": "sendCollectiveMessage",
+      "state": "frontend-migrated",
+      "target": "POST /api/collective/leagues/:leagueId/messages",
+      "evidence": [
+        "backend/src/contexts/collective/domain/collective.test.ts",
+        "backend/src/contexts/collective/application/manage-collective.test.ts",
+        "backend/src/contexts/collective/infrastructure/pg-collective-repository.test.ts",
+        "backend/src/contexts/collective/presentation/collective-route.test.ts",
+        "src/modules/collective/infrastructure/http-collective-gateway.test.ts",
+        "src/modules/collective/infrastructure/collective-api-session.test.ts",
+        "src/lib/actions/collective.test.ts"
+      ]
+    },
+    {
+      "context": "collective",
+      "source": "src/lib/actions/collective.ts",
+      "name": "editCollectiveMessage",
+      "state": "frontend-migrated",
+      "target": "PATCH /api/collective/leagues/:leagueId/messages/:messageId",
+      "evidence": [
+        "backend/src/contexts/collective/domain/collective.test.ts",
+        "backend/src/contexts/collective/application/manage-collective.test.ts",
+        "backend/src/contexts/collective/infrastructure/pg-collective-repository.test.ts",
+        "backend/src/contexts/collective/presentation/collective-route.test.ts",
+        "src/modules/collective/infrastructure/http-collective-gateway.test.ts",
+        "src/modules/collective/infrastructure/collective-api-session.test.ts",
+        "src/lib/actions/collective.test.ts"
+      ]
+    },
+    {
+      "context": "collective",
+      "source": "src/lib/actions/collective.ts",
+      "name": "deleteCollectiveMessage",
+      "state": "frontend-migrated",
+      "target": "DELETE /api/collective/leagues/:leagueId/messages/:messageId",
+      "evidence": [
+        "backend/src/contexts/collective/domain/collective.test.ts",
+        "backend/src/contexts/collective/application/manage-collective.test.ts",
+        "backend/src/contexts/collective/infrastructure/pg-collective-repository.test.ts",
+        "backend/src/contexts/collective/presentation/collective-route.test.ts",
+        "src/modules/collective/infrastructure/http-collective-gateway.test.ts",
+        "src/modules/collective/infrastructure/collective-api-session.test.ts",
+        "src/lib/actions/collective.test.ts"
+      ]
+    },
+    {
+      "context": "collective",
+      "source": "src/lib/actions/collective.ts",
+      "name": "markCollectiveRead",
+      "state": "frontend-migrated",
+      "target": "POST /api/collective/leagues/:leagueId/reads",
+      "evidence": [
+        "backend/src/contexts/collective/domain/collective.test.ts",
+        "backend/src/contexts/collective/application/manage-collective.test.ts",
+        "backend/src/contexts/collective/infrastructure/pg-collective-repository.test.ts",
+        "backend/src/contexts/collective/presentation/collective-route.test.ts",
+        "src/modules/collective/infrastructure/http-collective-gateway.test.ts",
+        "src/modules/collective/infrastructure/collective-api-session.test.ts",
+        "src/lib/actions/collective.test.ts"
+      ]
+    },
+    {
+      "context": "collective",
+      "source": "src/lib/actions/collective.ts",
+      "name": "getAdminPreviousCollective",
+      "state": "frontend-migrated",
+      "target": "GET /api/collective/leagues/:leagueId/admin-previous",
+      "evidence": [
+        "backend/src/contexts/collective/domain/collective.test.ts",
+        "backend/src/contexts/collective/application/manage-collective.test.ts",
+        "backend/src/contexts/collective/infrastructure/pg-collective-repository.test.ts",
+        "backend/src/contexts/collective/presentation/collective-route.test.ts",
+        "src/modules/collective/infrastructure/http-collective-gateway.test.ts",
+        "src/modules/collective/infrastructure/collective-api-session.test.ts",
+        "src/lib/actions/collective.test.ts"
+      ]
+    },
+    {
+      "context": "integrations",
+      "source": "src/app/bq-manager/actions.ts",
+      "name": "createManagerClub",
+      "state": "frontend-migrated",
+      "target": "POST /api/integrations/manager/club",
+      "evidence": [
+        "backend/src/contexts/integrations/domain/manager.test.ts",
+        "backend/src/contexts/integrations/application/manage-manager.test.ts",
+        "backend/src/contexts/integrations/infrastructure/pg-manager-repository.test.ts",
+        "backend/src/contexts/integrations/presentation/manager-route.test.ts",
+        "src/modules/integrations/infrastructure/http-manager-gateway.test.ts",
+        "src/modules/integrations/infrastructure/manager-api-session.test.ts",
+        "src/app/bq-manager/actions.test.ts"
+      ]
+    },
+    {
+      "context": "integrations",
+      "source": "src/app/bq-manager/actions.ts",
+      "name": "runManagerCommand",
+      "state": "frontend-migrated",
+      "target": "POST /api/integrations/manager/command",
+      "evidence": [
+        "backend/src/contexts/integrations/domain/manager.test.ts",
+        "backend/src/contexts/integrations/application/manage-manager.test.ts",
+        "backend/src/contexts/integrations/infrastructure/pg-manager-repository.test.ts",
+        "backend/src/contexts/integrations/presentation/manager-route.test.ts",
+        "src/modules/integrations/infrastructure/http-manager-gateway.test.ts",
+        "src/modules/integrations/infrastructure/manager-api-session.test.ts",
+        "src/app/bq-manager/actions.test.ts"
+      ]
+    },
+    {
+      "context": "operations",
+      "source": "src/lib/actions/performance.ts",
+      "name": "getPerformanceSummary",
+      "state": "frontend-migrated",
+      "target": "GET /api/operations/performance-summary",
+      "evidence": [
+        "backend/src/contexts/operations/domain/operations.test.ts",
+        "backend/src/contexts/operations/application/manage-operations.test.ts",
+        "backend/src/contexts/operations/infrastructure/pg-operations-repository.test.ts",
+        "backend/src/contexts/operations/presentation/operations-route.test.ts",
+        "src/modules/operations/infrastructure/http-operations-gateway.test.ts",
+        "src/modules/operations/infrastructure/operations-api-session.test.ts",
+        "src/lib/actions/performance.test.ts",
+        "src/app/api/internal/observability/route.test.ts"
+      ]
+    },
+    {
+      "context": "operations",
+      "source": "src/app/api/internal/observability/route.ts",
+      "name": "POST",
+      "state": "frontend-migrated",
+      "target": "POST /api/internal/operations/observability",
+      "evidence": [
+        "backend/src/contexts/operations/domain/operations.test.ts",
+        "backend/src/contexts/operations/application/manage-operations.test.ts",
+        "backend/src/contexts/operations/infrastructure/pg-operations-repository.test.ts",
+        "backend/src/contexts/operations/presentation/operations-route.test.ts",
+        "src/modules/operations/infrastructure/http-operations-gateway.test.ts",
+        "src/modules/operations/infrastructure/operations-api-session.test.ts",
+        "src/lib/actions/performance.test.ts",
+        "src/app/api/internal/observability/route.test.ts"
+      ]
+    }
+  ]
+}

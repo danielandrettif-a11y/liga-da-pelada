@@ -5,15 +5,27 @@ const mocks = vi.hoisted(() => ({
   selectedLeague: vi.fn(),
   revalidatePath: vi.fn(),
   rpc: vi.fn(),
+  rosterApi: vi.fn(),
+  unreadState: vi.fn(),
+  unreadPlayers: vi.fn(),
+  markThrough: vi.fn(),
+  markSeen: vi.fn(),
+  registrationHistory: vi.fn(),
+  mergeCandidates: vi.fn(),
+  mergeGuest: vi.fn(),
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 vi.mock("@/lib/auth", () => ({ getCurrentAccount: mocks.account }));
 vi.mock("@/lib/league-context", () => ({ getSelectedLeague: mocks.selectedLeague }));
-vi.mock("./stats", () => ({ calculateRoundStats: vi.fn() }));
-vi.mock("./overall", () => ({ refreshFluidOverallSafely: vi.fn() }));
+vi.mock("./stats", () => ({ calculateRoundStats: vi.fn().mockResolvedValue({ success: true }) }));
+vi.mock("./overall", () => ({ refreshFluidOverallSafely: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("@/modules/roster/infrastructure/roster-api-session", () => ({ rosterApiFor: mocks.rosterApi }));
 
-import { getRosterUnreadState, markRosterActivitySeen, markRosterActivitySeenThrough } from "./registrations";
+import {
+  getRegisteredMergeCandidates, getRegistrationHistory, getRosterUnreadState, getUnreadRosterPlayers,
+  markRosterActivitySeen, markRosterActivitySeenThrough, mergeGuestWithRegistered,
+} from "./registrations";
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -24,6 +36,7 @@ beforeEach(() => {
   });
   mocks.selectedLeague.mockResolvedValue({ id: "league-a", role: "admin" });
   mocks.rpc.mockResolvedValue({ error: null });
+  mocks.rosterApi.mockResolvedValue(null);
 });
 
 describe("leitura do elenco por pelada", () => {
@@ -80,5 +93,50 @@ describe("leitura do elenco por pelada", () => {
     expect((await markRosterActivitySeen()).success).toBe(false);
     expect((await markRosterActivitySeenThrough("2026-10-10T12:00:00.000Z")).success).toBe(false);
     expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+  it("usa a API de elenco para leitura e confirmação quando a flag está ativa", async () => {
+    mocks.rosterApi.mockResolvedValue({
+      getRosterUnreadState: mocks.unreadState,
+      getUnreadRosterPlayers: mocks.unreadPlayers,
+      markRosterActivitySeenThrough: mocks.markThrough,
+      markRosterActivitySeen: mocks.markSeen,
+    });
+    mocks.unreadState.mockResolvedValue({ count: 2, lastSeenAt: "2026-10-09T12:00:00.000Z" });
+    mocks.unreadPlayers.mockResolvedValue({ playerIds: ["player-a"], seenThrough: "2026-10-10T12:00:00.000Z" });
+    await expect(getRosterUnreadState()).resolves.toMatchObject({ count: 2 });
+    await expect(getUnreadRosterPlayers()).resolves.toMatchObject({ playerIds: ["player-a"] });
+    await expect(markRosterActivitySeenThrough("2026-10-10T12:00:00.000Z")).resolves.toEqual({ success: true });
+    await expect(markRosterActivitySeen()).resolves.toEqual({ success: true });
+    expect(mocks.unreadState).toHaveBeenCalledWith("league-a");
+    expect(mocks.markThrough).toHaveBeenCalledWith("league-a", "2026-10-10T12:00:00.000Z");
+    expect(mocks.markSeen).toHaveBeenCalledWith("league-a");
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+  it("usa a API de elenco para histórico administrativo e candidatos à união", async () => {
+    mocks.rosterApi.mockResolvedValue({
+      getRegistrationHistory: mocks.registrationHistory,
+      getRegisteredMergeCandidates: mocks.mergeCandidates,
+    });
+    mocks.registrationHistory.mockResolvedValue([{ id: 1, player_id: "guest-a" }]);
+    mocks.mergeCandidates.mockResolvedValue([{ id: "player-a", name: "Atleta" }]);
+    await expect(getRegistrationHistory()).resolves.toMatchObject([{ id: 1 }]);
+    await expect(getRegisteredMergeCandidates("guest-a")).resolves.toMatchObject([{ id: "player-a" }]);
+    expect(mocks.registrationHistory).toHaveBeenCalledWith("league-a");
+    expect(mocks.mergeCandidates).toHaveBeenCalledWith("league-a", "guest-a");
+  });
+
+  it("usa a API de elenco para união de perfis quando a flag está ativa", async () => {
+    mocks.rosterApi.mockResolvedValue({
+      mergeGuestWithRegistered: mocks.mergeGuest,
+    });
+    mocks.mergeGuest.mockResolvedValue({ success: true, playerId: "guest-a", affectedRoundIds: [] });
+    await expect(mergeGuestWithRegistered("guest-a", "player-a")).resolves.toEqual({
+      success: true, playerId: "guest-a",
+    });
+    expect(mocks.mergeGuest).toHaveBeenCalledWith("league-a", "guest-a", "player-a");
+    expect(mocks.rpc).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/jogadores");
   });
 });

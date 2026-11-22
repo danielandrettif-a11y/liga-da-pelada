@@ -6,6 +6,7 @@ import { getCurrentAccount } from "@/lib/auth";
 import { getActiveLeague } from "./rounds";
 import { getActiveSeason } from "./seasons";
 import { buildAwardSeasonsByPlayer } from "../awards";
+import { notificationApiFor } from "@/modules/notifications/infrastructure/notification-api-session";
 
 export type InboxNotification = { id: string; title: string; body: string; href: string; notification_type?: string; state: "active" | "resolved"; read_at: string | null; created_at: string; updated_at: string };
 
@@ -15,6 +16,8 @@ export type InboxNotification = { id: string; title: string; body: string; href:
 const getMyInboxPreviewCached = cache(async (): Promise<InboxNotification[]> => {
   const account = await getCurrentAccount();
   if (!account.user) return [];
+  const api = await notificationApiFor(account.client);
+  if (api) return api.getInboxPreview();
 
   const { data, error } = await account.client
     .from("user_inbox_notifications")
@@ -238,6 +241,9 @@ export async function getMyInboxNotifications(): Promise<InboxNotification[]> {
       }
     }
 
+    const api = await notificationApiFor(account.client);
+    if (api) return api.syncAndListInbox(league.id, desired);
+
     const keys = new Set(desired.map((item) => item.key));
 
     // Buscar notificações existentes para nunca reabrir notificações já lidas/dispensadas pelo usuário
@@ -313,6 +319,13 @@ export async function getMyInboxNotifications(): Promise<InboxNotification[]> {
 export async function markInboxRead(ids?: string[]) {
   const account = await getCurrentAccount();
   if (!account.user) return { success: false };
+  const api = await notificationApiFor(account.client);
+  if (api) {
+    const res = await api.markInboxRead(ids);
+    revalidatePath("/");
+    revalidatePath("/notificacoes");
+    return res;
+  }
   let query = account.client
     .from("user_inbox_notifications")
     .update({ read_at: new Date().toISOString(), state: "resolved", resolved_at: new Date().toISOString() })

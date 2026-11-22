@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { CallupBoard } from "@/components/CallupBoard";
@@ -11,10 +12,11 @@ import { getFantasyQuickHighlights } from "@/lib/actions/fantasy";
 import { getStadiums } from "@/lib/actions/stadiums";
 import { labelCallupTabs } from "@/lib/callup-ui";
 import { getAllPlayersEquippedCosmeticsMap } from "@/lib/actions/cosmetics";
-import { getDraftWorkspace } from "@/lib/actions/draft";
+import { getDraftWorkspace, hasCallupDraft } from "@/lib/actions/draft";
 import { getCollectiveRoom } from "@/lib/actions/collective";
 import { DraftBoard } from "@/components/DraftBoard";
 import { CollectiveRoom } from "@/components/CollectiveRoom";
+import { WeatherBadge } from "@/components/WeatherBadge";
 import { CollectiveNavLink } from "@/components/CollectiveNavLink";
 import { Flag, Sparkles } from "@/components/icons";
 import { getEventWeather } from "@/lib/weather";
@@ -100,39 +102,16 @@ export default async function ConvocacaoPage({
 
   const callup = callups.find((item) => item.id === params.callup) || callups[0];
   const labeledCallups = labelCallupTabs(callups);
-  const [leagueConfig, fantasyHighlights, stadiums, cosmeticsMap, draftWorkspace, collectiveRoom] = await Promise.all([
-    safely(getLeagueConfig(), null),
-    selectedLeague?.featureTier === "complete" ? safely(getFantasyQuickHighlights(), null) : Promise.resolve(null),
-    safely(getStadiums(), []),
-    safely(getAllPlayersEquippedCosmeticsMap(), new Map()),
-    account.user && selectedLeague?.featureTier !== "quick" ? safely(getDraftWorkspace(callup.id), null) : Promise.resolve(null),
-    account.user && selectedLeague?.featureTier !== "quick" ? safely(getCollectiveRoom(callup.id), null) : Promise.resolve(null),
+  const canUseSections = Boolean(account.user && selectedLeague?.featureTier !== "quick");
+  const [draftWorkspace, collectiveRoom, hasDraft] = await Promise.all([
+    canUseSections && params.section === "draft" ? safely(getDraftWorkspace(callup.id), null) : null,
+    canUseSections && params.section === "collective"
+      ? safely(getCollectiveRoom(callup.id), null) : null,
+    canUseSections && params.section !== "draft" ? safely(hasCallupDraft(callup.id), false) : false,
   ]);
-  const section = params.section === "draft" && draftWorkspace
-    ? "draft"
-    : params.section === "collective" && collectiveRoom && callup.status !== "converted"
-      ? "collective"
-      : "list";
-  const showCollectiveInCallup = Boolean(collectiveRoom && callup.status !== "converted");
-
-  // A convocação é colaborativa: qualquer pessoa logada pode escolher um
-  // atleta elegível do elenco. A RPC ainda valida a liga, a abertura e a vaga.
-  const selectablePlayers = account.user
-    ? await safely(getSelectableLeaguePlayers(callup.league_id), [])
-    : [];
-  const visibleSelectablePlayers = selectedLeague?.featureTier === "quick"
-    ? selectablePlayers.filter((player) => player.member_category === "guest")
-    : selectablePlayers;
-  const stadiumName = callup.stadium_name || leagueConfig?.stadium_name || null;
-  const stadiumMapUrl = callup.stadium_map_url || leagueConfig?.stadium_map_url || null;
-  const stadium = stadiums.find((item) => item.id === callup.stadium_id);
-  const weather = await safely(getEventWeather({
-    latitude: stadium?.latitude,
-    longitude: stadium?.longitude,
-    date: callup.date,
-    startTime: callup.start_time || "08:00",
-    durationMinutes: leagueConfig?.event_duration_minutes || 120,
-  }), null);
+  const section = draftWorkspace ? "draft" : collectiveRoom ? "collective" : "list";
+  const showDraft = Boolean(draftWorkspace || hasDraft);
+  const showCollective = Boolean(collectiveRoom);
 
   return (
     <div className="min-w-0 overflow-x-clip">
@@ -155,35 +134,87 @@ export default async function ConvocacaoPage({
           })}
         </nav>
       )}
-      {(draftWorkspace || showCollectiveInCallup) && (
-        <nav className={`mb-4 grid rounded-2xl border border-border bg-surface p-1 ${draftWorkspace && showCollectiveInCallup ? "grid-cols-3" : "grid-cols-2"}`} aria-label="Áreas da convocação">
+      {(showDraft || showCollective) && (
+        <nav className={`mb-4 grid rounded-2xl border border-border bg-surface p-1 ${showDraft && showCollective ? "grid-cols-3" : "grid-cols-2"}`} aria-label="Áreas da convocação">
           <Link href={`/convocacao?callup=${callup.id}`} className={`flex items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-[10px] font-black uppercase ${section === "list" ? "bg-accent text-background" : "text-muted"}`}><Flag className="h-4 w-4" /> Lista</Link>
-          {draftWorkspace && <Link href={`/convocacao?callup=${callup.id}&section=draft`} className={`flex items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-[10px] font-black uppercase ${section === "draft" ? "bg-accent text-background" : "text-muted"}`}><Sparkles className="h-4 w-4" /> Draft</Link>}
-          {showCollectiveInCallup && <CollectiveNavLink callupId={callup.id} currentUserId={account.user?.id || null} initialUnread={collectiveRoom?.summary.unreadCount || 0} active={section === "collective"} />}
+          {showDraft && <Link href={`/convocacao?callup=${callup.id}&section=draft`} className={`flex items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 text-[10px] font-black uppercase ${section === "draft" ? "bg-accent text-background" : "text-muted"}`}><Sparkles className="h-4 w-4" /> Draft</Link>}
+          {showCollective && <CollectiveNavLink callupId={callup.id} currentUserId={account.user?.id || null} initialUnread={collectiveRoom?.summary.unreadCount || 0} active={section === "collective"} />}
         </nav>
       )}
       {section === "draft" && draftWorkspace ? <DraftBoard workspace={draftWorkspace} /> : section === "collective" && collectiveRoom ? <CollectiveRoom room={collectiveRoom} compact /> : (
-      <CallupBoard
-        key={callup.id}
-        callup={callup}
-        currentUserId={account.user?.id || null}
-        currentPlayerId={account.profile?.player_id || null}
-        isAuthenticated={Boolean(account.user)}
-        isAdmin={account.isAdmin}
-        selectablePlayers={visibleSelectablePlayers}
-        stadiumName={stadiumName}
-        stadiumMapUrl={stadiumMapUrl}
-        stadiums={stadiums}
-        fantasyHighlights={fantasyHighlights}
-        playerCosmetics={Object.fromEntries(cosmeticsMap)}
-        initialListTab={params.list === "waitlist" ? "waitlist" : "confirmed"}
-        initialPlayerSetupOpen={account.isAdmin && params.setup === "players"}
-        cartolaEnabled={selectedLeague?.featureTier === "complete"}
-        loginReturnTo={params.invite ? `/c/${encodeURIComponent(params.invite)}` : "/convocacao"}
-        weather={weather}
-        soloMode={selectedLeague?.featureTier === "quick"}
-      />
+        <Suspense fallback={<p role="status" className="py-4 text-sm text-muted">Carregando lista…</p>}>
+          <CallupList callup={callup} account={account} selectedLeague={selectedLeague} params={params} />
+        </Suspense>
       )}
     </div>
   );
+}
+
+
+async function CallupList({
+  callup,
+  account,
+  selectedLeague,
+  params,
+}: {
+  callup: Awaited<ReturnType<typeof getActiveCallups>>[number];
+  account: Awaited<ReturnType<typeof getCurrentAccount>>;
+  selectedLeague: Awaited<ReturnType<typeof getSelectedLeague>>;
+  params: { list?: string; setup?: string; invite?: string };
+}) {
+  const [leagueConfig, fantasyHighlights, stadiums, cosmeticsMap, selectablePlayers] = await Promise.all([
+    safely(getLeagueConfig(), null),
+    selectedLeague?.featureTier === "complete" ? safely(getFantasyQuickHighlights(), null) : null,
+    safely(getStadiums(), []),
+    safely(getAllPlayersEquippedCosmeticsMap(), new Map()),
+    account.user ? safely(getSelectableLeaguePlayers(callup.league_id), []) : [],
+  ]);
+  const visibleSelectablePlayers = selectedLeague?.featureTier === "quick"
+    ? selectablePlayers.filter((player) => player.member_category === "guest")
+    : selectablePlayers;
+  const stadiumName = callup.stadium_name || leagueConfig?.stadium_name || null;
+  const stadiumMapUrl = callup.stadium_map_url || leagueConfig?.stadium_map_url || null;
+  const stadium = stadiums.find((item) => item.id === callup.stadium_id);
+
+  return (
+    <CallupBoard
+      key={callup.id}
+      callup={callup}
+      currentUserId={account.user?.id || null}
+      currentPlayerId={account.profile?.player_id || null}
+      isAuthenticated={Boolean(account.user)}
+      isAdmin={account.isAdmin}
+      selectablePlayers={visibleSelectablePlayers}
+      stadiumName={stadiumName}
+      stadiumMapUrl={stadiumMapUrl}
+      stadiums={stadiums}
+      fantasyHighlights={fantasyHighlights}
+      playerCosmetics={Object.fromEntries(cosmeticsMap)}
+      initialListTab={params.list === "waitlist" ? "waitlist" : "confirmed"}
+      initialPlayerSetupOpen={account.isAdmin && params.setup === "players"}
+      cartolaEnabled={selectedLeague?.featureTier === "complete"}
+      allowDirectRead={process.env.CALLUPS_API_ENABLED === "true" && Boolean(account.profile?.player_id && selectedLeague) && !params.invite}
+      loginReturnTo={params.invite ? `/c/${encodeURIComponent(params.invite)}` : "/convocacao"}
+      weatherBadge={
+        <Suspense fallback={null}>
+          <CallupWeather
+            latitude={stadium?.latitude}
+            longitude={stadium?.longitude}
+            date={callup.date}
+            startTime={callup.start_time || "08:00"}
+            durationMinutes={leagueConfig?.event_duration_minutes || 120}
+            locationName={stadiumName}
+          />
+        </Suspense>
+      }
+      soloMode={selectedLeague?.featureTier === "quick"}
+    />
+  );
+}
+
+async function CallupWeather({ locationName, ...event }: Parameters<typeof getEventWeather>[0] & {
+  locationName: string | null;
+}) {
+  const weather = await safely(getEventWeather(event), null);
+  return <WeatherBadge weather={weather} locationName={locationName} />;
 }

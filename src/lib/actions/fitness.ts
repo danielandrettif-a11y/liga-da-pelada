@@ -4,26 +4,24 @@ import { revalidatePath } from "next/cache";
 import { getCurrentAccount } from "../auth";
 import type { PlayerRoundFitness, RoundType } from "../types";
 import { getActiveSeason } from "./seasons";
+import { getSelectedLeague } from "../league-context";
+import { rosterApiFor } from "@/modules/roster/infrastructure/roster-api-session";
+import type { FitnessRoundEntry, FitnessSummary } from "@/modules/roster/domain/fitness";
 
-export type FitnessRoundEntry = {
-  roundId: string;
-  number: number;
-  date: string;
-  roundType: RoundType;
-  fitness: PlayerRoundFitness | null;
-};
-
-export type FitnessSummary = {
-  distanceKm: number;
-  averageSpeedKmh: number;
-  metersPerMinute: number;
-  entries: number;
-};
+export type { FitnessRoundEntry, FitnessSummary } from "@/modules/roster/domain/fitness";
 
 export async function getMyFitnessRounds(playerId: string): Promise<FitnessRoundEntry[]> {
   const account = await getCurrentAccount();
   if (!account.user || account.profile?.player_id !== playerId) return [];
-  const season = await getActiveSeason();
+  const league = await getSelectedLeague();
+  if (!league) return [];
+  try {
+    const api = await rosterApiFor(account.client);
+    if (api) return await api.getMyFitnessRounds(playerId, league.id);
+  } catch {
+    return [];
+  }
+  const season = await getActiveSeason(league.id);
   if (!season) return [];
   const { data, error } = await account.client
     .from("round_players")
@@ -59,6 +57,18 @@ export async function saveMyFitness(roundId: string, distance: number, paceInput
   const account = await getCurrentAccount();
   const playerId = account.profile?.player_id;
   if (!account.user || !playerId) return { success: false, error: "Conta sem jogador vinculado." };
+  try {
+    const api = await rosterApiFor(account.client);
+    if (api) {
+      const persistedPlayerId = await api.saveMyFitness(roundId, distance, paceInput);
+      revalidatePath("/meu-perfil");
+      revalidatePath(`/jogadores/${persistedPlayerId}`);
+      revalidatePath("/ranking");
+      return { success: true };
+    }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível salvar os dados físicos." };
+  }
   const distanceKm = Number(distance);
   const rawPace = Number(paceInput);
   if (!Number.isFinite(distanceKm) || distanceKm < 0.01 || distanceKm > 100) {
@@ -90,6 +100,18 @@ export async function setFitnessVisibility(visible: boolean) {
   const account = await getCurrentAccount();
   const playerId = account.profile?.player_id;
   if (!account.user || !playerId) return { success: false, error: "Conta sem jogador vinculado." };
+  try {
+    const api = await rosterApiFor(account.client);
+    if (api) {
+      const persistedPlayerId = await api.setFitnessVisibility(Boolean(visible));
+      revalidatePath("/meu-perfil");
+      revalidatePath(`/jogadores/${persistedPlayerId}`);
+      revalidatePath("/ranking");
+      return { success: true };
+    }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível alterar a privacidade." };
+  }
   const { error } = await account.client.from("players").update({ show_fitness_stats: Boolean(visible) }).eq("id", playerId);
   if (error) return { success: false, error: error.message };
   revalidatePath("/meu-perfil");
@@ -100,10 +122,20 @@ export async function setFitnessVisibility(visible: boolean) {
 
 export async function getPlayerFitnessSummaries(playerId: string): Promise<{ official: FitnessSummary; friendly: FitnessSummary } | null> {
   const account = await getCurrentAccount();
+  const league = await getSelectedLeague();
+  if (!league) return null;
+  if (account.user) {
+    try {
+      const api = await rosterApiFor(account.client);
+      if (api) return await api.getPlayerFitnessSummaries(playerId, league.id);
+    } catch {
+      return null;
+    }
+  }
   const playerResult = await account.client.from("players").select("show_fitness_stats").eq("id", playerId).maybeSingle();
   const owns = account.profile?.player_id === playerId;
   if (!playerResult.data?.show_fitness_stats && !owns) return null;
-  const season = await getActiveSeason();
+  const season = await getActiveSeason(league.id);
   if (!season) return null;
   const client = account.client;
   const { data, error } = await client.from("player_round_fitness").select(`

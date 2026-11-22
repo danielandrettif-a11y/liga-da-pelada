@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCurrentAccount } from "@/lib/auth";
+import { homeTraceId } from "@/lib/home-performance";
+import { measureMatchStep } from "@/lib/match-performance";
 import { ACTIVE_LEAGUE_COOKIE } from "@/lib/league-context";
 import {
   ENTRY_FLOW_DONE_COOKIE,
@@ -13,13 +15,20 @@ import {
 } from "@/lib/entry-flow";
 import { createLeagueForUser } from "@/modules/leagues/application/create-league";
 import { supabaseLeagueCreator } from "@/modules/leagues/infrastructure/supabase-league-creator";
+import { asLeagueCreator } from "@/modules/leagues/infrastructure/http-league-gateway";
+import { leagueApiFor } from "@/modules/leagues/infrastructure/league-api-session";
 
-async function completePendingEntryFlow(client: any) {
+async function completePendingEntryFlow(client: Awaited<ReturnType<typeof getCurrentAccount>>["client"]) {
   const cookieStore = await cookies();
   const pending = cookieStore.get(ENTRY_FLOW_PENDING_COOKIE)?.value;
   if (!pending) return null;
-  const { error } = await client.rpc("complete_my_entry_flow", { p_version: ENTRY_FLOW_VERSION });
-  if (error) throw new Error(error.message);
+  const api = await leagueApiFor(client);
+  if (api) {
+    await api.completeEntryFlow(ENTRY_FLOW_VERSION);
+  } else {
+    const { error } = await client.rpc("complete_my_entry_flow", { p_version: ENTRY_FLOW_VERSION });
+    if (error) throw new Error(error.message);
+  }
   cookieStore.set(ENTRY_FLOW_DONE_COOKIE, String(ENTRY_FLOW_VERSION), {
     httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax",
     path: "/", maxAge: 60 * 60 * 24 * 365,
@@ -38,23 +47,34 @@ export async function continueEntryFlow() {
 
 export async function enterLeague(formData: FormData) {
   const leagueId = String(formData.get("league_id") || "");
-  const { client, user, memberships } = await getCurrentAccount();
+  const traceId = homeTraceId(formData.get("home_trace"));
+  const { client, user, memberships } = await measureMatchStep("load_home", "entry_account", getCurrentAccount, traceId);
   if (!user) redirect("/login?next=/lobby");
-  if (!memberships.some((membership) => membership.league_id === leagueId)) {
+  try {
+    await measureMatchStep("load_home", "entry_authorize", async () => {
+      const api = await leagueApiFor(client);
+      if (api) await api.authorizeSelection(leagueId, "active");
+      else if (!memberships.some((membership) => membership.league_id === leagueId)) throw new Error("access");
+    }, traceId);
+  } catch {
     redirect("/lobby?error=access");
   }
   (await cookies()).set(ACTIVE_LEAGUE_COOKIE, leagueId, {
     httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 365,
   });
   const destination = await completePendingEntryFlow(client);
-  redirect(destination || "/");
+  redirect(destination || (traceId ? `/?home_trace=${traceId}` : "/"));
 }
 
 export async function enterArchivedQuickLeague(formData: FormData) {
   const leagueId = String(formData.get("league_id") || "");
-  const { user, memberships } = await getCurrentAccount();
+  const { client, user, memberships } = await getCurrentAccount();
   if (!user) redirect("/login?next=/lobby");
-  if (!memberships.some((membership) => membership.league_id === leagueId)) {
+  try {
+    const api = await leagueApiFor(client);
+    if (api) await api.authorizeSelection(leagueId, "archived-quick");
+    else if (!memberships.some((membership) => membership.league_id === leagueId)) throw new Error("access");
+  } catch {
     redirect("/lobby?error=access");
   }
   (await cookies()).set(ACTIVE_LEAGUE_COOKIE, leagueId, {
@@ -65,10 +85,20 @@ export async function enterArchivedQuickLeague(formData: FormData) {
 
 export async function toggleFavorite(formData: FormData) {
   const leagueId = String(formData.get("league_id") || "");
+  const favorite = formData.get("favorite") === "true";
   const { client, user } = await getCurrentAccount();
   if (!user) redirect("/login?next=/lobby");
-  const { error } = await client.rpc("toggle_league_favorite", { p_league_id: leagueId });
-  if (error) redirect("/lobby?error=favorite");
+  try {
+    const api = await leagueApiFor(client);
+    if (api) {
+      await api.setFavorite(leagueId, favorite);
+    } else {
+      const { error } = await client.rpc("toggle_league_favorite", { p_league_id: leagueId });
+      if (error) throw new Error(error.message);
+    }
+  } catch {
+    redirect("/lobby?error=favorite");
+  }
   revalidatePath("/lobby");
 }
 
@@ -76,8 +106,17 @@ export async function requestAccess(formData: FormData) {
   const token = String(formData.get("token") || "");
   const { client, user } = await getCurrentAccount();
   if (!user) redirect(`/login?next=${encodeURIComponent(`/convite/${token}`)}`);
-  const { error } = await client.rpc("request_league_membership", { p_invite_token: token });
-  if (error) redirect(`/convite/${encodeURIComponent(token)}?error=request`);
+  try {
+    const api = await leagueApiFor(client);
+    if (api) {
+      await api.requestByInvite(token);
+    } else {
+      const { error } = await client.rpc("request_league_membership", { p_invite_token: token });
+      if (error) throw new Error(error.message);
+    }
+  } catch {
+    redirect(`/convite/${encodeURIComponent(token)}?error=request`);
+  }
   revalidatePath(`/convite/${token}`);
   redirect(`/convite/${encodeURIComponent(token)}?sent=1`);
 }
@@ -91,8 +130,15 @@ export async function reviewAccess(formData: FormData) {
     : "/lobby";
   const { client, user } = await getCurrentAccount();
   if (!user) redirect("/login?next=/lobby");
-  const { error } = await client.rpc("review_league_membership", { p_request_id: requestId, p_approve: approve });
-  if (error) {
+  try {
+    const api = await leagueApiFor(client);
+    if (api) {
+      await api.reviewMembership(requestId, approve);
+    } else {
+      const { error } = await client.rpc("review_league_membership", { p_request_id: requestId, p_approve: approve });
+      if (error) throw new Error(error.message);
+    }
+  } catch {
     const separator = returnTo.includes("?") ? "&" : "?";
     redirect(`${returnTo}${separator}${returnTo === "/lobby" ? "error" : "inviteError"}=review`);
   }
@@ -106,8 +152,17 @@ export async function addExistingAccount(formData: FormData) {
   const userId = String(formData.get("user_id") || "");
   const { client, user } = await getCurrentAccount();
   if (!user) redirect("/login?next=/lobby");
-  const { error } = await client.rpc("add_account_to_league", { p_league_id: leagueId, p_user_id: userId });
-  if (error) redirect("/lobby?error=add");
+  try {
+    const api = await leagueApiFor(client);
+    if (api) {
+      await api.addExistingAccount(leagueId, userId);
+    } else {
+      const { error } = await client.rpc("add_account_to_league", { p_league_id: leagueId, p_user_id: userId });
+      if (error) throw new Error(error.message);
+    }
+  } catch {
+    redirect("/lobby?error=add");
+  }
   revalidatePath("/lobby");
   redirect("/lobby?added=1");
 }
@@ -116,8 +171,17 @@ export async function joinOpenLeague(formData: FormData) {
   const leagueId = String(formData.get("league_id") || "");
   const { client, user } = await getCurrentAccount();
   if (!user) redirect("/login?next=/peladas");
-  const { error } = await client.rpc("join_open_league", { p_league_id: leagueId });
-  if (error) redirect("/peladas?error=join");
+  try {
+    const api = await leagueApiFor(client);
+    if (api) {
+      await api.joinOpen(leagueId);
+    } else {
+      const { error } = await client.rpc("join_open_league", { p_league_id: leagueId });
+      if (error) throw new Error(error.message);
+    }
+  } catch {
+    redirect("/peladas?error=join");
+  }
   (await cookies()).set(ACTIVE_LEAGUE_COOKIE, leagueId, {
     httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 365,
   });
@@ -132,10 +196,17 @@ export async function requestClosedLeague(formData: FormData) {
   const leagueId = String(formData.get("league_id") || "");
   const { client, user } = await getCurrentAccount();
   if (!user) redirect("/login?next=/peladas");
-  const { error } = await client.rpc("request_league_membership_by_id", {
-    p_league_id: leagueId,
-  });
-  if (error) redirect("/peladas?error=request");
+  try {
+    const api = await leagueApiFor(client);
+    if (api) {
+      await api.requestMembership(leagueId);
+    } else {
+      const { error } = await client.rpc("request_league_membership_by_id", { p_league_id: leagueId });
+      if (error) throw new Error(error.message);
+    }
+  } catch {
+    redirect("/peladas?error=request");
+  }
   await completePendingEntryFlow(client);
   revalidatePath("/peladas");
   revalidatePath("/lobby");
@@ -145,11 +216,18 @@ export async function requestClosedLeague(formData: FormData) {
 export async function createLeague(formData: FormData) {
   const { client, user } = await getCurrentAccount();
   if (!user) redirect("/login?next=/lobby/criar");
+  let creator = supabaseLeagueCreator(client);
+  try {
+    const api = await leagueApiFor(client);
+    if (api) creator = asLeagueCreator(api);
+  } catch {
+    redirect("/lobby/criar?error=create");
+  }
   const result = await createLeagueForUser({
     name: String(formData.get("name") || ""),
     tier: String(formData.get("tier") || ""),
     visibility: String(formData.get("visibility") || ""),
-  }, supabaseLeagueCreator(client));
+  }, creator);
   if (result.status === "invalid") redirect("/lobby/criar?error=invalid");
   if (result.status === "duplicate") redirect("/lobby/criar?error=duplicate");
   if (result.status === "failed") redirect("/lobby/criar?error=create");
@@ -185,17 +263,23 @@ export async function createQuickLeague(formData: FormData) {
     redirect("/lobby/criar?quickError=invalid");
   }
 
-  const { data, error } = await client.rpc("create_quick_match_session", {
-    p_date: date,
-    p_start_time: startTime,
-    p_field_name: fieldName,
-    p_map_url: mapUrl,
-    p_players_per_team: 5,
-    p_teams_per_round: 3,
-  });
-  const session = data as { league_id?: string; callup_id?: string; round_id?: string } | null;
-  if (error || !session?.league_id || !session.callup_id || !session.round_id) {
+  let session: { league_id: string; callup_id: string; round_id: string } | null = null;
+  try {
+    const api = await leagueApiFor(client);
+    if (api) {
+      session = await api.createQuickMatch({ date, start_time: startTime, field_name: fieldName, map_url: mapUrl });
+    } else {
+      const { data, error } = await client.rpc("create_quick_match_session", {
+        p_date: date, p_start_time: startTime, p_field_name: fieldName, p_map_url: mapUrl,
+        p_players_per_team: 5, p_teams_per_round: 3,
+      });
+      if (error) throw new Error(error.message);
+      session = data as typeof session;
+    }
+  } catch (error) {
     console.error("Erro ao criar partida rápida:", error);
+  }
+  if (!session?.league_id || !session.callup_id || !session.round_id) {
     redirect("/lobby/criar?quickError=create");
   }
 

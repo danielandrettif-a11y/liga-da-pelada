@@ -16,15 +16,19 @@ import { hasCallupClosingMatch } from "@/lib/callup-lifecycle";
 export function CallupAdminCard({
   callups,
   stadiums = [],
+  lastStadiumId = null,
   playersPerTeam = 5,
   teamsPerRound = 3,
+  defaultGoalsToFinish = 2,
   initialShowCreate = false,
   featureTier = "basic",
 }: {
   callups: CallupWithEntries[];
   stadiums?: Stadium[];
+  lastStadiumId?: string | null;
   playersPerTeam?: number;
   teamsPerRound?: number;
+  defaultGoalsToFinish?: number;
   initialShowCreate?: boolean;
   featureTier?: "quick" | "basic" | "complete";
 }) {
@@ -44,10 +48,13 @@ export function CallupAdminCard({
   const [matchRulesNotice, setMatchRulesNotice] = useState("");
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [editVersion, setEditVersion] = useState<string | undefined>();
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
   const [availableStadiums, setAvailableStadiums] = useState(stadiums);
-  const [selectedStadiumId, setSelectedStadiumId] = useState(stadiums[0]?.id || "");
+  const [selectedStadiumId, setSelectedStadiumId] = useState(
+    () => stadiums.some((stadium) => stadium.id === lastStadiumId) ? lastStadiumId! : stadiums[0]?.id || "",
+  );
   const [showQuickStadium, setShowQuickStadium] = useState(false);
   const [quickStadiumName, setQuickStadiumName] = useState("");
   const [quickStadiumAddress, setQuickStadiumAddress] = useState("");
@@ -123,7 +130,7 @@ export function CallupAdminCard({
   async function close() {
     if (!callup || !confirm("Fechar esta convocação? A lista deixará de aparecer para todos.")) return;
     setLoading(true);
-    const result = await closeCallup(callup.id);
+    const result = await closeCallup(callup.id, callup.updated_at);
     if (!result.success) setError(result.error || "Erro ao fechar convocação.");
     else router.refresh();
     setLoading(false);
@@ -133,7 +140,7 @@ export function CallupAdminCard({
     if (!callup) return;
     setLoading(true);
     setError("");
-    const result = await setCallupVisibility(callup.id, !callup.is_public);
+    const result = await setCallupVisibility(callup.id, !callup.is_public, callup.updated_at);
     if (!result.success) setError(result.error || "Erro ao atualizar a visibilidade.");
     else router.refresh();
     setLoading(false);
@@ -162,7 +169,7 @@ export function CallupAdminCard({
     setLoading(true);
     setError("");
     setMatchRulesNotice("");
-    const result = await setCallupMatchRules(callup.id, matchDurationDraft, goalsToFinishDraft);
+    const result = await setCallupMatchRules(callup.id, matchDurationDraft, goalsToFinishDraft, callup.updated_at);
     if (!result.success) setError(result.error || "Não foi possível salvar as regras das partidas.");
     else {
       setMatchRulesNotice("Configurações das partidas atualizadas.");
@@ -225,7 +232,7 @@ export function CallupAdminCard({
         <h2 className="text-xs font-bold uppercase tracking-wider text-muted">Convocação</h2>
         <div className="flex items-center gap-3">
           {callup && !editing && !showCreate && (
-            <button type="button" onClick={() => setEditing(true)} className="flex items-center gap-1 text-[10px] font-black uppercase text-muted hover:text-accent">
+            <button type="button" onClick={() => { setEditVersion(callup.updated_at); setEditing(true); }} className="flex items-center gap-1 text-[10px] font-black uppercase text-muted hover:text-accent">
               <PencilLine className="h-3 w-3" /> Editar
             </button>
           )}
@@ -390,6 +397,20 @@ export function CallupAdminCard({
               </select>
             </div>}
 
+            <label className="block text-[10px] font-bold uppercase text-muted">Gols por partida
+              <select name="goals_to_finish" defaultValue={defaultGoalsToFinish} className="mt-1 block w-full rounded-xl border border-border bg-background px-3 py-2.5 text-xs text-foreground">
+                <option value={0}>Sem limite de gols</option>
+                {Array.from({ length: 20 }, (_, index) => index + 1).map((goals) => <option key={goals} value={goals}>{goals} {goals === 1 ? "gol" : "gols"}</option>)}
+              </select>
+            </label>
+
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-background p-3">
+              <input type="checkbox" name="referee_enabled" className="mt-0.5 size-4 accent-accent" />
+              <span className="text-xs font-bold text-foreground">Usar juiz nas partidas
+                <span className="mt-1 block font-normal text-muted">O app sugere um ADM do time de fora em rodízio. Você pode trocar antes de iniciar.</span>
+              </span>
+            </label>
+
             <button
               disabled={loading || Boolean(conflictingCallup)}
               className="w-full rounded-xl bg-accent py-3 text-sm font-black text-background transition-transform active:scale-[0.99] disabled:opacity-50"
@@ -419,6 +440,7 @@ export function CallupAdminCard({
             </div>
 
             <input type="hidden" name="callup_id" value={callup.id} />
+            <input type="hidden" name="expected_version" value={editVersion ?? ""} />
 
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               <div className="w-full min-w-0">

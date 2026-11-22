@@ -21,11 +21,14 @@ node_modules/
 
 # production
 /build
+/backend/dist/
 /amazfit-scoreboard-poc/dist/
 
 # misc
 .DS_Store
 *.pem
+*.dump
+*.backup
 
 # debug
 npm-debug.log*
@@ -36,6 +39,7 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example
+!.env.docker.example
 
 # vercel
 .vercel
@@ -43,3 +47,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# temp & local documents
+.tmp/
+*.docx

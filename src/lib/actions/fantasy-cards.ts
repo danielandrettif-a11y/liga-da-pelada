@@ -9,6 +9,7 @@ import { canSelectFantasyCardInstance, fantasyCardRequiresSavedLineup, isFantasy
 import type { FantasyActiveCardDTO, FantasyPackDTO, FantasyUserCardDTO } from "@/lib/fantasy/cards/dtos";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getActiveLeague } from "./rounds";
+import { cardsApiFor } from "@/modules/cards/infrastructure/cards-api-session";
 import { cardDefinitionFromRow, packLeagueId, relationOne } from "@/modules/fantasy/domain/card-inventory";
 import {
   readActiveFantasyCard,
@@ -32,6 +33,10 @@ export async function getMyPacks(): Promise<{
   const account = await getCurrentAccount();
   if (!account.user) return { availablePacks: [], claimedCount: 0, totalPacks: 0 };
   const league = await getActiveLeague();
+  const cardsApi = await cardsApiFor(account.client);
+  if (cardsApi) {
+    return cardsApi.getMyPacks(league.id);
+  }
   const readClient = createServiceClient() || account.client;
   return readMyFantasyPacks(readClient, account.user.id, league.id);
 }
@@ -41,6 +46,15 @@ export async function restoreMyPassPacks(fantasySeasonId: string) {
   if (!account.user || !account.isAdmin) return { success: false, error: "A reativação é exclusiva para administradores." };
   if (!fantasySeasonId) return { success: false, error: "Passe da temporada não encontrado." };
   const league = await getActiveLeague();
+  const cardsApi = await cardsApiFor(account.client);
+  if (cardsApi) {
+    const res = await cardsApi.restoreMyPassPacks(league.id, fantasySeasonId);
+    if (res.success) {
+      revalidatePath("/cartola");
+      revalidatePath("/mais");
+    }
+    return res;
+  }
   const { data: season } = await account.client.from("fantasy_seasons").select("id")
     .eq("id", fantasySeasonId).eq("league_id", league.id).maybeSingle();
   if (!season) return { success: false, error: "Passe não pertence à pelada selecionada." };
@@ -61,6 +75,16 @@ export async function openPack(packId: string): Promise<{
 }> {
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Não autenticado." };
+  const cardsApi = await cardsApiFor(account.client);
+  if (cardsApi) {
+    const league = await getActiveLeague();
+    const res = await cardsApi.openPack(league.id, packId);
+    if (res.success) {
+      revalidatePath("/cartola");
+      revalidatePath("/mais");
+    }
+    return res;
+  }
 
   const mutationClient = createServiceClient() || account.client;
   const league = await getActiveLeague();
@@ -160,6 +184,16 @@ export async function claimPackCard(
 ): Promise<{ success: boolean; error?: string; chosenCard?: FantasyCardDefinition }> {
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Não autenticado." };
+  const cardsApi = await cardsApiFor(account.client);
+  if (cardsApi) {
+    const league = await getActiveLeague();
+    const res = await cardsApi.claimPackCard(league.id, packId, chosenSlug);
+    if (res.success) {
+      revalidatePath("/cartola");
+      revalidatePath("/mais");
+    }
+    return res;
+  }
 
   const client = account.client;
   const mutationClient = createServiceClient() || client;
@@ -284,6 +318,12 @@ export async function getMyInventory(): Promise<{
   const account = await getCurrentAccount();
   if (!account.user) return { cards: [], groupedBySlug: {}, availableCount: 0 };
   const league = await getActiveLeague();
+  const cardsApi = await cardsApiFor(account.client);
+  if (cardsApi) {
+    const inv = await cardsApi.getMyInventory(league.id);
+    const availableCount = inv.cards.filter((c: any) => c.status === "available").length;
+    return { ...inv, availableCount };
+  }
   const readClient = createServiceClient() || account.client;
   return readMyFantasyInventory(readClient, account.user.id, league.id);
 }
@@ -296,6 +336,11 @@ export async function getMyInventoryCount(): Promise<number> {
   const account = await getCurrentAccount();
   if (!account.user) return 0;
   const league = await getActiveLeague();
+  const cardsApi = await cardsApiFor(account.client);
+  if (cardsApi) {
+    const res = await cardsApi.getMyInventoryCount(league.id);
+    return res.count;
+  }
   const readClient = createServiceClient() || account.client;
   return readMyFantasyInventoryCount(readClient, account.user.id, league.id);
 }
@@ -307,6 +352,10 @@ export async function getActiveCardForRound(roundId: string): Promise<FantasyAct
   const account = await getCurrentAccount();
   if (!account.user) return null;
   const league = await getActiveLeague();
+  const cardsApi = await cardsApiFor(account.client);
+  if (cardsApi) {
+    return cardsApi.getActiveCardForRound(league.id, roundId);
+  }
   const readClient = createServiceClient() || account.client;
   return readActiveFantasyCard(readClient, { userId: account.user.id, leagueId: league.id, roundId });
 }
@@ -329,6 +378,22 @@ export async function activateCardForRound({
 }): Promise<{ success: boolean; error?: string }> {
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Não autenticado." };
+  const cardsApi = await cardsApiFor(account.client);
+  if (cardsApi) {
+    const league = await getActiveLeague();
+    const res = await cardsApi.activateCardForRound(league.id, roundId, {
+      userCardId,
+      cardSlug: "carta",
+      targetPlayerId,
+      targetPlayer2Id,
+      targetPrediction,
+    });
+    if (res.success) {
+      revalidatePath("/cartola");
+      revalidatePath(`/cartola/rodada/${roundId}`);
+    }
+    return res;
+  }
 
   const client = createServiceClient() || account.client;
   const league = await getActiveLeague();
@@ -582,6 +647,16 @@ export async function removeActiveCardForRound(
 ): Promise<{ success: boolean; error?: string }> {
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Não autenticado." };
+  const cardsApi = await cardsApiFor(account.client);
+  if (cardsApi) {
+    const league = await getActiveLeague();
+    const res = await cardsApi.removeActiveCardForRound(league.id, roundId);
+    if (res.success) {
+      revalidatePath("/cartola");
+      revalidatePath(`/cartola/rodada/${roundId}`);
+    }
+    return res;
+  }
 
   const client = createServiceClient() || account.client;
   const league = await getActiveLeague();
@@ -638,6 +713,12 @@ export async function removeActiveCardForRound(
 export async function generatePacksForFinishedRound(roundId: string): Promise<number> {
   const client = await getAdminClient();
   if (!client) return 0;
+  const cardsApi = await cardsApiFor(client);
+  if (cardsApi) {
+    const league = await getActiveLeague();
+    const res = await cardsApi.generatePacksForFinishedRound(league.id, roundId);
+    return res.count ?? 0;
+  }
   const league = await getActiveLeague();
   const { data: scopedRound } = await client.from("rounds").select("id").eq("id", roundId).eq("league_id", league.id).maybeSingle();
   if (!scopedRound) return 0;
@@ -699,6 +780,16 @@ export async function giveMyAccountTestPack(): Promise<{ success: boolean; error
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Não autenticado." };
   if (!account.isAdmin) return { success: false, error: "Apenas administradores podem gerar pacotes de teste." };
+  const cardsApi = await cardsApiFor(account.client);
+  if (cardsApi) {
+    const league = await getActiveLeague();
+    const res = await cardsApi.giveMyAccountTestPack(league.id);
+    if (res.success) {
+      revalidatePath("/cartola");
+      revalidatePath("/mais");
+    }
+    return res;
+  }
 
   const client = account.client;
   const league = await getActiveLeague();
@@ -758,6 +849,18 @@ export async function resetMyAccountCards(): Promise<{
   deletedPacksCount?: number;
   error?: string;
 }> {
+  const account = await getCurrentAccount();
+  if (!account.user) return { success: false, error: "Não autenticado." };
+  const cardsApi = await cardsApiFor(account.client);
+  if (cardsApi) {
+    const league = await getActiveLeague();
+    const res = await cardsApi.resetMyAccountCards(league.id);
+    if (res.success) {
+      revalidatePath("/cartola");
+      revalidatePath("/mais");
+    }
+    return res;
+  }
   // O inventário legado ainda não possui league_id. Impedir um reset global
   // que apagaria também as cartas das outras peladas da mesma conta.
   return { success: false, error: "Reset de cartas temporariamente indisponível até o inventário ser separado por pelada." };
@@ -776,6 +879,16 @@ export async function distributePackToAllLineupUsers(): Promise<{
   const account = await getCurrentAccount();
   if (!account.user) return { success: false, error: "Não autenticado." };
   if (!account.isAdmin) return { success: false, error: "Apenas administradores podem distribuir pacotes em massa." };
+  const cardsApi = await cardsApiFor(account.client);
+  if (cardsApi) {
+    const league = await getActiveLeague();
+    const res = await cardsApi.distributePackToAllLineupUsers(league.id);
+    if (res.success) {
+      revalidatePath("/cartola");
+      revalidatePath("/mais");
+    }
+    return res;
+  }
 
   const client = account.client;
   const league = await getActiveLeague();
@@ -862,7 +975,16 @@ export async function distributePackToAllLineupUsers(): Promise<{
 export async function auditAndRepairCurrentSeasonPacks() {
   const account = await getCurrentAccount();
   if (!account.user || !account.isAdmin) return { success: false as const, error: "Somente administradores podem auditar pacotes." };
-  const { getActiveLeague } = await import("./rounds");
+  const cardsApi = await cardsApiFor(account.client);
+  if (cardsApi) {
+    const league = await getActiveLeague();
+    const res = await cardsApi.auditAndRepairCurrentSeasonPacks(league.id);
+    if (res.success) {
+      revalidatePath("/cartola");
+      revalidatePath("/mais");
+    }
+    return res;
+  }
   const { getActiveSeason } = await import("./seasons");
   const league = await getActiveLeague();
   const season = await getActiveSeason(league.id);
@@ -898,6 +1020,16 @@ export async function grantFantasyPackToUser(targetUserId: string): Promise<{ su
   const account = await getCurrentAccount();
   if (!account.user || !account.isAdmin) {
     return { success: false, error: "Apenas administradores podem enviar pacotes." };
+  }
+  const cardsApi = await cardsApiFor(account.client);
+  if (cardsApi) {
+    const league = await getActiveLeague();
+    const res = await cardsApi.grantFantasyPackToUser(league.id, targetUserId);
+    if (res.success) {
+      revalidatePath("/cartola");
+      revalidatePath("/mais");
+    }
+    return res;
   }
   if (!targetUserId) return { success: false, error: "Escolha uma pessoa para receber o pacote." };
   const league = await getActiveLeague();

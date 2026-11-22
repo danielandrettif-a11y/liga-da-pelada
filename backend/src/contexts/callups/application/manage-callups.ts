@@ -1,0 +1,272 @@
+import type { Actor } from "../../../shared/actor.js";
+import {
+  InvalidCallupError,
+  parseCallupUuid,
+  parseCallupVersion,
+  validateCallupMatchRulesInput,
+  validateOpenCallupInput,
+  validateUpdateCallupInput,
+  type AgendaCallup,
+  type Callup,
+  type CallupEntryStatus,
+  type OpenCallupInput,
+  type UpdateCallupInput,
+} from "../domain/callup.js";
+
+export type CallupInviteResult = {
+  playerId: string;
+  status: CallupEntryStatus;
+  position: number;
+};
+
+export type CallupGuestListResult = {
+  created: number;
+  confirmed: number;
+  waitlisted: number;
+  failed: Array<{ name: string; error: string }>;
+};
+
+export interface CallupQueryRepository {
+  listActive(leagueId: string, actor: Actor, inviteCallupId?: string): Promise<Callup[]>;
+  listAgenda(leagueId: string, actor: Actor): Promise<AgendaCallup[]>;
+}
+
+export interface CallupCommandRepository {
+  openCallup(leagueId: string, input: ReturnType<typeof validateOpenCallupInput>, actor: Actor): Promise<{ callupId: string; roundId: string }>;
+  updateCallup(leagueId: string, callupId: string, input: ReturnType<typeof validateUpdateCallupInput>, actor: Actor, expectedVersion?: string): Promise<void>;
+  closeCallup(leagueId: string, callupId: string, actor: Actor, expectedVersion?: string): Promise<void>;
+  setVisibility(leagueId: string, callupId: string, isPublic: boolean, actor: Actor, expectedVersion?: string): Promise<void>;
+  setMatchRules(leagueId: string, callupId: string, matchDuration: number, goalsToFinish: number, actor: Actor, expectedVersion?: string): Promise<void>;
+  lockCallup(leagueId: string, callupId: string, actor: Actor): Promise<void>;
+  joinCallup(leagueId: string, callupId: string, actor: Actor): Promise<{ status: CallupEntryStatus; position: number }>;
+  leaveCallup(leagueId: string, callupId: string, actor: Actor): Promise<{ roundId?: string | null }>;
+  addPlayer(leagueId: string, callupId: string, playerId: string, asAdmin: boolean, actor: Actor): Promise<{ status: CallupEntryStatus; position: number }>;
+  addPlayers(leagueId: string, callupId: string, playerIds: string[], actor: Actor): Promise<{ added: number; failures: Array<{ playerId: string; error: string }> }>;
+  removePlayer(leagueId: string, callupId: string, playerId: string, asAdmin: boolean, actor: Actor): Promise<{ revalidateRoundId?: string | null }>;
+  inviteGuest(leagueId: string, callupId: string, guest: { name: string; playerProfile?: string; isGoalkeeper?: boolean }, actor: Actor): Promise<CallupInviteResult>;
+  inviteGuestList(leagueId: string, callupId: string, guests: Array<{ name: string; isGoalkeeper?: boolean }>, playerProfile: string, actor: Actor): Promise<CallupGuestListResult>;
+  createPrelist(leagueId: string, callupId: string, actor: Actor): Promise<{ roundId: string; created: boolean }>;
+  repairMyPlayer(actor: Actor): Promise<{ playerId?: string }>;
+}
+
+export type CallupRepository = CallupQueryRepository & CallupCommandRepository;
+
+export function listActiveCallups(
+  leagueId: string,
+  actor: Actor,
+  repository: CallupQueryRepository,
+  inviteCallupId?: string,
+): Promise<Callup[]> {
+  const cleanLeague = leagueId ? parseCallupUuid(leagueId, "Pelada") : "";
+  const cleanInvite = inviteCallupId ? parseCallupUuid(inviteCallupId, "Convocação convidada") : undefined;
+  return repository.listActive(cleanLeague, actor, cleanInvite);
+}
+
+export function listAgendaCallups(
+  leagueId: string,
+  actor: Actor,
+  repository: CallupQueryRepository,
+): Promise<AgendaCallup[]> {
+  return repository.listAgenda(parseCallupUuid(leagueId, "Pelada"), actor);
+}
+
+export function openCallup(
+  leagueId: string,
+  input: OpenCallupInput,
+  actor: Actor,
+  repository: CallupCommandRepository,
+): Promise<{ callupId: string; roundId: string }> {
+  const cleanLeague = parseCallupUuid(leagueId, "Pelada");
+  const validated = validateOpenCallupInput(input);
+  return repository.openCallup(cleanLeague, validated, actor);
+}
+
+function callupVersionArgument(input?: string): [string] | [] {
+  const version = parseCallupVersion(input);
+  return version === undefined ? [] : [version];
+}
+
+export function updateCallup(
+  leagueId: string,
+  callupId: string,
+  input: UpdateCallupInput,
+  actor: Actor,
+  repository: CallupCommandRepository,
+  expectedVersion?: string,
+): Promise<void> {
+  const cleanLeague = parseCallupUuid(leagueId, "Pelada");
+  const cleanCallup = parseCallupUuid(callupId, "Convocação");
+  const validated = validateUpdateCallupInput(input);
+  return repository.updateCallup(cleanLeague, cleanCallup, validated, actor, ...callupVersionArgument(expectedVersion));
+}
+
+export function closeCallup(
+  leagueId: string,
+  callupId: string,
+  actor: Actor,
+  repository: CallupCommandRepository,
+  expectedVersion?: string,
+): Promise<void> {
+  return repository.closeCallup(parseCallupUuid(leagueId, "Pelada"), parseCallupUuid(callupId, "Convocação"), actor, ...callupVersionArgument(expectedVersion));
+}
+
+export function setCallupVisibility(
+  leagueId: string,
+  callupId: string,
+  isPublic: boolean,
+  actor: Actor,
+  repository: CallupCommandRepository,
+  expectedVersion?: string,
+): Promise<void> {
+  return repository.setVisibility(parseCallupUuid(leagueId, "Pelada"), parseCallupUuid(callupId, "Convocação"), isPublic, actor, ...callupVersionArgument(expectedVersion));
+}
+
+export function setCallupMatchRules(
+  leagueId: string,
+  callupId: string,
+  matchDuration: number,
+  goalsToFinish: number,
+  actor: Actor,
+  repository: CallupCommandRepository,
+  expectedVersion?: string,
+): Promise<void> {
+  const validated = validateCallupMatchRulesInput(matchDuration, goalsToFinish);
+  return repository.setMatchRules(
+    parseCallupUuid(leagueId, "Pelada"),
+    parseCallupUuid(callupId, "Convocação"),
+    validated.matchDuration,
+    validated.goalsToFinish,
+    actor,
+    ...callupVersionArgument(expectedVersion),
+  );
+}
+
+export function lockCallup(
+  leagueId: string,
+  callupId: string,
+  actor: Actor,
+  repository: CallupCommandRepository,
+): Promise<void> {
+  return repository.lockCallup(parseCallupUuid(leagueId, "Pelada"), parseCallupUuid(callupId, "Convocação"), actor);
+}
+
+export function joinCallup(
+  leagueId: string,
+  callupId: string,
+  actor: Actor,
+  repository: CallupCommandRepository,
+): Promise<{ status: CallupEntryStatus; position: number }> {
+  return repository.joinCallup(parseCallupUuid(leagueId, "Pelada"), parseCallupUuid(callupId, "Convocação"), actor);
+}
+
+export function leaveCallup(
+  leagueId: string,
+  callupId: string,
+  actor: Actor,
+  repository: CallupCommandRepository,
+): Promise<{ roundId?: string | null }> {
+  return repository.leaveCallup(parseCallupUuid(leagueId, "Pelada"), parseCallupUuid(callupId, "Convocação"), actor);
+}
+
+export function addPlayersToCallup(
+  leagueId: string,
+  callupId: string,
+  input: unknown,
+  actor: Actor,
+  repository: CallupCommandRepository,
+) {
+  if (!Array.isArray(input) || input.length < 1 || input.length > 50 ||
+    !input.every((value) => typeof value === "string")) {
+    throw new InvalidCallupError("Selecione de 1 a 50 jogadores.");
+  }
+  const playerIds = [...new Set(input.map((value) => parseCallupUuid(value, "Jogador")))];
+  return repository.addPlayers(
+    parseCallupUuid(leagueId, "Pelada"), parseCallupUuid(callupId, "Convocação"), playerIds, actor,
+  );
+}
+
+export function addPlayerToCallup(
+  leagueId: string,
+  callupId: string,
+  playerId: string,
+  asAdmin: boolean,
+  actor: Actor,
+  repository: CallupCommandRepository,
+): Promise<{ status: CallupEntryStatus; position: number }> {
+  return repository.addPlayer(
+    parseCallupUuid(leagueId, "Pelada"),
+    parseCallupUuid(callupId, "Convocação"),
+    parseCallupUuid(playerId, "Jogador"),
+    asAdmin,
+    actor,
+  );
+}
+
+export function removePlayerFromCallup(
+  leagueId: string,
+  callupId: string,
+  playerId: string,
+  asAdmin: boolean,
+  actor: Actor,
+  repository: CallupCommandRepository,
+): Promise<{ revalidateRoundId?: string | null }> {
+  return repository.removePlayer(
+    parseCallupUuid(leagueId, "Pelada"),
+    parseCallupUuid(callupId, "Convocação"),
+    parseCallupUuid(playerId, "Jogador"),
+    asAdmin,
+    actor,
+  );
+}
+
+export function inviteGuestToCallup(
+  leagueId: string,
+  callupId: string,
+  guest: { name: string; playerProfile?: string; isGoalkeeper?: boolean },
+  actor: Actor,
+  repository: CallupCommandRepository,
+): Promise<CallupInviteResult> {
+  return repository.inviteGuest(
+    parseCallupUuid(leagueId, "Pelada"),
+    parseCallupUuid(callupId, "Convocação"),
+    guest,
+    actor,
+  );
+}
+
+export function inviteGuestListToCallup(
+  leagueId: string,
+  callupId: string,
+  guests: Array<{ name: string; isGoalkeeper?: boolean }>,
+  playerProfile: string,
+  actor: Actor,
+  repository: CallupCommandRepository,
+): Promise<CallupGuestListResult> {
+  return repository.inviteGuestList(
+    parseCallupUuid(leagueId, "Pelada"),
+    parseCallupUuid(callupId, "Convocação"),
+    guests,
+    playerProfile,
+    actor,
+  );
+}
+
+export function createCallupPrelist(
+  leagueId: string,
+  callupId: string,
+  actor: Actor,
+  repository: CallupCommandRepository,
+): Promise<{ roundId: string; created: boolean }> {
+  return repository.createPrelist(
+    parseCallupUuid(leagueId, "Pelada"),
+    parseCallupUuid(callupId, "Convocação"),
+    actor,
+  );
+}
+
+export function repairMyPlayerAccount(
+  actor: Actor,
+  repository: CallupCommandRepository,
+): Promise<{ playerId?: string }> {
+  return repository.repairMyPlayer(actor);
+}

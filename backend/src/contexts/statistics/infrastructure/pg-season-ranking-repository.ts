@@ -1,0 +1,408 @@
+import { buildPlayerCardOverallMap } from "../domain/season-operations.js";
+import type { Pool, PoolClient } from "pg";
+import { withAuthenticatedTransaction } from "../../../infrastructure/authenticated-transaction.js";
+import type { Actor } from "../../../shared/actor.js";
+import type {
+  RankingRawEnrichmentData,
+  SeasonRankingRepository,
+} from "../application/manage-season-ranking.js";
+import type {
+  OfficialRoundMeta,
+  OverallTrend,
+  PlayerAchievementBelt,
+  PlayerEquippedCosmetics,
+  RankingDetailStatsRow,
+  RankingPlayer,
+  VisibleSeasonMeta,
+} from "../domain/season-ranking.js";
+
+function overallTrend(value: unknown): OverallTrend {
+  return value === "rising" || value === "falling" ? value : "steady";
+}
+
+export class PgSeasonRankingRepository implements SeasonRankingRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async findActiveLeaguePlayerIds(actor: Actor, leagueId: string, playerIds: string[]): Promise<string[]> {
+    if (!playerIds.length) return [];
+    return withAuthenticatedTransaction(this.pool, actor, async (client) => {
+      const result = await client.query<{ player_id: string }>(
+        `SELECT membership.player_id
+         FROM public.league_members membership
+         WHERE membership.league_id = $1::uuid
+           AND membership.player_id = ANY($2::uuid[])
+           AND membership.is_active = true`,
+        [leagueId, playerIds],
+      );
+      return result.rows.map((row) => row.player_id);
+    });
+  }
+
+  async findActiveSeason(actor: Actor, leagueId: string): Promise<VisibleSeasonMeta | null> {
+    return withAuthenticatedTransaction(this.pool, actor, async (client) => {
+      const result = await client.query<{
+        id: string;
+        number: number;
+        status: string;
+        started_at: string;
+      }>(
+        `SELECT id, number, status, started_at
+         FROM public.seasons
+         WHERE league_id = $1::uuid AND status = 'active'
+         LIMIT 1`,
+        [leagueId],
+      );
+      if (!result.rows[0]) return null;
+      const r = result.rows[0];
+      return {
+        id: r.id,
+        number: Number(r.number),
+        status: r.status,
+        startedAt: r.started_at,
+      };
+    });
+  }
+
+  async findVisibleSeasons(
+    actor: Actor,
+    leagueId: string,
+  ): Promise<VisibleSeasonMeta[]> {
+    return withAuthenticatedTransaction(this.pool, actor, async (client) => {
+      const result = await client.query<{
+        id: string;
+        number: number;
+        status: string;
+        started_at: string;
+      }>(
+        `SELECT id, number, status, started_at
+         FROM public.seasons
+         WHERE league_id = $1::uuid AND status = 'finished'
+         ORDER BY number DESC
+         LIMIT 1`,
+        [leagueId],
+      );
+      return result.rows.map((r) => ({
+        id: r.id,
+        number: Number(r.number),
+        status: r.status,
+        startedAt: r.started_at,
+      }));
+    });
+  }
+
+  async findFinishedOfficialRounds(actor: Actor, seasonIds: string[]): Promise<OfficialRoundMeta[]> {
+    if (!seasonIds.length) return [];
+    return withAuthenticatedTransaction(this.pool, actor, async (client) => {
+      const result = await client.query<{
+        id: string;
+        number: number;
+        date: string;
+        season_id: string;
+        best_goalkeeper_player_id: string | null;
+        scoring_snapshot: Record<string, unknown> | null;
+      }>(
+        `SELECT id, number, date, season_id, best_goalkeeper_player_id, scoring_snapshot
+         FROM public.rounds
+         WHERE season_id = ANY($1::uuid[]) AND status = 'finished' AND round_type = 'official'
+         ORDER BY date DESC, number DESC`,
+        [seasonIds],
+      );
+      return result.rows.map((r) => ({
+        id: r.id,
+        number: Number(r.number),
+        date: r.date,
+        seasonId: r.season_id,
+        bestGoalkeeperPlayerId: r.best_goalkeeper_player_id,
+        scoringSnapshot: r.scoring_snapshot,
+      }));
+    });
+  }
+
+  async findPlayerRoundStats(actor: Actor, roundIds: string[]): Promise<RankingDetailStatsRow[]> {
+    if (!roundIds.length) return [];
+    return withAuthenticatedTransaction(this.pool, actor, async (client) => {
+      const result = await client.query<any>(
+        `SELECT
+          prs.player_id,
+          prs.round_id,
+          prs.games,
+          prs.wins,
+          prs.draws,
+          prs.losses,
+          prs.goals,
+          prs.assists,
+          prs.points,
+          prs.goalkeeper_games,
+          prs.goalkeeper_goals,
+          prs.goalkeeper_assists,
+          prs.goalkeeper_own_goals,
+          prs.goals_conceded,
+          prs.clean_sheets,
+          prs.own_goals,
+          prs.defensive_clean_games,
+          prs.defensive_one_goal_games,
+          prs.team_goals_conceded,
+          prs.ranking_defensive_clean_games,
+          prs.ranking_defensive_one_goal_games,
+          prs.ranking_role_weights,
+          prs.ranking_position_bonus,
+          prs.ranking_points,
+          prs.player_profile_locked,
+          prs.profile_decision_source,
+          prs.profile_appearance_number,
+          prs.profile_def_overall,
+          prs.profile_ata_overall
+        FROM public.player_round_stats prs
+        JOIN public.players p ON p.id = prs.player_id
+        WHERE prs.round_id = ANY($1::uuid[])`,
+        [roundIds],
+      );
+
+      const playerIds = [...new Set(result.rows.map((row) => row.player_id as string))];
+      if (!playerIds.length) return [];
+      const playersResult = await client.query<{ player: RankingPlayer }>(
+        `SELECT row_to_json(player) AS player
+         FROM public.players player
+         WHERE player.id = ANY($1::uuid[])`,
+        [playerIds],
+      );
+      const playersById = new Map(playersResult.rows.map(({ player }) => [player.id, player]));
+
+      return result.rows.map((row) => ({
+        player_id: row.player_id,
+        round_id: row.round_id,
+        games: Number(row.games || 0),
+        wins: Number(row.wins || 0),
+        draws: Number(row.draws || 0),
+        losses: Number(row.losses || 0),
+        goals: Number(row.goals || 0),
+        assists: Number(row.assists || 0),
+        points: Number(row.points || 0),
+        goalkeeper_games: Number(row.goalkeeper_games || 0),
+        goalkeeper_goals: Number(row.goalkeeper_goals || 0),
+        goalkeeper_assists: Number(row.goalkeeper_assists || 0),
+        goalkeeper_own_goals: Number(row.goalkeeper_own_goals || 0),
+        goals_conceded: Number(row.goals_conceded || 0),
+        clean_sheets: Number(row.clean_sheets || 0),
+        own_goals: Number(row.own_goals || 0),
+        defensive_clean_games: Number(row.defensive_clean_games || 0),
+        defensive_one_goal_games: Number(row.defensive_one_goal_games || 0),
+        team_goals_conceded: Number(row.team_goals_conceded || 0),
+        ranking_defensive_clean_games: Number(row.ranking_defensive_clean_games || 0),
+        ranking_defensive_one_goal_games: Number(row.ranking_defensive_one_goal_games || 0),
+        ranking_role_weights: row.ranking_role_weights,
+        ranking_position_bonus: Number(row.ranking_position_bonus || 0),
+        ranking_points: row.ranking_points !== null ? Number(row.ranking_points) : null,
+        player_profile_locked: row.player_profile_locked,
+        profile_decision_source: row.profile_decision_source,
+        profile_appearance_number:
+          row.profile_appearance_number !== null ? Number(row.profile_appearance_number) : null,
+        profile_def_overall: row.profile_def_overall !== null ? Number(row.profile_def_overall) : null,
+        profile_ata_overall: row.profile_ata_overall !== null ? Number(row.profile_ata_overall) : null,
+        player: playersById.get(row.player_id),
+      })).filter((row): row is RankingDetailStatsRow => Boolean(row.player));
+    });
+  }
+
+  async findEnrichmentData(
+    actor: Actor,
+    leagueId: string,
+    seasonId: string,
+    roundIds: string[],
+    playerIds?: string[],
+  ): Promise<RankingRawEnrichmentData> {
+    return withAuthenticatedTransaction(this.pool, actor, async (client) => {
+      const result = await client.query<{
+        fitness: RankingRawEnrichmentData["fitnessRows"];
+        cosmetics: Array<{ player_id: string; slot: string; name: string; asset_key: string }>;
+        overalls: Array<{
+          player_id: string; overall: number; trend: string; def_overall: number; ala_mei_overall: number;
+          ata_overall: number; gol_overall: number; def_trend: string; ala_mei_trend: string;
+          ata_trend: string; gol_trend: string; goalkeeper_games: number; goalkeeper_rounds: number; rounds_played: number;
+        }>;
+        speeds: Array<{ player_id: string; speed_rating: number }>;
+        belts: Array<{ player_id: string; belts: unknown }>;
+      }>(
+        `SELECT
+           ARRAY(SELECT row_to_json(fitness) FROM (
+             SELECT player_id, distance_km, average_speed_kmh
+             FROM public.player_round_fitness
+             WHERE round_id = ANY($2::uuid[])
+               AND ($3::uuid[] IS NULL OR player_id = ANY($3::uuid[]))
+           ) fitness) AS fitness,
+           ARRAY(SELECT row_to_json(equipped) FROM (
+             SELECT profile.player_id, selected.slot, c.name, c.asset_key
+             FROM public.account_cosmetic_loadouts loadout
+             JOIN public.account_profiles profile ON profile.user_id = loadout.user_id
+             CROSS JOIN LATERAL (VALUES
+               ('frame', loadout.frame_cosmetic_id),
+               ('aura', loadout.aura_cosmetic_id),
+               ('title', loadout.title_cosmetic_id),
+               ('banner', loadout.banner_cosmetic_id),
+               ('nameplate', loadout.nameplate_cosmetic_id)
+             ) selected(slot, cosmetic_id)
+             JOIN public.fantasy_cosmetics c ON c.id = selected.cosmetic_id
+             WHERE profile.player_id IS NOT NULL
+               AND ($3::uuid[] IS NULL OR profile.player_id = ANY($3::uuid[]))
+           ) equipped) AS cosmetics,
+           ARRAY(SELECT row_to_json(o) FROM public.get_latest_player_card_overalls_for_league($1::uuid) o) AS overalls,
+           ARRAY(SELECT row_to_json(s) FROM public.get_public_player_speed_ratings_for_league($1::uuid) s) AS speeds,
+           ARRAY(SELECT row_to_json(b) FROM public.get_league_achievement_belt_holders($1::uuid) b) AS belts`,
+        [leagueId, roundIds, playerIds?.length ? playerIds : null],
+      );
+      const data = result.rows[0]!;
+      // 2. Cosméticos
+      const cosmeticsByPlayer = new Map<string, PlayerEquippedCosmetics>();
+      const mapByPlayerAndSlot = new Map<string, Map<string, { name: string; asset_key: string }>>();
+      for (const row of data.cosmetics) {
+        const m = mapByPlayerAndSlot.get(row.player_id) || new Map();
+        m.set(row.slot, { name: row.name, asset_key: row.asset_key });
+        mapByPlayerAndSlot.set(row.player_id, m);
+      }
+      for (const [pid, slotMap] of mapByPlayerAndSlot.entries()) {
+        cosmeticsByPlayer.set(pid, {
+          frameKey: slotMap.get("frame")?.asset_key || null,
+          auraKey: slotMap.get("aura")?.asset_key || null,
+          titleName: slotMap.get("title")?.name || null,
+          bannerAssetKey: slotMap.get("banner")?.asset_key || null,
+          nameplateKey: slotMap.get("nameplate")?.asset_key || null,
+        });
+      }
+
+      // 3. Overalls (RPC)
+      const overallByPlayer = new Map<
+        string,
+        {
+          overall: number;
+          trend: OverallTrend;
+          positions: { DEF: number; ALA_MEI: number; ATA: number; GOL: number } | null;
+          positionTrends: Record<"DEF" | "ALA_MEI" | "ATA" | "GOL", OverallTrend>;
+          goalkeeperGames: number;
+          goalkeeperRounds: number;
+          roundsPlayed: number;
+        }
+      >();
+      for (const row of data.overalls) {
+        const overall = Number(row.overall);
+        const trend = overallTrend(row.trend);
+        const values = {
+          DEF: Number(row.def_overall),
+          ALA_MEI: Number(row.ala_mei_overall),
+          ATA: Number(row.ata_overall),
+          GOL: Number(row.gol_overall),
+        };
+        const positions = Object.values(values).every(Number.isFinite) ? values : null;
+        const positionTrends = {
+          DEF: overallTrend(row.def_trend),
+          ALA_MEI: overallTrend(row.ala_mei_trend),
+          ATA: overallTrend(row.ata_trend),
+          GOL: overallTrend(row.gol_trend),
+        };
+        if (Number.isFinite(overall)) {
+          overallByPlayer.set(row.player_id, {
+            overall,
+            trend,
+            positions,
+            positionTrends,
+            goalkeeperGames: Number(row.goalkeeper_games || 0),
+            goalkeeperRounds: Number(row.goalkeeper_rounds || 0),
+            roundsPlayed: Number(row.rounds_played || 0),
+          });
+        }
+      }
+
+      // 4. Velocidade (RPC)
+      const speedByPlayer = new Map<string, 1 | 2 | 3>();
+      for (const row of data.speeds) {
+        const rating = Number(row.speed_rating);
+        if (rating === 1 || rating === 2 || rating === 3) {
+          speedByPlayer.set(row.player_id, rating as 1 | 2 | 3);
+        }
+      }
+
+      // 5. Cinturões (RPC)
+      const achievementBeltsByPlayer = new Map<string, PlayerAchievementBelt[]>();
+      for (const row of data.belts) {
+        const beltsRaw = Array.isArray(row.belts) ? row.belts : [];
+        const parsed = beltsRaw.filter((belt: any) =>
+          ["top_scorer", "top_assister", "team_win_streak"].includes(belt.slug),
+        ) as PlayerAchievementBelt[];
+        achievementBeltsByPlayer.set(String(row.player_id), parsed);
+      }
+
+      return {
+        fitnessRows: data.fitness,
+        cosmeticsByPlayer,
+        overallByPlayer,
+        speedByPlayer,
+        achievementBeltsByPlayer,
+      };
+    });
+  }
+
+  async findLeaguePlayer(actor: Actor, leagueId: string, playerId: string): Promise<RankingPlayer | null> {
+    return withAuthenticatedTransaction(this.pool, actor, async (client) => {
+      const result = await client.query<any>(
+        `SELECT p.*
+         FROM public.players p
+         JOIN public.league_members lm ON lm.player_id = p.id
+         WHERE lm.league_id = $1::uuid AND lm.player_id = $2::uuid AND lm.is_active = true
+         LIMIT 1`,
+        [leagueId, playerId],
+      );
+      if (!result.rows[0]) return null;
+      return result.rows[0] as RankingPlayer;
+    });
+  }
+
+  async findPlayerOverall(actor: Actor, leagueId: string, playerId: string) {
+    return withAuthenticatedTransaction(this.pool, actor, async (client) => {
+      const result = await client.query<Record<string, unknown>>(
+        "SELECT * FROM public.get_latest_player_card_overalls_for_league($1::uuid) WHERE player_id = $2::uuid",
+        [leagueId, playerId],
+      );
+      return buildPlayerCardOverallMap(result.rows, new Set([playerId]))[playerId] ?? null;
+    });
+  }
+
+  async findPlayerCosmetics(actor: Actor, playerId: string): Promise<PlayerEquippedCosmetics | null> {
+    return withAuthenticatedTransaction(this.pool, actor, async (client) => {
+      try {
+        const result = await client.query<{
+          slot: string;
+          name: string;
+          asset_key: string;
+        }>(
+          `SELECT selected.slot, c.name, c.asset_key
+           FROM public.account_profiles profile
+           JOIN public.account_cosmetic_loadouts loadout ON loadout.user_id = profile.user_id
+           CROSS JOIN LATERAL (VALUES
+             ('frame', loadout.frame_cosmetic_id),
+             ('aura', loadout.aura_cosmetic_id),
+             ('title', loadout.title_cosmetic_id),
+             ('banner', loadout.banner_cosmetic_id),
+             ('nameplate', loadout.nameplate_cosmetic_id)
+           ) selected(slot, cosmetic_id)
+           JOIN public.fantasy_cosmetics c ON c.id = selected.cosmetic_id
+           WHERE profile.player_id = $1::uuid`,
+          [playerId],
+        );
+        const map = new Map(result.rows.map((r) => [r.slot, { name: r.name, asset_key: r.asset_key }]));
+        return {
+          frameKey: map.get("frame")?.asset_key || null,
+          auraKey: map.get("aura")?.asset_key || null,
+          titleName: map.get("title")?.name || null,
+          bannerAssetKey: map.get("banner")?.asset_key || null,
+          nameplateKey: map.get("nameplate")?.asset_key || null,
+        };
+      } catch {
+        return null;
+      }
+    });
+  }
+}
+
+export function pgSeasonRankingRepository(pool: Pool): SeasonRankingRepository {
+  return new PgSeasonRankingRepository(pool);
+}
+

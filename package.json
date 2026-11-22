@@ -7,13 +7,17 @@
     "build": "next build",
     "start": "next start",
     "typegen": "next typegen",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:multi-league": "node scripts/verify-multi-league-isolation.mjs",
     "check": "npm run typecheck && npm test && npm run build",
     "audit:security": "npm audit --omit=dev --audit-level=high",
+    "audit:architecture": "node scripts/audit-architecture.mjs",
+    "audit:contexts": "node scripts/audit-application-contexts.mjs",
+    "audit:migration": "node scripts/audit-migration-progress.mjs",
+    "audit:db-archive": "node scripts/check-db-archive.mjs",
     "audit:cards": "node scripts/audit-fantasy-cards.mjs",
     "types:supabase": "node scripts/generate-database-types.mjs",
     "audit:cartola": "node scripts/analyze-cartola-balance.mjs",
@@ -22,14 +26,15 @@
     "audit:market:v11:self-test": "node scripts/analyze-market-v11.mjs --self-test",
     "benchmark:stats": "node scripts/benchmark-statistics.mjs",
     "benchmark:structures": "node scripts/benchmark-app-structures.mjs",
-    "benchmark:web": "node scripts/benchmark-web.mjs"
+    "benchmark:web": "node scripts/benchmark-web.mjs",
+    "benchmark:home": "node scripts/benchmark-home-entry.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.2",
     "clsx": "^2.1.1",
     "jspdf": "^4.2.1",
-    "next": "16.3.8",
+    "next": "16.4.3",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-easy-crop": "^6.2.3",
@@ -46,6 +51,6 @@
     "@types/web-push": "^3.6.4",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.12"
   }
 }

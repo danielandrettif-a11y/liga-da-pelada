@@ -2,7 +2,7 @@ import "server-only";
 
 import { cookies } from "next/headers";
 import { cache } from "react";
-import { getCurrentAccount } from "@/lib/auth";
+import { getCurrentAccount, readAccountMemberships } from "@/lib/auth";
 
 export const ACTIVE_LEAGUE_COOKIE = "active_league_id";
 
@@ -22,19 +22,24 @@ export type MyLeague = {
 };
 
 export const getMyLeagues = cache(async (): Promise<MyLeague[]> => {
-  const { client, user } = await getCurrentAccount();
+  const { client, user, memberships: initialMemberships, membershipError } = await getCurrentAccount();
   if (!user) return [];
-
-  // Funciona como rede de segurança caso o projeto não tenha pg_cron ativo:
-  // qualquer abertura do app remove sessões descartáveis cujo prazo venceu.
-  await client.rpc("cleanup_expired_quick_leagues").then(() => undefined, () => undefined);
-
-  const { data: memberships, error } = await client
-    .from("league_members")
-    .select("league_id, role, is_favorite, leagues!inner(id, name, slug, is_active, feature_tier, visibility, logo_url, cover_url, accent_color, archived_at, quick_purge_at)")
-    .eq("user_id", user.id)
-    .eq("is_active", true);
-  if (error) throw new Error(`Não foi possível carregar suas peladas: ${error.message}`);
+  if (membershipError) throw new Error(`Não foi possível carregar suas peladas: ${membershipError.message}`);
+  let memberships = initialMemberships;
+  const now = Date.now();
+  const hasExpiredQuickLeague = memberships.some((membership) => {
+    const league = Array.isArray(membership.leagues) ? membership.leagues[0] : membership.leagues;
+    return league?.feature_tier === "quick" && league.quick_purge_at && Date.parse(league.quick_purge_at) <= now;
+  });
+  if (hasExpiredQuickLeague) {
+    // Fallback para instalações sem pg_cron. A navegação normal reaproveita os vínculos da conta.
+    const cleanup = await client.rpc("cleanup_expired_quick_leagues").then((result) => result, () => null);
+    if (Number(cleanup?.data || 0) > 0) {
+      const refreshed = await readAccountMemberships(client, user.id);
+      if (refreshed.error) throw new Error(`Não foi possível carregar suas peladas: ${refreshed.error.message}`);
+      memberships = refreshed.data || [];
+    }
+  }
 
   return (memberships || []).flatMap((membership) => {
     const league = Array.isArray(membership.leagues) ? membership.leagues[0] : membership.leagues;

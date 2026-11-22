@@ -5,6 +5,7 @@ import { getAdminClient, getCurrentAccount } from "../auth";
 import { calculatePlayerOveralls, parseOverallFormulaConfig, type OverallPlayer, type OverallRole } from "../overall";
 import { buildOverallHistoryInput } from "../overall-history";
 import { getSelectedLeague } from "../league-context";
+import { getStatisticsApiSession } from "@/modules/statistics/infrastructure/statistics-api-session";
 
 const FORMULA_KEY = "adaptive-v20-statistical-confidence";
 const COMPARISON_FORMULA_KEY = "adaptive-v19-admin-fixed-profile";
@@ -90,6 +91,12 @@ export type OverallShadowAdminData = {
 };
 
 export async function getOverallShadowAdminData(): Promise<OverallShadowAdminData | null> {
+  const session = await getStatisticsApiSession();
+  if (session) {
+    const league = await getSelectedLeague();
+    if (!league) return null;
+    return session.gateway.getOverallShadowAdminData(league.id);
+  }
   const client = await getAdminClient();
   const league = await getSelectedLeague();
   if (!client || !league || league.role !== "admin") return null;
@@ -158,6 +165,14 @@ export async function getOverallShadowAdminData(): Promise<OverallShadowAdminDat
 
 /** Gera um rascunho auditável. Nunca publica OVR, muda ranking ou altera sorteio. */
 export async function recalculateOverallShadow() {
+  const session = await getStatisticsApiSession();
+  if (session) {
+    const league = await getSelectedLeague();
+    if (!league) return { success: false, error: "Escolha uma pelada para calcular o OVR." };
+    const result = await session.gateway.recalculateOverallShadow(league.id);
+    if (result.success) revalidatePath("/admin/overall");
+    return result;
+  }
   const account = await getCurrentAccount();
   const client = await getAdminClient();
   const league = await getSelectedLeague();
@@ -198,6 +213,22 @@ export async function recalculateOverallShadow() {
 }
 
 export async function publishOverallShadow(runId: string) {
+  const session = await getStatisticsApiSession();
+  if (session) {
+    const league = await getSelectedLeague();
+    if (!league) return { success: false, error: "Escolha uma pelada para publicar o OVR." };
+    const result = await session.gateway.publishOverallShadow(league.id, runId);
+    if (result.success) {
+      revalidatePath("/admin/overall");
+      revalidatePath("/ranking");
+      revalidatePath("/jogadores", "layout");
+      revalidatePath("/cartola", "layout");
+      revalidatePath("/rodadas", "layout");
+      revalidatePath("/convocacao", "layout");
+      revalidatePath("/admin", "layout");
+    }
+    return result;
+  }
   const account = await getCurrentAccount();
   const client = await getAdminClient();
   const league = await getSelectedLeague();
@@ -228,6 +259,22 @@ export async function publishOverallShadow(runId: string) {
 
 /** Fecha o ciclo automático sem tornar a finalização da rodada dependente do OVR. */
 export async function recalculateAndPublishFluidOverall() {
+  const session = await getStatisticsApiSession();
+  if (session) {
+    const league = await getSelectedLeague();
+    if (!league) return { success: false, error: "Escolha uma pelada para calcular o OVR." };
+    const result = await session.gateway.recalculateAndPublishFluidOverall(league.id);
+    if (result.success) {
+      revalidatePath("/admin/overall");
+      revalidatePath("/ranking");
+      revalidatePath("/jogadores", "layout");
+      revalidatePath("/cartola", "layout");
+      revalidatePath("/rodadas", "layout");
+      revalidatePath("/convocacao", "layout");
+      revalidatePath("/admin", "layout");
+    }
+    return result;
+  }
   const recalculation = await recalculateOverallShadow();
   if (!recalculation.success || !recalculation.runId) return recalculation;
   const publication = await publishOverallShadow(recalculation.runId);
@@ -237,6 +284,22 @@ export async function recalculateAndPublishFluidOverall() {
 }
 
 export async function refreshFluidOverallSafely(reason: string) {
+  const session = await getStatisticsApiSession();
+  if (session) {
+    const league = await getSelectedLeague();
+    if (!league) return { success: false, error: "Escolha uma pelada para calcular o OVR." };
+    const result = await session.gateway.refreshFluidOverallSafely(league.id, reason);
+    if (result.success) {
+      revalidatePath("/admin/overall");
+      revalidatePath("/ranking");
+      revalidatePath("/jogadores", "layout");
+      revalidatePath("/cartola", "layout");
+      revalidatePath("/rodadas", "layout");
+      revalidatePath("/convocacao", "layout");
+      revalidatePath("/admin", "layout");
+    }
+    return result;
+  }
   const result = await recalculateAndPublishFluidOverall();
   if (!result.success) console.error(`Falha ao atualizar OVR com tags fixas (${reason}):`, result.error);
   return result;

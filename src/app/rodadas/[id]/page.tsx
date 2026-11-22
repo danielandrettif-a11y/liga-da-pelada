@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense, type ComponentProps } from "react";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, CalendarDays } from "@/components/icons";
 import { getRound } from "@/lib/actions/rounds";
@@ -15,7 +16,7 @@ import { RoundHistoryTabs } from "@/components/RoundHistoryTabs";
 import { RoundAdminPlayerTools } from "@/components/RoundAdminPlayerTools";
 import { getPlayers } from "@/lib/actions/players";
 import { RoundTeamShuffleCard } from "@/components/RoundTeamShuffleCard";
-import { getExpenseItems, getPaymentRecipients } from "@/lib/actions/payments";
+import { getAppFeeConfig, getExpenseItems, getPaymentRecipients } from "@/lib/actions/payments";
 import { DeleteMatchButton } from "@/components/DeleteMatchButton";
 import { RoundLiveStats } from "@/components/RoundLiveStats";
 import { getSelectedLeague } from "@/lib/league-context";
@@ -23,6 +24,17 @@ import { RoundMatchLauncher } from "@/components/RoundMatchLauncher";
 import { hasCallupClosingMatch } from "@/lib/callup-lifecycle";
 
 export const revalidate = 0;
+
+async function DeferredFinishRound(props: Omit<ComponentProps<typeof FinishRoundButton>, "recipients" | "expenseItems" | "appFee">) {
+  if (!props.canManage || props.status === "finished") return <FinishRoundButton {...props} />;
+  const [recipients, expenseItems, appFee] = await Promise.all([getPaymentRecipients(), getExpenseItems(), getAppFeeConfig()]);
+  return <FinishRoundButton {...props} recipients={recipients} expenseItems={expenseItems} appFee={appFee} />;
+}
+
+async function DeferredRoundAdminTools(props: Omit<ComponentProps<typeof RoundAdminPlayerTools>, "allPlayers">) {
+  const allPlayers = await getPlayers(true);
+  return <RoundAdminPlayerTools {...props} allPlayers={allPlayers} />;
+}
 
 export default async function RodadaDetalhePage({
   params,
@@ -35,20 +47,14 @@ export default async function RodadaDetalhePage({
   const query = await searchParams;
   const roundPromise = getRound(id);
   const accountPromise = getCurrentAccount();
-  const allSelectablePlayersPromise = accountPromise.then((acc) => acc.isAdmin ? getPlayers(true) : []);
-  const paymentRecipientsPromise = accountPromise.then((acc) => acc.isAdmin ? getPaymentRecipients() : []);
-  const expenseItemsPromise = accountPromise.then((acc) => acc.isAdmin ? getExpenseItems() : []);
   const selectedLeaguePromise = getSelectedLeague();
 
-  const [round, account, roundStatistics, allSelectablePlayers, paymentRecipients, expenseItems, selectedLeague] = await Promise.all([
+  const [round, account, roundStatistics, selectedLeague] = await Promise.all([
     roundPromise,
     accountPromise,
     roundPromise.then((currentRound) => currentRound?.status === "finished"
       ? getRoundStatistics(currentRound.id)
       : null),
-    allSelectablePlayersPromise,
-    paymentRecipientsPromise,
-    expenseItemsPromise,
     selectedLeaguePromise,
   ]);
 
@@ -299,22 +305,23 @@ export default async function RodadaDetalhePage({
         </div>
       </section>
       
-      <FinishRoundButton roundId={round.id} status={round.status} canManage={account.isAdmin} recipients={paymentRecipients} expenseItems={expenseItems} participantCount={participants.length} quickMode={selectedLeague?.featureTier === "quick"} />
+      <Suspense fallback={null}>
+        <DeferredFinishRound roundId={round.id} roundVersion={round.updated_at || round.created_at} status={round.status} canManage={account.isAdmin} participantCount={participants.length} quickMode={selectedLeague?.featureTier === "quick"} />
+      </Suspense>
 
-      {account.isAdmin && (
-        <RoundAdminPlayerTools
+      {account.isAdmin && <Suspense fallback={null}>
+        <DeferredRoundAdminTools
           roundId={round.id}
           status={round.status}
           participants={round.round_players || []}
           teams={round.teams || []}
-          allPlayers={allSelectablePlayers}
           canReopenCallup={
             round.status === "draft" &&
             Boolean((round.callups || []).length) &&
             !(round.matches || []).some((match: any) => match.started_at || match.status === "live" || match.status === "finished")
           }
         />
-      )}
+      </Suspense>}
     </div>
   );
 

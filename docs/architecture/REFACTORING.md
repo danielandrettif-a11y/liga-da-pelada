@@ -24,13 +24,229 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 | Base, limites entre camadas e registro de decisões | Em andamento | ADR 001 criado; continuar mapa de dependências e testes de regressão por área. |
 | Piloto — criação de pelada no lobby | Concluído | Validação de nome/tipo/visibilidade em domínio; caso de uso com porta para criação; adaptador Supabase; Server Action mantém autenticação, cookie, revalidação e redirecionamento. |
 | Convocação e rodadas | Concluído nesta fase | Formato, abertura, pré-lista, edição, estado e participação extraídos; migrations 325 e 328 aplicadas e validadas em teste e oficial; isolamento entre duas peladas aprovado. |
-| Partidas e pontuação | Banco implantado; código pronto para publicação | Gols ao vivo/finalizados, encerramento, goleiros e substituições extraídos; abertura transacional e outbox de gols implementadas. Migrations 326–327 e 334 aplicadas; catálogo e permissões da 334 conferidos no teste e no oficial. Ainda faltam publicar o commit e executar o ensaio móvel integrado com falhas de rede e dois ADMs. |
+| Partidas e pontuação | 21/21 operações aceitas em revisão | Ciclo de vida, gols, goleiros, substituições e cronômetro extraídos. O cronômetro agenda QStash no backend, reivindica alertas de forma transacional e libera a reivindicação quando o Web Push falha. Ainda falta o ensaio móvel integrado com falhas de rede e dois ADMs para promover o contexto a verificado. |
 | Cartola e cosméticos | Concluído nesta fase | Mutações e leitores principais extraídos; ranking, históricos, ficha e destaques usam modelos analíticos e filtros sazonais. |
 | Pagamentos | Concluído nesta fase | Itens, parcelas, PIX, rateio, obrigações, checklist e auditoria separados em domínio, aplicação e infraestrutura, mantendo RPCs e escopo por pelada. |
-| Estatísticas e demais áreas | Concluído nesta fase | Pontuação canônica e modelos analíticos extraídos; leitores sazonais separados; rankings duplicados removidos; cache limitado à requisição. |
+| Notificações | Concluído nesta fase (16/16) | Inbox, preferências, push subscriptions, envio Web Push e e-mail Resend, agendamento QStash de lembretes do Cartola e alerta de cronômetro com 100% de paridade e fail-fast. |
+| Estatísticas e demais áreas | Em migração | Pontuação canônica e modelos analíticos extraídos; leitores sazonais separados; rankings duplicados removidos; cache limitado à requisição. |
 | Avaliação de tabela de acumulados | Medida no oficial; sem justificativa para criar | No banco oficial, `seasonStats`, `rankingHistory` e `playerHistory` ficaram em 128,51 ms, 119,62 ms e 99,64 ms no p95. Os gargalos estão nos enriquecimentos/RPCs compostas. Ver `reports/performance/BASELINE-2026-10-21.md`. |
 
 ## Registro de lotes
+
+### 2026-10-30 — contexto Statistics: Subfatia 4 (Operações Sazonais) (16/22 aceitas)
+
+- Migradas e aceitas `getLatestPlayerCardOverallMap`, `getSeasonTeamStandings`, `previewReprocessSeason` e `executeReprocessSeason`. O progresso global passa a **182/267 operações (68,2%)**, restando 85.
+- `season-operations.ts` preserva o contrato de OVR das cartas e a classificação dos quatro clubes, incluindo desempates, artilheiro e líder de assistências.
+- A prévia e a execução continuam usando as RPCs administrativas existentes; o backend autentica o ator, exige `is_app_admin()` e executa a RPC no mesmo contexto transacional, sem duplicar regras SQL em TypeScript.
+- Rotas: `GET /player-card-overalls`, `GET /team-standings`, `GET /reprocess/preview` e `POST /reprocess`, todas sob `/api/statistics/leagues/:leagueId`.
+- Verificação: **140 arquivos/538 testes backend** e **214 arquivos/1.144 testes frontend**; typecheck, builds de produção, auditorias de migração/contextos/arquitetura e `git diff --check` aprovados.
+
+### 2026-10-30 — contexto Statistics: Subfatia 3 (Scouts de Rodada e Amistosos) (12/22 aceitas)
+
+- Migradas e aceitas `calculateRoundStats`, `getRoundStatistics` e `getFriendlyStats`. O progresso global passa a **178/267 operações (66,7%)**, restando 89.
+- O domínio `round-statistics.ts` preserva elegibilidade de participantes, placar, gols/assistências, gol contra, períodos e snapshots de goleiro, versões BQ/Coluna C, perfis congelados, bônus posicionais e overrides de zeragem.
+- `pg-round-statistics-repository.ts` autoriza o ADM dentro da transação autenticada, lê a rodada exclusivamente na pelada informada, grava `player_round_stats` e reconcilia o Cartola antes do commit. Nenhuma falha da API habilitada dispara a mutação legada.
+- As leituras de rodada encerrada e amistosos usam pelada/temporada ativas, ignoram linhas sem participação e preservam os contratos públicos anteriores.
+- Rotas: `POST /api/statistics/leagues/:leagueId/rounds/:roundId/recalculate`, `GET /api/statistics/leagues/:leagueId/rounds/:roundId` e `GET /api/statistics/leagues/:leagueId/friendlies`.
+- Verificação: **136 arquivos/525 testes backend** e **212 arquivos/1.139 testes frontend**; typecheck e build de produção dos dois projetos, auditorias de migração/contextos/arquitetura e `git diff --check` aprovados.
+
+### 2026-10-30 — contexto Statistics: Subfatia 1 (Pontuação BQ v5) e Subfatia 2 (Ranking Oficial e Desempates) (9/22 aceitas)
+
+- O contexto **Statistics** avançou de 0 para **9/22 operações estruturais e aceitas**. O progresso auditado global da aplicação avançou para **175 de 267 operações aceitas (65,5%)**, restando apenas 92 operações para a conclusão integral.
+- **Subfatia 1 (Regras de Pontuação BQ v5 e Coluna C - 4 operações):** `getBQScoringRules`, `getColumnCScoringRules`, `saveBQScoringRules` e `saveColumnCScoringRules` (`src/lib/actions/bq-scoring.ts`). Domínio `scoring-policy.ts` com centésimos inteiros, caso de uso `manage-scoring-rules.ts`, repositório PostgreSQL `pg-scoring-rules-repository.ts` e rotas Fastify `/api/statistics/leagues/:leagueId/scoring/*`.
+- **Subfatia 2 (Núcleo do Ranking Oficial e Desempates - 5 operações):** `getRanking`, `getRankingEssentialData`, `getPlayerRankingEntry`, `getRankingExperienceData` e `getRankingEnrichmentForPlayers` (`src/lib/actions/stats.ts`).
+  - Domínio `season-ranking.ts` puro e determinístico: cálculo oficial das 6 melhores rodadas da temporada (`countedInTop6`), desempates canônicos (`points > wins > goals > assists`), filtros de atividade nas 3 rodadas mais recentes e corte de perfil competitivo completo.
+  - Caso de uso `manage-season-ranking.ts` estruturando as visões geral (`general`), mensal (`monthly`) e última rodada (`latestRound`), com agregação de prêmios de rodada (`buildAwardSeasonsByPlayer`, `countAwards`).
+  - Repositório `pg-season-ranking-repository.ts` conectado com `SET LOCAL ROLE authenticated`, cobrindo consultas de temporada, rodadas oficiais, estatísticas de atletas e enriquecimentos (fitness, cosméticos, RPCs de overall, velocidade e cinturões).
+  - Rotas Fastify `/api/statistics/leagues/:leagueId/ranking/*` sob a flag `ENABLE_STATISTICS_API`.
+  - Gateway HTTP `http-statistics-gateway.ts` e Server Actions em `src/lib/actions/stats.ts` mantendo fallback legado somente quando a flag estiver inativa; uma API habilitada que falha não dispara leitura duplicada no Supabase.
+  - Testes de paridade unitários em `src/lib/actions/stats.test.ts`.
+  - Ajuste de conformidade Next.js App Router: `DEFAULT_COLUMN_C_SCORING` isolado em `src/lib/column-c-scoring.ts`, respeitando a regra estrita de que arquivos `"use server"` só podem exportar funções assíncronas.
+- Verificação automatizada completa aprovada:
+  - Backend: **132 arquivos de teste, 511 testes passando**, `tsc` e build com 0 erros.
+  - Frontend: **212 arquivos de teste, 1.132 testes passando**, `tsc` com 0 erros, build Next.js Turbopack 100% verde gerando todas as 28 páginas estáticas previstas e as rotas dinâmicas.
+  - `npm audit` aprovado com **0 vulnerabilidades** nos dois pacotes.
+  - Auditorias: `npm run audit:migration` com **175/267 aceitas (65,5%)** e `npm run audit:contexts` aprovado (15 contextos, 12 módulos, 58 páginas, 41 entradas, 267 funções catalogadas).
+
+### 2026-10-29 — conclusão integral do contexto Notifications (16/16 operações aceitas)
+
+- O contexto **Notifications** foi migrado e revisado integralmente, atingindo **16/16 operações estruturais e aceitas (100% de paridade)**. O progresso auditado global da aplicação avançou para **166 de 267 operações aceitas (62,2%)**, restando 101 operações para a paridade completa.
+- A revisão pós-Antigravity de 30/10 corrigiu três lacunas antes de manter essa aceitação: o teste de e-mail agora autoriza o ADM e resolve o destinatário no backend antes do envio; o alerta do cronômetro reivindica, entrega Web Push aos jogadores da rodada e libera a trava em falha total; e as rotas Next usam `NOTIFICATIONS_API_ENABLED`, enquanto o processo backend usa `ENABLE_NOTIFICATIONS_API`. A composição de produção também falha cedo se faltar qualquer dependência do contexto.
+- **Subfatia 1 (Inbox - 3 operações):** `getMyInboxPreview`, `markInboxRead` e `getMyInboxNotifications` (`src/lib/actions/inbox.ts`). Domínio puro `inbox-notification.ts`, repositório PostgreSQL `pg-inbox-repository.ts`, caso de uso `manage-inbox.ts` e rotas Fastify `/api/notifications/inbox/*`.
+- **Subfatia 2 (Preferências e Push - 6 operações):** `getPushPublicKey`, `getPushSystemStatus`, `subscribeToPush`, `unsubscribeFromPush`, `getNotificationPreferences` e `updateNotificationPreferences` (`src/app/mais/notification-actions.ts`). Domínios `notification-preferences.ts` e `push-subscription.ts`, repositórios PostgreSQL `pg-notification-preferences-repository.ts` e `pg-push-subscription-repository.ts`, rotas Fastify `/api/notifications/preferences` e `/api/notifications/push/*`.
+- **Subfatia 3 (Entrega Push, Testes e Webhook Interno - 3 operações):** `sendPushTest`, `sendCartolaEmailTest` e o webhook interno seguro `POST /api/internal/push-test-alert`. Domínio `push-delivery.ts`, caso de uso `manage-delivery.ts`, adaptador de envio `web-push-notification-sender.ts`, agendador QStash `qstash-push-alert-scheduler.ts`, remetente de e-mail Resend `resend-cartola-email-sender.ts`, repositório de configurações de pelada `pg-league-notification-settings-repository.ts` e rota de despacho `/api/internal/notifications/push-test-alert`.
+- **Subfatia 4 (Lembretes do Cartola e E-mail - 3 operações):** `setCartolaRemindersEnabled`, `cancelCartolaEmailReminders` e o webhook interno idempotente `POST /api/internal/cartola-reminder`. Domínio `cartola-reminder.ts`, caso de uso `manage-cartola-reminders.ts`, repositório de claims transacionais com tolerância a reclaim `pg-cartola-reminder-repository.ts`, remetente Resend de lembretes `resend-cartola-reminder-email-sender.ts`, agendador QStash `qstash-cartola-reminder-scheduler.ts` e rota `/api/internal/notifications/cartola-reminder`. Cancelamento de lembretes desacoplado de login via token HMAC SHA-256 (`cartola-email:${userId}`) e chave `EMAIL_UNSUBSCRIBE_SECRET`.
+- **Subfatia 5 (Alertas de Partidas e Cronômetro - 1 operação):** `POST /api/internal/match-timer-alert`. Conectado ao `httpNotificationGateway.dispatchMatchTimerAlert(body.matchId, body.threshold, expectedSecret)` encaminhando com segurança para a rota interna `/api/internal/matches/:matchId/timer/dispatch`, preservando contrato de erro 425 com cabeçalho `Retry-After: 1` para disparos prematuros (`too_early`) e mantendo fallback legado idêntico caso a flag `ENABLE_NOTIFICATIONS_API` esteja desligada.
+- Verificação automatizada completa aprovada:
+  - Backend: **124 arquivos de teste, 450 testes passando**, `tsc` com 0 erros, compilação de produção TS sem falhas.
+  - Frontend: **205 arquivos de teste, 1.070+ testes passando**, `tsc` com 0 erros, build de produção do Next.js Turbopack bem-sucedido (todas as 28 rotas e páginas estáticas/dinâmicas geradas sem erros).
+  - Auditoria: `npm run audit:contexts` aprovado (15 contextos, 12 módulos, 58 páginas, 41 entradas catalogadas), `npm run audit:migration` com 166/267 aceitas e 0 violações de integridade.
+
+### 2026-10-29 — cronômetro e notificações de partidas
+
+- As cinco operações restantes de `matches` foram comparadas com o fluxo legado e migradas: iniciar/pausar, zerar, adicionar acréscimo, reivindicar um marco e despachar o alerta agendado. O contexto chegou a **21/21 operações aceitas em revisão**.
+- Estado, duração, pausa, reset e as travas de notificação agora são autoritativos no backend/PostgreSQL e sempre limitados à pelada da rota. Reset e mudança de duração invalidam alertas anteriores; a reivindicação bloqueia a linha e tolera a latência do provedor sem duplicar a entrega.
+- O QStash passou a ser uma porta da aplicação com adaptador próprio no backend. Iniciar ou acrescentar tempo reagenda os três marcos; o webhook usa uma rota interna protegida por `MATCH_TIMER_WEBHOOK_SECRET`, sem depender de sessão de navegador.
+- Web Push permanece no adaptador de notificação do Next até a migração desse contexto. O backend devolve uma reivindicação, o Next entrega a mensagem e, se nenhuma entrega for possível, libera exatamente aquela reivindicação para permitir retry seguro.
+- Progresso auditado esperado após a atualização do catálogo: **150/267 estruturais, 150/267 (56,2%) aceitas em revisão, 0/267 verificadas de ponta a ponta e 117 pendentes de paridade**.
+- Verificação desta fatia cobre caso de uso, PostgreSQL, agendamento QStash, autorização da rota interna, gateway HTTP, entrega Web Push e rollback da trava. Gate completo aprovado com **1.043 testes frontend em 200 arquivos**, **359 testes backend em 100 arquivos**, typecheck e builds dos dois projetos; auditorias de arquitetura, contexto e migração aprovadas; `npm audit --omit=dev` sem vulnerabilidades em frontend e backend.
+
+### 2026-10-29 — ciclo principal da partida
+
+- `createMatch`, `getMatch`, `finishMatch` e `deleteMatch` passaram pela comparação integral com o fluxo legado. Partidas chegaram a **16/21 operações aceitas**; restam somente as cinco operações do cronômetro e suas notificações.
+- A abertura deixou de enviar a lista parcial de substitutos como se fosse a escalação da RPC. O domínio do backend agora monta titulares, substitutos de ausência e empréstimos estruturais, preserva fila justa, goleiro fixo/forçado, ordem lógica e limites da rodada; `create_live_match` continua sendo o único commit, com idempotência e validação transacional no banco.
+- A leitura detalhada passou a entregar os relacionamentos usados pela tela ao vivo: elencos e atletas, times de origem, eventos, passagens no gol, substituições, contexto completo da rodada e cosméticos atuais da conta, sempre limitada à pelada da rota.
+- O encerramento bloqueia a partida, calcula o tempo exibido e o tempo oficial de elegibilidade, finaliza participantes de modo idempotente e devolve o placar necessário à notificação. Estatísticas, sugestão de início rápido, notificação e invalidações continuam como efeitos pós-confirmação na Server Action até os respectivos contextos serem migrados; falhas derivadas viram aviso e não sugerem repetir o encerramento já confirmado.
+- A exclusão exige partida encerrada e rodada ainda aberta, ambas da pelada selecionada. Depois do commit, estatísticas e Cartola são reprocessados; falhas posteriores também são retornadas como aviso.
+- Progresso auditado: **150/267 estruturais, 145/267 (54,3%) aceitas em revisão, 0/267 verificadas de ponta a ponta e 122 pendentes de paridade**.
+- Verificação automatizada: **1.041 testes frontend em 200 arquivos**, **355 testes backend em 99 arquivos**, typecheck e builds dos dois projetos; auditorias de arquitetura, contexto e migração aprovadas; `npm audit --omit=dev` sem vulnerabilidades em frontend e backend.
+
+### 2026-10-28 — gols, goleiros e substituições de partidas
+
+- Doze operações de `matches` passaram pela comparação com o fluxo legado: busca da partida ao vivo, auditoria finalizada, registro/exclusão/correção de gols, goleiro fixo e troca ao vivo, substituição e desfazer, além da resposta de compatibilidade do prêmio manual removido.
+- Exclusão e correções de gol, troca de goleiro, substituição e desfazer deixaram de executar `DELETE`/`UPDATE`/`INSERT` parciais no backend. O repositório agora confere o vínculo da partida/evento com a pelada da rota e chama exclusivamente `delete_match_event`, `correct_finished_goal`, `correct_finished_goal_event`, `add_finished_goal_event`, `change_match_goalkeeper`, `substitute_match_player` e `undo_last_match_substitution`.
+- Correções de rodadas encerradas voltaram a executar consolidação de estatísticas, reprocessamento condicional do Cartola e atualização do overall depois da confirmação da RPC; falha derivada retorna aviso e não orienta repetir uma mutação já confirmada.
+- Substituições preservam motivo, lesão opcional, presença obrigatória fora da formação manual e validações transacionais da RPC. Goleiro fixo exige time da rodada/pelada e atleta do próprio time; a troca ao vivo usa o relógio autoritativo do servidor.
+- Permanecem em revisão 9 operações de partidas: `createMatch`, `getMatch`, `finishMatch`, `deleteMatch` e as cinco operações de cronômetro/notificação. Elas dependem de lineup completo, read model/cosméticos, estatísticas/quick start/notificações e QStash/Web Push.
+- Progresso auditado: **150/267 estruturais, 141/267 (52,8%) aceitas em revisão, 0/267 verificadas de ponta a ponta e 126 pendentes de paridade**. Partidas chegaram a **12/21** aceitas.
+- Verificação automatizada: **1.041 testes frontend em 200 arquivos**, **351 testes backend em 98 arquivos**, typecheck e builds dos dois projetos; auditorias de arquitetura, contexto e migração aprovadas; `npm audit --omit=dev` sem vulnerabilidades em frontend e backend.
+
+### 2026-10-28 — correções administrativas de participantes da rodada
+
+- As três operações finais de `rounds` foram comparadas com o fluxo legado. Transferência de identidade, zeragem de pontos e substituição emergencial agora passam pelos casos de uso com UUIDs validados, exigem que a rodada pertença à pelada da rota e delegam a mutação exclusivamente às RPCs canônicas `transfer_round_player_identity`, `zero_player_round_points` e `add_round_emergency_substitute`.
+- O contrato de substituição deixou de criar um atleta novo a partir de um campo chamado `name`: a interface envia os IDs do atleta que sai, do substituto existente e do time. A zeragem voltou a transportar e persistir o motivo informado pelo ADM.
+- Transferência e zeragem preservam o pós-processamento legado: consolidação de estatísticas, reprocessamento condicional do Cartola e atualização do overall. Essa composição continua na Server Action até a fatia própria de estatísticas migrar o cálculo; erro da API habilitada não dispara a mutação Supabase antiga.
+- Nenhuma migration foi necessária: as migrations 283 e 284 já contêm as RPCs completas, com autorização e auditoria. O backend deixou de substituí-las por `UPDATE`/`INSERT` parciais.
+- Progresso auditado: **150/267 estruturais, 129/267 (48,3%) aceitas em revisão, 0/267 verificadas de ponta a ponta e 138 pendentes de paridade**. O contexto `rounds` está **38/38** aceito em revisão de código.
+- Verificação automatizada: **1.040 testes frontend em 200 arquivos**, **348 testes backend em 98 arquivos**, typecheck e builds dos dois projetos; auditorias de arquitetura, contexto e migração aprovadas; `npm audit --omit=dev` sem vulnerabilidades em frontend e backend.
+
+### 2026-10-28 — Draft de times e sorteio adaptativo
+
+- As nove operações do Draft foram comparadas com o fluxo legado. Criação escolhe três capitães elegíveis e delega snapshots/estado à `create_team_draft`; início, escolha, troca de capitão, reinício, swap e confirmação usam exclusivamente as RPCs versionadas e conferem o escopo da pelada solicitado na rota.
+- O workspace por convocação corrigiu o identificador do contrato e agora reconstrói atletas, capitães, ordem de escolha, OVR, velocidade, perfil, médias, nota de equilíbrio, usuário atual e melhor sugestão de troca. A leitura por rodada reutiliza a mesma projeção dentro da mesma transação, sem abrir uma segunda conexão.
+- A confirmação materializa os times pela RPC, aplica os três presets oficiais e marca a presença de todos os participantes na mesma transação autenticada.
+- `drawTeamsAdaptiveOnServer` deixou de distribuir jogadores por módulo: domínio e backend preservam capacidade, atributos, fallbacks, ordem de chegada, titulares e a função de equilíbrio completo. Erros de uma API habilitada não caem silenciosamente no caminho Supabase antigo.
+- Progresso auditado: **150/267 estruturais, 126/267 (47,2%) aceitas em revisão, 0/267 verificadas de ponta a ponta e 141 pendentes de paridade**. Rodadas chegaram a **35/38** aceitas.
+- Verificação automatizada: **1.036 testes frontend em 200 arquivos**, **343 testes backend em 98 arquivos**, typecheck e builds dos dois projetos; auditorias de arquitetura, contexto e migração aprovadas; `npm audit --omit=dev` sem vulnerabilidades em frontend e backend.
+
+### 2026-10-28 — criação, exclusão e encerramento de rodadas
+
+- `createRoundWithTeams` passou a validar formato, convocação/pré-lista, escopo e aptidão dos jogadores, presença inicial, estádio, nomes, capitães e distribuição reduzida antes de persistir toda a rodada em uma única transação autenticada. Numeração concorrente usa trava transacional e a presença continua sob a RPC canônica.
+- `deleteRound` deixou de apagar apenas a linha principal e agora exige escopo da pelada e delega a limpeza completa à `delete_round_cascade`.
+- `finishRound` preserva consolidação de estatísticas antes do comando e executa fechamento financeiro, Cartola, recompensas e arquivamento rápido dentro da transação do backend. Atualização de overall permanece pós-commit; falhas opcionais de recompensa/arquivo usam savepoint sem desfazer o fechamento principal.
+- A ponte habilitada é fail-fast: erro da API na criação não executa silenciosamente a implementação Supabase antiga.
+- Progresso auditado: **150/267 estruturais, 116/267 (43,4%) aceitas em revisão, 0/267 verificadas de ponta a ponta e 151 pendentes de paridade**. Rodadas chegaram a **25/38** aceitas.
+- Verificação automatizada: **1.031 testes frontend em 200 arquivos**, **330 testes backend em 96 arquivos**, typecheck e builds dos dois projetos; auditorias de arquitetura, contexto e migração aprovadas; `npm audit --omit=dev` sem vulnerabilidades em frontend e backend.
+
+### 2026-10-28 — paridade inicial de convocações e rodadas
+
+- As 21 operações de convocação foram revisadas contra as Server Actions e gateways legados. A API agora rejeita estádio de outra pelada, impede travar lista incompleta, reutiliza pré-lista ainda em rascunho sem duplicação e preserva o agendamento de lembretes do Cartola.
+- `previewRoundTeamShuffle` deixou de devolver uma resposta fictícia: o backend carrega somente a rodada/pelada autorizada, overall, velocidade, perfil, goleiro e, quando permitido, tags privadas; o algoritmo puro preserva capacidade e unicidade. `shuffleRoundTeams`, `applyRoundTeamShuffle` e `applyPermanentRoundTeamFormation` persistem pela RPC transacional versionada.
+- A aplicação de uma prévia passou a transportar os `assignments` aprovados pelo ADM. Erros da API habilitada não caem silenciosamente na implementação antiga.
+- `architecture/operation-parity-status.json` e `npm run audit:migration` tornam o aceite explícito: **150/267 estruturais, 113/267 (42,3%) aceitas em revisão, 0/267 verificadas de ponta a ponta e 154 pendentes de paridade**.
+- Rodadas chegaram a 22/38 aceitas: `getRound` reconstrói o read model aninhado completo, `getRoundMatchSetup` mantém uma projeção enxuta com todo o estado necessário à rotação e `saveRoundPrelist` preserva capacidade, convocação, RPC transacional e lembretes pós-commit do Cartola.
+- Verificação: **1.018 testes frontend em 200 arquivos**, **316 testes backend em 96 arquivos**, typecheck e builds dos dois projetos; auditorias arquitetural/de catálogo aprovadas e `npm audit` com zero vulnerabilidades em frontend e backend.
+
+### 2026-10-28 — auditoria dos commits de convocações, rodadas e partidas
+
+- A branch foi atualizada até `c4fa53d` e os 5 commits posteriores a `72b4030` foram revisados. As 80 operações novas possuem a estrutura esperada de contexto, rota, gateway e flag, mas o lote ainda não tem paridade funcional suficiente para homologação.
+- Foram corrigidos o contrato público de `openCallup`, a criação atômica da pré-lista, a preservação dos lembretes do Cartola, a exigência de sessão nas leituras protegidas pela RLS atual, a composição obrigatória do repositório de partidas e a execução reproduzível do typecheck em checkout limpo.
+- Fallbacks que duplicavam `create_live_match`, `set_callup_format` e `get_callup_entry_joiners` foram removidos. Essas RPCs são parte do esquema versionado e continuam como autoridade; além de perder regras, tentar um segundo SQL depois do primeiro erro manteria a transação PostgreSQL abortada.
+- Pendências de paridade impedem considerar o lote 3 concluído: `finishRound` não preserva o fechamento financeiro, estatísticas e Cartola; `finishMatch` não preserva tempos de saída, recálculo, próxima partida e notificações; outras mutações precisam da mesma comparação antes da ativação das flags. O sorteio de times citado na auditoria foi corrigido no lote seguinte.
+- Linha de base naquele momento: **150/267 (56,2%)** com ponte estrutural, **70/267 (26,2%)** aceitas e **0/267** verificadas. A linha de base atual está no lote acima e no auditor automatizado.
+
+### 2026-10-27 — estatísticas e agrupamento do elenco
+
+- `getPlayersWithStats` e `getRosterGroups` passaram ao backend modular. A regra de domínio combina o catálogo da pelada com `player_season_stats`, usa `ranking_points` nas rodadas oficiais, preserva `points` como `legacyPoints`, ordena pela pontuação e separa jogadores, convidados, acompanhantes e torcedores.
+- As rotas `GET /api/roster/leagues/:leagueId/player-statistics` e `GET /api/roster/leagues/:leagueId/roster-groups` exigem vínculo ativo com a pelada dentro da transação autenticada. O OVR mais recente é consultado somente para o agrupamento oficial e enriquece somente membros da categoria `player`. As Server Actions mantêm o fallback Supabase quando a ponte está desligada.
+- O catálogo registra **32/35 operações de elenco** em `frontend-migrated`; restam 3: `savePlayer`, `deletePlayer` e `mergeGuestWithRegistered`. No inventário inteiro são **67/267 operações no frontend**, 1 piloto no backend e 199 planejadas.
+- Verificação: **943 testes frontend em 189 arquivos**, **217 testes backend em 79 arquivos**, typecheck, builds, auditorias arquiteturais e de dependências com zero vulnerabilidades. A imagem Docker local foi reconstruída; o smoke retornou `200` e contratos válidos para estatísticas, grupos e todas as leituras anteriores, repetiu as quatro mutações descartáveis e confirmou limpeza residual zero.
+
+### 2026-10-27 — gestão administrativa e importação do elenco
+
+- `createPlayer`, `updatePlayer`, `swapPlayerAvatars` e `importGuestRoster` passaram ao backend modular. Validação e normalização ficam no domínio; criação e edição de identidade/vínculo executam na mesma transação autenticada; a troca de fotos preserva autorização de ADM global ou dono do perfil; a importação continua usando a RPC transacional que também integra a convocação aberta.
+- As rotas `POST /api/roster/leagues/:leagueId/players`, `PATCH /api/roster/leagues/:leagueId/players/:playerId`, `POST /api/roster/leagues/:leagueId/players/:playerId/swap-avatars` e `POST /api/roster/leagues/:leagueId/guest-imports` preservam os contratos das Server Actions e o fallback Supabase quando a ponte está desligada.
+- O primeiro smoke revelou que `INSERT ... RETURNING` era incompatível com a política de leitura antes da criação do vínculo; o backend passou a gerar o UUID e só lê a projeção após inserir `league_members`. O mesmo ensaio revelou que a RPC de importação ainda persistia o perfil removido `midfield`; a migration `352_fix_guest_roster_import_profile.sql` corrige o perfil e a característica inicial para `offensive`.
+- O catálogo registra **30/35 operações de elenco** em `frontend-migrated`; restam 5 operações de elenco. No inventário inteiro são **65/267 operações no frontend**, 1 piloto no backend e 201 planejadas.
+- Verificação: **938 testes frontend em 188 arquivos**, **205 testes backend em 76 arquivos**, typecheck, builds, auditorias arquiteturais e de dependências com zero vulnerabilidades. O smoke Docker executou criação `201`, edição `200`, troca `204` e importação `201`, repetiu todas as leituras anteriores e removeu as fixtures; a busca residual retornou zero.
+
+### 2026-10-27 — correções de segurança do frontend
+
+- Next.js foi atualizado de 16.3.8 para 16.4.3, levando junto os binários SWC e `sharp` corrigidos; DOMPurify transitivo passou de 3.4.16 para 3.4.17 e Vitest de 4.1.11 para 4.1.12.
+- `npm audit` completo e `npm audit --omit=dev` passaram com **zero vulnerabilidades**. Typecheck, os **907 testes frontend em 179 arquivos** e o build de produção com Next 16.4.3 também passaram.
+
+### 2026-10-27 — catálogo-base de jogadores no backend modular
+
+- `getPlayers`, `getSelectableLeaguePlayers` e `getPlayer` passaram a usar o contexto de elenco por uma única projeção PostgreSQL escopada à pelada e à conta autenticada. Identidade global e perfil competitivo do vínculo são combinados no domínio, mantendo filtro e ordenação compatíveis.
+- As rotas `GET /api/roster/leagues/:leagueId/players` e `GET /api/roster/leagues/:leagueId/players/:playerId` devolvem contratos completos e conferem `is_league_member()` dentro da transação autenticada. A ponte Next continua desligada por padrão e mantém o fallback Supabase enquanto a homologação não termina.
+- O catálogo passa a registrar **17/35 operações de elenco** em `frontend-migrated`; restam 18 operações de elenco nesta etapa.
+- Verificação: **914 testes frontend em 181 arquivos**, **158 testes backend em 61 arquivos**, typecheck e build dos dois pacotes, auditorias arquiteturais e de dependências aprovados. O smoke Docker local retornou `200` para catálogo, catálogo selecionável e detalhe, além das fatias anteriores, sem gravar dados.
+
+### 2026-10-27 — consultas administrativas de cadastro do elenco
+
+- `getRegistrationHistory` e `getRegisteredMergeCandidates` passaram ao backend modular. O histórico cruza eventos com membros ativos da pelada e reaplica nome, foto e categoria atuais; candidatos exigem que origem e destino pertençam ao mesmo elenco ativo.
+- As rotas `GET /api/roster/leagues/:leagueId/registrations` e `GET /api/roster/leagues/:leagueId/players/:guestId/merge-candidates` exigem `is_league_admin()` dentro da transação autenticada. O fallback Supabase permanece disponível quando a ponte está desligada.
+- O catálogo passa a registrar **19/35 operações de elenco** em `frontend-migrated`; restam 16 operações de elenco. A mutação de união de perfis continua separada para que recálculo de rodadas, Cartola e OVR seja migrado como uma unidade consistente.
+- Verificação: **918 testes frontend em 182 arquivos**, **166 testes backend em 64 arquivos**, typecheck e build dos dois pacotes e auditorias arquiteturais aprovados. O smoke Docker local retornou `200` para as duas novas leituras e para as fatias anteriores, sem escrita no banco.
+
+### 2026-10-27 — desempenho básico no perfil do jogador
+
+- `getPlayerPlaytime` e `getPlayerGoalsByClub` passaram ao backend modular. O domínio soma intervalos encerrados e ao vivo por tipo de rodada e agrega gols por escudo, preservando os nomes e cores canônicos dos quatro clubes históricos.
+- As rotas `GET /api/roster/leagues/:leagueId/players/:playerId/playtime` e `GET /api/roster/leagues/:leagueId/players/:playerId/club-goals` exigem vínculo do leitor com a pelada e limitam todas as junções ao `leagueId` recebido. O fallback Supabase permanece disponível com a ponte desligada.
+- O catálogo passa a registrar **21/35 operações de elenco** em `frontend-migrated`; restam 14 operações de elenco. A união de perfis foi deliberadamente adiada até que o recálculo de estatísticas, Cartola e OVR possa ser movido como uma unidade completa.
+- Verificação: **923 testes frontend em 184 arquivos**, **174 testes backend em 67 arquivos**, typecheck e build dos dois pacotes e auditorias arquiteturais aprovados. O smoke Docker local retornou `200` para tempo em campo, gols por clube e todas as fatias anteriores, sem escrita no banco.
+
+### 2026-10-27 — prêmios e cinturões do jogador
+
+- `getPlayerMonthlyAwards`, `getPlayerAchievementBelts` e `getPreviousMonthAwardWinners` passaram ao backend modular. O domínio normaliza as linhas SQL e o JSON dos cinturões sem levar detalhes PostgreSQL para a apresentação.
+- As três rotas exigem sessão válida e vínculo com a pelada dentro da transação autenticada. As RPCs existentes continuam como projeções de leitura e a Server Action preserva o fallback Supabase quando a ponte está desligada.
+- O catálogo passa a registrar **24/35 operações de elenco** em `frontend-migrated`; restam 11 operações de elenco. A consulta histórica por temporada permanece em uma fatia própria por depender de rodadas, temporadas e estatísticas.
+- Verificação: **928 testes frontend em 186 arquivos**, **182 testes backend em 70 arquivos**, typecheck, build e auditoria de dependências com zero vulnerabilidades nos dois pacotes. As auditorias registram **59 operações no frontend**, **207 planejadas** e o piloto de gol no backend. O smoke Docker local retornou `200` e contratos válidos para as três novas rotas e todas as fatias anteriores, sem escrita no banco.
+
+### 2026-10-27 — históricos de rodadas e insígnias sazonais
+
+- `getPlayerRoundHistory` passou ao backend modular com escopo pela temporada ativa, pelada e tipo de rodada. A resposta preserva pontuação canônica, valor legado, snapshot da rodada e detalhamento dos scouts, incluindo regras posicionais das versões recentes.
+- `getPlayerAwardSeasons` passou à mesma fronteira de histórico. O domínio calcula destaques da rodada, xerife e lideranças sazonais usando todos os competidores oficiais elegíveis, sem expor linhas brutas do banco.
+- As rotas `GET /api/roster/leagues/:leagueId/players/:playerId/round-history` e `GET /api/roster/leagues/:leagueId/players/:playerId/award-seasons` exigem vínculo com a pelada dentro da transação autenticada. O fallback Supabase permanece disponível com a ponte desligada.
+- O catálogo registra **26/35 operações de elenco** em `frontend-migrated`; restam 9 operações de elenco. Verificação: **932 testes frontend em 187 arquivos**, **191 testes backend em 73 arquivos**, typecheck, builds, auditorias arquiteturais e de dependências com zero vulnerabilidades. O smoke Docker local retornou `200` e contratos válidos para as duas rotas novas e todas as anteriores.
+
+### 2026-10-26 — primeiras fatias verticais de elenco
+
+- Criado o contexto `backend/src/contexts/roster` e o módulo `src/modules/roster` com a operação `getMyAccountCareer`, cobrindo domínio de agregação, caso de uso, porta, adaptador PostgreSQL sob claims verificadas, rota `GET /api/roster/me/career`, gateway HTTP e sessão server-side.
+- Leitura e alteração da classificação privada de equilíbrio passam pelas rotas escopadas do jogador. O backend valida o conjunto fechado de tags, verifica `can_manage_private_balance_tags()` na mesma transação da leitura/escrita e mantém RLS e a lista persistida de editores como autoridade.
+- Aptidão física ganhou validação e conversão de ritmo no domínio, casos de uso próprios e quatro contratos HTTP. Leituras recebem a pelada selecionada explicitamente, dados pessoais conferem o vínculo da conta, resumos obedecem `show_fitness_stats` e gravações reconfirmam `can_manage_own_fitness()` dentro da transação.
+- O sorteio por velocidade e suas avaliações passaram ao contexto de elenco. O backend relê elegibilidade e estrelas da pelada, valida a lista, executa o algoritmo no domínio e exige `is_league_admin()` na mesma transação para leitura, sorteio e alteração; a interface envia somente IDs, configuração e ordem de presença.
+- O estado de novidades do elenco agora é isolado por conta e pelada no backend: resumo, jogadores não vistos e os dois comandos de confirmação usam o marcador persistido do ADM, exigem administração da pelada e preservam as RPCs monotônicas como autoridade de escrita.
+- O primeiro smoke de aptidão encontrou IDs UUID legados com versão zero nas fixtures. A validação do contexto foi alinhada ao formato aceito pelo PostgreSQL e pelo domínio de peladas, com regressão explícita para esses IDs; o smoke repetido aprovou rodadas e resumo com `200`.
+- A Server Action preserva o retorno vazio para conta anônima/indisponibilidade e mantém o acesso Supabase como fallback somente enquanto `ROSTER_API_ENABLED` estiver desligado. O backend é opt-in com `ENABLE_ROSTER_API=true`.
+- Antes do catálogo-base, o lote registrava **14/35 operações de elenco** em `frontend-migrated`. As fatias têm testes de domínio, aplicação, persistência, rota, gateway, sessão e compatibilidade das Server Actions; as telas e as mutações ainda precisam ser exercitadas na stack local antes de promoção para `verified`.
+- A imagem local foi reconstruída e [`verify-local-roster.sh`](../../scripts/verify-local-roster.sh) aprovou carreira, classificação privada, aptidão, velocidades, sorteio sem persistência e as duas leituras de novidades com `200` e contratos válidos, sem escrita no banco.
+- Verificação automatizada: **907 testes frontend em 179 arquivos**, **149 testes backend em 58 arquivos**, typecheck e build dos dois pacotes e auditorias de migração/contextos/arquitetura aprovados.
+
+### 2026-10-26 — identidade e acesso 8/8 no backend
+
+- A listagem de contas administráveis e a promoção/remoção de ADM global ganharam domínio, caso de uso, repositório PostgreSQL autenticado e rotas próprias. As RPCs existentes continuam responsáveis por autorização, lock, proteção do último ADM e auditoria.
+- O Next usa um gateway HTTP server-only quando `IDENTITY_API_ENABLED=true`; o access token não chega ao navegador por código novo e o caminho Supabase anterior permanece como fallback reversível. A API valida UUID/payload, verifica a sessão e executa SQL sob `SET LOCAL ROLE authenticated` com claims do usuário verificado.
+- Cadastro, login, logout, recuperação, troca de senha e Google OAuth foram migrados junto com o callback PKCE. O Next gera desafio/verificador por fluxo, guarda o verificador em cookie HttpOnly de uso único, envia apenas o desafio ao backend e instala no SSR os tokens recebidos pela comunicação interna. O Auth auto-hospedado continua como infraestrutura substituível; `APP_PUBLIC_URL` e a allow-list de redirects precisam corresponder ao ambiente.
+- Login e callback mantêm a reparação de perfil como melhor esforço: falha temporária no banco não invalida uma sessão emitida corretamente pelo Auth. Troca de senha revoga a sessão no Auth e depois limpa apenas o cookie local. Erros esperados do provedor são traduzidos sem vazar detalhes internos.
+- O catálogo registra **8/8 operações de identidade** em `frontend-migrated`. Testes de domínio, aplicação, adaptadores Auth/PostgreSQL, rotas, gateway, Server Actions, PKCE e callback cobrem o caminho novo; homologação real com confirmação por e-mail, Google de teste, recuperação e dois ADMs ainda é necessária antes de promover para `verified`.
+- A imagem local foi reconstruída e [`verify-local-identity.sh`](../../scripts/verify-local-identity.sh) aprovou login `200`, perfil criado, recuperação aceita `202`, URL OAuth `200`, troca de senha `204`, logout `204`, login com a nova senha `200`, contas `200` e papel idempotente `200`; a fixture foi removida e não restou conta `codex.identity.*`. A confirmação real de cadastro não pôde ser exercitada porque o Auth restaurado aponta para o host SMTP ausente `supabase-mail`; o script valida a rejeição de entrada inválida e deixa o envio real como gate manual.
+- Verificação da fatia: **884 testes frontend em 173 arquivos**, **105 testes backend em 42 arquivos**, typecheck e build dos dois pacotes e auditorias de migração/contextos/arquitetura aprovados.
+
+### 2026-10-26 — contexto de peladas 27/27 conectado ao backend
+
+- Os três fluxos de entrada restantes agora concluem a apresentação e autorizam a seleção ativa/arquivada no backend sob claims verificadas; somente o cookie HttpOnly e o redirecionamento continuam como responsabilidade da camada Next.js.
+- Branding ganhou domínio, orquestração com compensação, repositório PostgreSQL e adaptador de Storage autenticado. Logo e capa chegam por multipart limitado a dois arquivos; MIME, assinatura binária e limites de 4/8 MB são validados antes da gravação. O banco só recebe URLs depois do upload, novos objetos são removidos se a persistência falhar e objetos substituídos são apagados após sucesso.
+- `@fastify/multipart` foi fixado em uma versão posterior à correção do advisory de upload abortado; o parser impõe limites explícitos de arquivos, campos, partes e tamanho. `SUPABASE_PUBLIC_URL` separa a URL publicada nas imagens da URL interna usada entre contêineres.
+- O catálogo passa a registrar **27/27 operações de peladas** em `frontend-migrated`. O smoke no banco/Storage locais aprovou seleção ativa `200`, rejeição de modo arquivado numa liga ativa `403`, conclusão do onboarding `200`, upload multipart `200`, persistência do objeto, remoção `200` e limpeza completa. Isso fecha a implementação estrutural desse contexto, mas não o promove a `verified`: ainda é necessário testar manualmente as telas com duas contas/peladas antes de retirar os fallbacks.
+- Verificação final: typecheck e build dos dois pacotes, **862 testes frontend em 166 arquivos**, **82 testes backend em 34 arquivos**, auditorias de migração/contextos/arquitetura e auditoria das dependências de produção do backend aprovados; esta última reportou zero vulnerabilidades.
+
+### 2026-10-26 — estádios no backend modular
+
+- As quatro operações de estádios passaram a usar domínio e casos de uso próprios, repositório PostgreSQL autenticado e rotas HTTP escopadas pela pelada. Criação serializa a próxima ordem; reordenação é uma única transação e rejeita IDs repetidos ou externos à pelada.
+- As Server Actions preservam o contrato das telas e o fallback Supabase enquanto `LEAGUE_API_ENABLED` estiver desligado. Com a flag local ligada, leitura, criação, edição, exclusão e ordenação usam o backend sem aceitar identidade ou papel enviados pelo cliente.
+- O catálogo registrava **23/27 operações de peladas** em `frontend-migrated` (**23/267 no total**, além do piloto de gol); os quatro fluxos então pendentes foram concluídos no lote seguinte.
+- Verificação desta fatia: typecheck e build dos dois pacotes, **855 testes frontend em 166 arquivos**, **68 testes backend em 27 arquivos** e auditorias de migração, contextos e arquitetura aprovados. No banco local restaurado, o smoke autenticado aprovou criação `201`, leitura `200`, edição `200`, ordem atômica `200`, exclusão `200` e confirmou zero registros temporários restantes.
 
 ### 2026-10-22 — RLS, read models, cache, mídia e observabilidade
 
@@ -309,6 +525,22 @@ Este arquivo é a fonte de progresso da migração arquitetural. Atualizar no me
 - Testes novos: limites de formato, bloqueio de convocação de outra pelada/fechada, filtros do gateway e retorno do tamanho do Cartola. Tipagem, 511 testes em 73 arquivos e build aprovados.
 - Migrations: nenhuma. Banco e dados de produção não foram alterados. Não foram executados testes integrados contra duas peladas reais neste lote.
 - Commit: consultar o registro Git deste lote; nenhuma implantação efetuada.
+
+### 2026-10-29 — migração e paridade de Notifications (Subfatia 1: Inbox)
+
+- Migração vertical completa das 3 operações de Inbox: `getMyInboxPreview`, `markInboxRead` e `getMyInboxNotifications`.
+- Backend:
+  - Domínio com validação de invariantes e normalização de rotas em `backend/src/contexts/notifications/domain/inbox-notification.ts`.
+  - Casos de uso de aplicação e porta `InboxRepository` em `backend/src/contexts/notifications/application/manage-inbox.ts`.
+  - Repositório PostgreSQL `pg-inbox-repository.ts` operando sob transações autenticadas (`withAuthenticatedTransaction`) com `SET LOCAL ROLE authenticated` e escopo restrito ao ator autenticado (`actor.userId`).
+  - Rotas Fastify protegidas por Bearer token registradas em `backend/src/contexts/notifications/presentation/inbox-route.ts` sob a feature flag `ENABLE_NOTIFICATIONS_API`.
+- Frontend:
+  - Módulo `src/modules/notifications/` com tipos de domínio, cliente HTTP interno `httpNotificationGateway` e factory de sessão `notificationApiFor` controlada pela feature flag `NOTIFICATIONS_API_ENABLED`.
+  - Server Actions em `src/lib/actions/inbox.ts` delegam ao gateway Fastify quando a sessão está ativa e mantêm o fallback legado intacto quando desligada.
+- Verificação:
+  - 100% de aprovação nos testes frontend (203 arquivos, 1.055 testes) e backend (104 arquivos, 374 testes).
+  - TypeScript estrito (`typecheck`) e builds de produção aprovados em ambos os projetos.
+  - Auditoria de migração avançou para 153/267 operações estruturais e aceitas (`notifications: 3/16`).
 
 ### 2026-10-17 — piloto e diagnóstico das estatísticas
 

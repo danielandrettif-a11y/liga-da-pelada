@@ -2,18 +2,25 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { ENTRY_FLOW_DONE_COOKIE, ENTRY_FLOW_PENDING_COOKIE, ENTRY_FLOW_VERSION, isEntryFlowScreen } from '@/lib/entry-flow'
 import { requestOrigin } from '@/lib/siteUrl'
+import { supabaseServerConfig } from '@/lib/supabase/server-config'
+import { homeTraceId } from '@/lib/home-performance'
 
 export default async function proxy(request: NextRequest) {
+  // O Fastify valida a sessão e o PostgreSQL aplica o escopo da liga nesta leitura.
+  if (request.nextUrl.pathname === '/api/backend/callups/active') return NextResponse.next()
+
   let supabaseResponse = NextResponse.next({
     request: {
       headers: request.headers,
     },
   })
 
+  const config = supabaseServerConfig(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_INTERNAL_URL)
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    config.url,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions: { name: config.cookieName },
       cookies: {
         getAll() {
           return request.cookies.getAll()
@@ -31,8 +38,17 @@ export default async function proxy(request: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
   const pathname = request.nextUrl.pathname
+  const measureHome = pathname === '/' && process.env.MATCH_PERF_DIAGNOSTICS === '1'
+  const authStartedAt = performance.now()
+  const { data: { user } } = await supabase.auth.getUser()
+  const authDuration = performance.now() - authStartedAt
+  const traceId = pathname === '/' ? homeTraceId(request.nextUrl.searchParams.get('home_trace')) : undefined
+  if (traceId) console.info(JSON.stringify({
+    event: 'match_step', operation: 'load_home', step: 'proxy_auth',
+    durationMs: Math.round(authDuration), success: Boolean(user), traceId,
+  }))
+  let membershipDuration = 0
   const origin = requestOrigin(request)
   const isAdminRoute =
     pathname.startsWith('/admin') ||
@@ -57,19 +73,26 @@ export default async function proxy(request: NextRequest) {
   if (pathname === '/' && !user) return NextResponse.redirect(new URL('/inicio', origin))
 
   if (user) {
-    const { data: memberships } = await supabase
-      .from('league_members')
-      .select('league_id, role')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
-    hasMembership = Boolean(memberships?.length)
+    const needsMembershipContext = !isPublicRoute && !isLeagueSelectionRoute && pathname !== '/'
+    const membershipStartedAt = performance.now()
+    const { data: memberships } = needsMembershipContext
+      ? await supabase
+        .from('league_members')
+        .select('league_id, role, leagues(feature_tier)')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+      : { data: null }
+    membershipDuration = performance.now() - membershipStartedAt
+    hasMembership = needsMembershipContext ? Boolean(memberships?.length) : true
     const selectedLeagueId = request.cookies.get('active_league_id')?.value
     const selectedMembership = memberships?.find((item) => item.league_id === selectedLeagueId)
       || (memberships?.length === 1 ? memberships[0] : null)
     needsLeagueChoice = Boolean((memberships?.length || 0) > 1 && !selectedMembership)
     isAdmin = selectedMembership?.role === 'admin'
     if (selectedMembership) {
-      const { data: league } = await supabase.from('leagues').select('feature_tier').eq('id', selectedMembership.league_id).maybeSingle()
+      const league = Array.isArray(selectedMembership.leagues)
+        ? selectedMembership.leagues[0]
+        : selectedMembership.leagues
       isBasicLeague = league?.feature_tier === 'basic'
       isQuickLeague = league?.feature_tier === 'quick'
     }
@@ -112,10 +135,10 @@ export default async function proxy(request: NextRequest) {
   }
 
   if (!isPublicRoute && !user) return NextResponse.redirect(loginUrl)
-  if (!isPublicRoute && !isLeagueSelectionRoute && user && !hasMembership) {
+  if (pathname !== '/' && !isPublicRoute && !isLeagueSelectionRoute && user && !hasMembership) {
     return NextResponse.redirect(new URL('/lobby', origin))
   }
-  if (!isPublicRoute && !isLeagueSelectionRoute && user && needsLeagueChoice) {
+  if (pathname !== '/' && !isPublicRoute && !isLeagueSelectionRoute && user && needsLeagueChoice) {
     return NextResponse.redirect(new URL('/lobby', origin))
   }
   const isFullFeatureRoute = pathname.startsWith('/cartola') || pathname.startsWith('/bq-manager')
@@ -144,6 +167,10 @@ export default async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/lobby', origin))
   }
 
+  if (measureHome && user) {
+    supabaseResponse.headers.append('Server-Timing',
+      `home_auth;dur=${authDuration.toFixed(1)}, home_membership;dur=${membershipDuration.toFixed(1)}`)
+  }
   return supabaseResponse
 }
 

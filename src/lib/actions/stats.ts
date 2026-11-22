@@ -24,6 +24,7 @@ import {
   resolveRankingRoleWeights,
   type RankingRoleWeight,
 } from "../ranking-position-bonus";
+import { getStatisticsApiSession } from "@/modules/statistics/infrastructure/statistics-api-session";
 
 type RankingStatsRow = {
   player_id: string;
@@ -102,6 +103,12 @@ function overallTrend(value: unknown): OverallTrend {
 }
 
 export async function getLatestPlayerCardOverallMap(client?: any) {
+  const session = await getStatisticsApiSession(client);
+  if (session) {
+    const league = await getSelectedLeague();
+    if (!league) return new Map<string, PlayerCardOverall>();
+    return new Map(Object.entries(await session.gateway.getPlayerCardOveralls(league.id)));
+  }
   client ||= await createServerClient();
   const league = await getSelectedLeague();
   if (!league) return new Map<string, PlayerCardOverall>();
@@ -344,6 +351,16 @@ function aggregateRankingRows(
 }
 
 export async function calculateRoundStats(roundId: string) {
+  const session = await getStatisticsApiSession();
+  if (session) {
+    const league = await getSelectedLeague();
+    if (!league) return { success: false, error: "Selecione uma pelada no lobby." };
+    try {
+      return await session.gateway.calculateRoundStats(league.id, roundId);
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Erro ao recalcular estatísticas." };
+    }
+  }
   try {
     const client = await getAdminClient();
     if (!client) return { success: false, error: "Somente administradores podem recalcular estatisticas." };
@@ -745,6 +762,13 @@ export async function calculateRoundStats(roundId: string) {
 }
 
 export async function getRanking() {
+  const session = await getStatisticsApiSession();
+  if (session) {
+    const league = await getSelectedLeague();
+    if (league) {
+      return session.gateway.getRanking(league.id);
+    }
+  }
   // Todas as superfícies de ranking usam o mesmo read model (atividade,
   // elegibilidade e seis melhores rodadas), evitando totais divergentes.
   return (await getRankingExperienceData()).general;
@@ -753,6 +777,8 @@ export async function getRanking() {
 export async function getRoundStatistics(roundId: string): Promise<RoundStatistics | null> {
   const league = await getSelectedLeague();
   if (!league) return null;
+  const session = await getStatisticsApiSession();
+  if (session) return session.gateway.getRoundStatistics(league.id, roundId);
   const supabase = await createServerClient();
   const [{ data: round, error: roundError }, { data: rows, error: statsError }] = await Promise.all([
     supabase
@@ -1083,14 +1109,29 @@ async function getRankingExperienceDataUncached(includeEnrichment = true): Promi
 const getRankingExperienceDataCached = cache(getRankingExperienceDataUncached);
 const getRankingEssentialDataCached = cache(() => getRankingExperienceDataUncached(false));
 
-async function withLeagueRankingProfiles(data: RankingExperienceData): Promise<RankingExperienceData> {
-  const league = await getSelectedLeague();
-  if (!league) return data;
-  const client = await createServerClient();
-  const { data: profiles, error } = await client.from("league_members")
-    .select("player_id, player_profile").eq("league_id", league.id);
-  if (error) console.error("Erro ao buscar posições da pelada para o ranking:", error);
-  const positions = new Map((profiles || []).map((item) => [item.player_id, item.player_profile]));
+async function withLeagueRankingProfiles(dataPromise: Promise<RankingExperienceData>): Promise<RankingExperienceData> {
+  const profilesPromise = (async () => {
+    const startedAt = performance.now();
+    let failed = true;
+    let count = 0;
+    try {
+      const league = await getSelectedLeague();
+      if (!league) return null;
+      const client = await createServerClient();
+      if (!client) return null;
+      const { data: profiles, error } = await client.from("league_members")
+        .select("player_id, player_profile").eq("league_id", league.id);
+      if (error) console.error("Erro ao buscar posições da pelada para o ranking:", error);
+      failed = Boolean(error);
+      count = profiles?.length || 0;
+      return profiles || [];
+    } finally {
+      logStatsQuery("ranking_page", "profiles", startedAt, count, failed);
+    }
+  })();
+  const [data, profiles] = await Promise.all([dataPromise, profilesPromise]);
+  if (!profiles) return data;
+  const positions = new Map(profiles.map((item) => [item.player_id, item.player_profile]));
   const apply = (entries: RankingEntry[]) => entries.map((entry) => ({
     ...entry, player: { ...entry.player, player_profile: positions.get(entry.player.id) ?? null },
   }));
@@ -1103,7 +1144,21 @@ async function withLeagueRankingProfiles(data: RankingExperienceData): Promise<R
 }
 
 export async function getRankingEssentialData(): Promise<RankingExperienceData> {
-  return withLeagueRankingProfiles(await getRankingEssentialDataCached());
+  const startedAt = performance.now();
+  let failed = true;
+  let count = 0;
+  try {
+    const [session, league] = await Promise.all([getStatisticsApiSession(), getSelectedLeague()]);
+    const dataPromise = session && league
+      ? session.gateway.getRankingExperience(league.id, { includeEnrichment: false })
+      : getRankingEssentialDataCached();
+    const result = await withLeagueRankingProfiles(dataPromise);
+    failed = false;
+    count = result.general.length;
+    return result;
+  } finally {
+    logStatsQuery("ranking_page", "essential", startedAt, count, failed);
+  }
 }
 
 type RankingEnrichment = Pick<RankingEntry,
@@ -1116,6 +1171,13 @@ type RankingEnrichment = Pick<RankingEntry,
 export async function getRankingEnrichmentForPlayers(playerIds: string[]): Promise<Record<string, RankingEnrichment>> {
   const requested = [...new Set(playerIds)].filter((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)).slice(0, 150);
   if (!requested.length) return {};
+  const session = await getStatisticsApiSession();
+  if (session) {
+    const league = await getSelectedLeague();
+    if (league) {
+      return session.gateway.getRankingEnrichmentForPlayers(league.id, requested);
+    }
+  }
   const [league, season, account] = await Promise.all([getSelectedLeague(), getActiveSeason(), getCurrentAccount()]);
   if (!league || !season || season.league_id !== league.id || !account.user) return {};
   const client = account.client;
@@ -1169,15 +1231,26 @@ export async function getRankingEnrichmentForPlayers(playerIds: string[]): Promi
 }
 
 export async function getRankingExperienceData(): Promise<RankingExperienceData> {
+  const session = await getStatisticsApiSession();
+  if (session) {
+    const league = await getSelectedLeague();
+    if (league) {
+      return session.gateway.getRankingExperience(league.id, { includeEnrichment: true });
+    }
+  }
   // React.cache compartilha o resultado somente dentro da requisição atual.
   // Pelada e sessão continuam resolvidas pelo contexto autenticado dessa
   // requisição; nenhum dado é persistido entre usuários.
-  return withLeagueRankingProfiles(await getRankingExperienceDataCached());
+  return withLeagueRankingProfiles(getRankingExperienceDataCached());
 }
 
 export async function getPlayerRankingEntry(playerId: string): Promise<{ entry: RankingEntry; position: number } | null> {
   const league = await getSelectedLeague();
   if (!league) return null;
+  const session = await getStatisticsApiSession();
+  if (session) {
+    return session.gateway.getPlayerRankingEntry(league.id, playerId);
+  }
   const supabase = await createServerClient();
   const data = await getRankingExperienceData();
   const index = data.general.findIndex((item) => item.player.id === playerId);
@@ -1262,6 +1335,12 @@ export type FriendlyStatsEntry = {
 };
 
 export async function getFriendlyStats(): Promise<FriendlyStatsEntry[]> {
+  const session = await getStatisticsApiSession();
+  if (session) {
+    const league = await getSelectedLeague();
+    if (!league) return [];
+    return session.gateway.getFriendlyStats(league.id);
+  }
   const supabase = await createServerClient();
   const season = await getActiveSeason();
   if (!season) return [];

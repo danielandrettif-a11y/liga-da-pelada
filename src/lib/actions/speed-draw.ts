@@ -3,9 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentAccount } from "../auth";
 import { getSelectedLeague } from "../league-context";
-import type { PlayerAdminAttributes } from "../types";
 import { drawTeamsByAttendance } from "../round-draw";
 import { drawTeamsBySpeed, summarizeSpeedTeams, type SpeedTeamSummary } from "../speed-draw";
+import { rosterApiFor } from "@/modules/roster/infrastructure/roster-api-session";
 
 export type ServerSpeedDrawResult = {
   success: boolean;
@@ -42,6 +42,13 @@ export async function drawTeamsBySpeedOnServer(input: {
 
   const activeLeague = await getSelectedLeague();
   if (!activeLeague) return { success: false, error: "Escolha uma pelada no lobby." };
+
+  try {
+    const api = await rosterApiFor(account.client);
+    if (api) return { success: true, ...await api.drawTeamsBySpeed(activeLeague.id, input) };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível sortear por velocidade." };
+  }
 
   const { data: members, error: membersError } = await account.client
     .from("league_members")
@@ -100,6 +107,14 @@ export async function getPlayerSpeedRatings(): Promise<Record<string, 1 | 2 | 3 
   const league = await getSelectedLeague();
   if (!account.isAdmin || !league || league.role !== "admin") return {};
 
+  try {
+    const api = await rosterApiFor(account.client);
+    if (api) return await api.getPlayerSpeedRatings(league.id);
+  } catch (error) {
+    console.error("Erro ao buscar atributos de velocidade:", error);
+    return {};
+  }
+
   const { data, error } = await account.client
     .from("league_members")
     .select("player_id, speed_rating")
@@ -129,6 +144,18 @@ export async function setPlayerSpeedRating(
 
   if (speedRating !== null && ![1, 2, 3].includes(speedRating)) {
     return { success: false, error: "Avaliação de velocidade inválida (deve ser 1, 2 ou 3 estrelas)." };
+  }
+
+  try {
+    const api = await rosterApiFor(account.client);
+    if (api) {
+      await api.setPlayerSpeedRating(league.id, playerId, speedRating);
+      revalidatePath(`/jogadores/${playerId}`);
+      revalidatePath("/admin/jogadores");
+      return { success: true };
+    }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível salvar a velocidade." };
   }
 
   const { data: updated, error } = await account.client

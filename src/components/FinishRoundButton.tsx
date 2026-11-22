@@ -3,13 +3,15 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
 import { CheckCircle2, X } from "@/components/icons";
 import { finishRound } from "@/lib/actions/rounds";
 import { useDialogViewport } from "@/lib/useDialogViewport";
-import type { ExpenseItem, PaymentRecipient } from "@/lib/actions/payments";
+import type { AppFeeConfig, ExpenseItem, PaymentRecipient } from "@/lib/actions/payments";
 
-export function FinishRoundButton({ roundId, status, canManage, recipients = [], expenseItems = [], participantCount = 0, quickMode = false }: { roundId: string; status: string; canManage: boolean; recipients?: PaymentRecipient[]; expenseItems?: ExpenseItem[]; participantCount?: number; quickMode?: boolean }) {
+export function FinishRoundButton({ roundId, roundVersion, status, canManage, recipients = [], expenseItems = [], appFee, participantCount = 0, quickMode = false }: { roundId: string; roundVersion?: string; status: string; canManage: boolean; recipients?: PaymentRecipient[]; expenseItems?: ExpenseItem[]; appFee?: AppFeeConfig; participantCount?: number; quickMode?: boolean }) {
   const router = useRouter();
+  const [expectedVersion, setExpectedVersion] = useState<string | undefined>();
   const [open, setOpen] = useState(false);
   const [pix, setPix] = useState("");
   const [paymentTotal, setPaymentTotal] = useState("");
@@ -52,7 +54,7 @@ export function FinishRoundButton({ roundId, status, canManage, recipients = [],
 
     setLoading(true);
     setError("");
-    const result = await finishRound(roundId, pix, total, { id: recipientId || null, name: recipientName || null }, { expenseItemIds: selectedExpenseIds });
+    const result = await finishRound(roundId, pix, total, { id: recipientId || null, name: recipientName || null }, { expenseItemIds: selectedExpenseIds, expectedVersion });
     if (!result.success) {
       setError(result.error || "Nao foi possivel encerrar a rodada.");
       setLoading(false);
@@ -67,16 +69,16 @@ export function FinishRoundButton({ roundId, status, canManage, recipients = [],
   return (
     <>
       <button
-        onClick={() => setOpen(true)}
+        onClick={() => { setExpectedVersion(roundVersion); setOpen(true); }}
         className="w-full mt-6 bg-surface border border-danger/30 hover:bg-danger/10 text-danger font-bold py-4 rounded-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2"
       >
         <CheckCircle2 className="w-5 h-5" />
         Encerrar Rodada
       </button>
 
-      {open && (
+      {open && typeof document !== "undefined" && createPortal(
         <div className="mobile-dialog-backdrop bg-black/75 backdrop-blur-sm animate-fade-in" onMouseDown={(event) => event.target === event.currentTarget && !loading && setOpen(false)}>
-          <div role="dialog" aria-modal="true" aria-labelledby="finish-round-title" className="mobile-dialog-panel max-w-md rounded-2xl border border-border bg-surface p-5 shadow-2xl animate-fade-in-up">
+          <div role="dialog" aria-modal="true" aria-labelledby="finish-round-title" className="mobile-dialog-panel mobile-dialog-scroll max-w-md rounded-2xl border border-border bg-surface p-4 shadow-2xl animate-fade-in-up sm:p-5">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 id="finish-round-title" className="text-lg font-black text-foreground">Encerrar a rodada?</h2>
@@ -120,6 +122,8 @@ export function FinishRoundButton({ roundId, status, canManage, recipients = [],
               />
             </div>
 
+            {appFee && appFee.amountPerPlayer > 0 && <div className="mt-4 rounded-xl border border-accent/25 bg-accent/5 p-3 text-xs text-muted"><strong className="block text-foreground">Custo do app</strong><span>{participantCount} jogador{participantCount === 1 ? "" : "es"} × R$ {appFee.amountPerPlayer.toFixed(2).replace(".", ",")} = <b className="text-accent">R$ {(participantCount * appFee.amountPerPlayer).toFixed(2).replace(".", ",")}</b></span></div>}
+
             {expenseItems.length > 0 && <fieldset className="mt-5 space-y-2"><legend className="text-xs font-bold uppercase tracking-wider text-muted">Itens extras desta rodada</legend><p className="text-[11px] leading-5 text-muted">Selecione quantos quiser. Uma parcela de cada item será dividida entre os {participantCount} participantes.</p>{expenseItems.map((item) => { const checked = selectedExpenseIds.includes(item.id); const installmentAmount = Number(item.total_amount) / item.installment_count; return <label key={item.id} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 ${checked ? "border-accent bg-accent/5" : "border-border bg-background"}`}><input type="checkbox" checked={checked} onChange={() => setSelectedExpenseIds((current) => checked ? current.filter((id) => id !== item.id) : [...current, item.id])} className="mt-1 accent-[var(--color-accent)]" /><span className="min-w-0 flex-1"><strong className="block text-sm text-foreground">{item.name}</strong><span className="mt-1 block text-[11px] text-muted">Parcela {item.paid_installments + 1}/{item.installment_count} · R$ {installmentAmount.toFixed(2).replace(".", ",")} · PIX de {item.recipient?.name || "destinatário"}</span>{participantCount > 0 && <span className="mt-1 block text-[11px] font-bold text-accent">aprox. R$ {(installmentAmount / participantCount).toFixed(2).replace(".", ",")} por jogador</span>}</span></label>; })}</fieldset>}
 
             {error && <p role="alert" className="mt-3 rounded-lg bg-danger/10 p-3 text-xs font-bold text-danger">{error}</p>}
@@ -133,7 +137,7 @@ export function FinishRoundButton({ roundId, status, canManage, recipients = [],
               </button>
             </div>
           </div>
-        </div>
+        </div>, document.body
       )}
     </>
   );

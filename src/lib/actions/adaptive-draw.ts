@@ -5,6 +5,7 @@ import { drawTeamsAdaptive, type AdaptiveTeamSummary } from "../adaptive-draw";
 import type { PlayerProfile } from "../types";
 import { getPrivateBalanceTagsForDraw } from "../private-balance-tags";
 import { getSelectedLeague } from "../league-context";
+import { roundApiFor } from "@/modules/rounds/infrastructure/round-api-session";
 
 export type ServerAdaptiveDrawResult = {
   success: boolean;
@@ -27,6 +28,18 @@ export async function drawTeamsAdaptiveOnServer(input: {
   const activeLeague = await getSelectedLeague();
   if (!account.user || !activeLeague || activeLeague.role !== "admin") {
     return { success: false, error: "Apenas administradores desta pelada podem usar o equilíbrio completo." };
+  }
+
+  const api = await roundApiFor(account.client);
+  if (api) {
+    try {
+      return await api.drawTeamsAdaptiveOnServer(activeLeague.id, input);
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Não foi possível executar o equilíbrio completo.",
+      };
+    }
   }
 
   const playerIds = [...new Set(input.playerIds)];

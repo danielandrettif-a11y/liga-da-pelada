@@ -765,9 +765,19 @@ export function MatchLiveBoard({ match, matchDuration, goalsToFinish, canManage,
         .map((entry: any) => [entry.player_id, entry]),
     ).values()] as any[];
   }, [goalEdit, match.match_players]);
-  const playerNameById = useMemo(() => new Map<string, string>(
-    (match.match_players || []).map((entry: any) => [String(entry.player_id), String(entry.player?.name || "Jogador")] as [string, string]),
-  ), [match.match_players]);
+  const playerNameById = useMemo(() => {
+    const names = new Map<string, string>();
+    const add = (id: unknown, player: any) => {
+      if (id && player?.name) names.set(String(id), String(player.name));
+    };
+    for (const entry of match.round?.round_players || []) add(entry.player_id, entry.players);
+    for (const team of [match.team_a, match.team_b]) {
+      for (const entry of team?.team_players || []) add(entry.player_id, entry.players);
+    }
+    for (const entry of match.match_players || []) add(entry.player_id, entry.player);
+    for (const entry of match.match_goalkeeper_stints || []) add(entry.player_id, entry.player);
+    return names;
+  }, [match.match_players, match.match_goalkeeper_stints, match.round?.round_players, match.team_a, match.team_b]);
 
   // Timeline unificada e ordenada
   const timelineItems = useMemo(() => {
@@ -924,7 +934,7 @@ export function MatchLiveBoard({ match, matchDuration, goalsToFinish, canManage,
     setLoading(true);
     setFinishing(true);
     try {
-      const res = await finishMatch(match.id);
+      const res = await finishMatch(match.id, displayScore);
       if (!res.success) {
         setError(res.error || "Erro ao finalizar a partida.");
         return;
@@ -1173,7 +1183,7 @@ export function MatchLiveBoard({ match, matchDuration, goalsToFinish, canManage,
 
   function renderGoalkeeperControl(teamId: string) {
     const goalkeeperId = goalkeeperByTeam[teamId];
-    const label = goalkeeperId ? playerNameById.get(goalkeeperId) || "Jogador" : "Não definido";
+    const label = goalkeeperId ? playerNameById.get(goalkeeperId) || "Nome indisponível" : "Não definido";
     const teamName = teamId === match.team_a_id ? match.team_a.name : match.team_b.name;
     return (
       <div className="flex max-w-full items-center gap-1 rounded-2xl border border-cyan-300/25 bg-cyan-300/[.07] pl-2 pr-1 text-[11px] font-bold text-cyan-100">
@@ -1261,6 +1271,7 @@ export function MatchLiveBoard({ match, matchDuration, goalsToFinish, canManage,
 
       {/* Cronômetro e Placar */}
       <div className="glass-card flex flex-col items-center p-4 animate-fade-in sm:p-6">
+        {match.referee?.name && <p className="mb-2 text-xs font-semibold text-muted">Juiz · {match.referee.name}</p>}
         {/* Timer Section (Isolado com memo) */}
         {!isFinished && (
           <MatchTimer

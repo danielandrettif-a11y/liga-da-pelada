@@ -6,6 +6,7 @@ import type { Player, PlayerRegistrationEvent, RosterUnreadState } from "@/lib/t
 import { calculateRoundStats } from "./stats";
 import { refreshFluidOverallSafely } from "./overall";
 import { getSelectedLeague } from "@/lib/league-context";
+import { rosterApiFor } from "@/modules/roster/infrastructure/roster-api-session";
 
 async function getSelectedRosterPlayerIds() {
   const league = await getSelectedLeague();
@@ -19,6 +20,15 @@ async function getSelectedRosterPlayerIds() {
 export async function getRegistrationHistory(): Promise<PlayerRegistrationEvent[]> {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return [];
+  const league = await getSelectedLeague();
+  if (!league || league.role !== "admin") return [];
+  try {
+    const api = await rosterApiFor(account.client);
+    if (api) return await api.getRegistrationHistory(league.id);
+  } catch (error) {
+    console.error("Erro ao buscar historico de cadastros:", error);
+    return [];
+  }
   const rosterPlayerIds = await getSelectedRosterPlayerIds();
   if (!rosterPlayerIds.length) return [];
 
@@ -78,6 +88,13 @@ export async function getRosterUnreadState(): Promise<RosterUnreadState> {
   const account = await getCurrentAccount();
   const league = await getSelectedLeague();
   if (!account.isAdmin || !account.user || !league || league.role !== "admin") return { count: 0, lastSeenAt: null };
+  try {
+    const api = await rosterApiFor(account.client);
+    if (api) return await api.getRosterUnreadState(league.id);
+  } catch (error) {
+    console.error("Erro ao contar novos cadastros:", error);
+    return { count: 0, lastSeenAt: null };
+  }
   const rosterPlayerIds = await getSelectedRosterPlayerIds();
   if (!rosterPlayerIds.length) return { count: 0, lastSeenAt: null };
 
@@ -107,6 +124,13 @@ export async function getUnreadRosterPlayers(): Promise<{ playerIds: string[]; s
   const account = await getCurrentAccount();
   const league = await getSelectedLeague();
   if (!account.isAdmin || !account.user || !league || league.role !== "admin") return { playerIds: [], seenThrough: null };
+  try {
+    const api = await rosterApiFor(account.client);
+    if (api) return await api.getUnreadRosterPlayers(league.id);
+  } catch (error) {
+    console.error("Erro ao buscar cadastros não vistos:", error);
+    return { playerIds: [], seenThrough: null };
+  }
   const rosterPlayerIds = await getSelectedRosterPlayerIds();
   if (!rosterPlayerIds.length) return { playerIds: [], seenThrough: null };
 
@@ -145,6 +169,18 @@ export async function markRosterActivitySeenThrough(seenThrough: string) {
   if (Number.isNaN(parsed.getTime())) return { success: false, error: "Data de leitura inválida." };
   const safeSeenThrough = new Date(Math.min(parsed.getTime(), Date.now())).toISOString();
 
+  try {
+    const api = await rosterApiFor(account.client);
+    if (api) {
+      await api.markRosterActivitySeenThrough(league.id, safeSeenThrough);
+      revalidatePath("/", "layout");
+      revalidatePath("/jogadores");
+      return { success: true };
+    }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível atualizar esta leitura." };
+  }
+
   const { error } = await account.client.rpc("mark_roster_activity_seen_through", {
     p_league_id: league.id,
     p_seen_through: safeSeenThrough,
@@ -160,6 +196,17 @@ export async function markRosterActivitySeen() {
   const account = await getCurrentAccount();
   const league = await getSelectedLeague();
   if (!account.isAdmin || !league || league.role !== "admin") return { success: false, error: "Somente administradores podem atualizar esta leitura." };
+  try {
+    const api = await rosterApiFor(account.client);
+    if (api) {
+      await api.markRosterActivitySeen(league.id);
+      revalidatePath("/", "layout");
+      revalidatePath("/jogadores");
+      return { success: true };
+    }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível atualizar esta leitura." };
+  }
   const { error } = await account.client.rpc("mark_roster_activity_seen", { p_league_id: league.id });
   if (error) return { success: false, error: error.message };
   revalidatePath("/", "layout");
@@ -170,6 +217,15 @@ export async function markRosterActivitySeen() {
 export async function getRegisteredMergeCandidates(guestId: string): Promise<Player[]> {
   const account = await getCurrentAccount();
   if (!account.isAdmin) return [];
+  const league = await getSelectedLeague();
+  if (!league || league.role !== "admin") return [];
+  try {
+    const api = await rosterApiFor(account.client);
+    if (api) return await api.getRegisteredMergeCandidates(league.id, guestId);
+  } catch (error) {
+    console.error("Erro ao buscar candidatos para uniao:", error);
+    return [];
+  }
   const rosterPlayerIds = await getSelectedRosterPlayerIds();
   if (!rosterPlayerIds.includes(guestId)) return [];
 
@@ -192,8 +248,43 @@ export async function mergeGuestWithRegistered(guestId: string, registeredId: st
   const account = await getCurrentAccount();
   if (!account.isAdmin) return { success: false, error: "Somente administradores podem unir perfis." };
   const league = await getSelectedLeague();
+  if (!league || league.role !== "admin") return { success: false, error: "Somente administradores podem unir perfis." };
+
+  try {
+    const api = await rosterApiFor(account.client);
+    if (api) {
+      const merged = await api.mergeGuestWithRegistered(league.id, guestId, registeredId);
+      const affectedRoundIds = merged.affectedRoundIds;
+      for (const roundId of affectedRoundIds) {
+        const result = await calculateRoundStats(roundId);
+        if (!result.success) return { success: false, error: `Perfis unidos, mas a rodada precisa ser recalculada: ${result.error}` };
+      }
+      if (affectedRoundIds.length) {
+        const { data: rounds } = await account.client.from("rounds").select("id, date, number, status, round_type").in("id", affectedRoundIds).order("date").order("number");
+        const firstOfficial = (rounds || []).find((round) => round.status === "finished" && round.round_type === "official");
+        if (firstOfficial) {
+          const { data: fantasyRound } = await account.client.from("fantasy_rounds").select("id").eq("round_id", firstOfficial.id).maybeSingle();
+          if (fantasyRound) {
+            const { error: fantasyError } = await account.client.rpc("reprocess_fantasy_from_round", { p_round_id: firstOfficial.id });
+            if (fantasyError) return { success: false, error: `Perfis unidos, mas o Cartola precisa ser reprocessado: ${fantasyError.message}` };
+          }
+        }
+        await refreshFluidOverallSafely(`união de perfis ${registeredId} em ${guestId}`);
+      }
+
+      revalidatePath("/");
+      revalidatePath("/jogadores");
+      revalidatePath("/ranking");
+      revalidatePath("/admin/jogadores");
+      revalidatePath(`/jogadores/${guestId}`);
+      return { success: true, playerId: guestId };
+    }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível unir os perfis." };
+  }
+
   const rosterPlayerIds = await getSelectedRosterPlayerIds();
-  if (!league || !rosterPlayerIds.includes(guestId) || !rosterPlayerIds.includes(registeredId)) {
+  if (!rosterPlayerIds.includes(guestId) || !rosterPlayerIds.includes(registeredId)) {
     return { success: false, error: "Os dois perfis precisam pertencer à pelada selecionada." };
   }
   const { data: canMerge, error: mergeCheckError } = await account.client.rpc("can_merge_profiles_in_league", {
@@ -209,7 +300,6 @@ export async function mergeGuestWithRegistered(guestId: string, registeredId: st
     p_source_id: registeredId,
   });
   if (error) return { success: false, error: error.message };
-
   const affectedRoundIds = Array.isArray(data) ? data.map(String) : [];
   for (const roundId of affectedRoundIds) {
     const result = await calculateRoundStats(roundId);

@@ -4,13 +4,21 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { cache } from "react";
 import { createClient as createServerClient } from "../supabase/server";
 import type { RoundType, Season, SeasonPlayerSummary, SeasonSummary } from "../types";
-import { getAdminClient } from "../auth";
+import { getCurrentAccount } from "../auth";
 import { getSelectedLeague } from "../league-context";
+import { LeagueApiError } from "@/modules/leagues/infrastructure/http-league-gateway";
+import { leagueApiFor } from "@/modules/leagues/infrastructure/league-api-session";
 
 type SupabaseClient = Awaited<ReturnType<typeof createServerClient>>;
 
 const getActiveSeasonCached = cache(async (leagueId: string) => {
   const client = await createServerClient();
+  try {
+    const api = await leagueApiFor(client);
+    if (api) return await api.getActiveSeason(leagueId);
+  } catch {
+    return null;
+  }
   const { data, error } = await client
     .from("seasons")
     .select("*")
@@ -32,10 +40,16 @@ export async function getActiveSeason(leagueId?: string) {
 }
 
 const getActiveSeasonRoundIdsCached = cache(async (leagueId: string, roundType: RoundType) => {
+  const client = await createServerClient();
+  try {
+    const api = await leagueApiFor(client);
+    if (api) return await api.getActiveSeasonRoundIds(leagueId, roundType);
+  } catch {
+    return [];
+  }
   const season = await getActiveSeason(leagueId);
   if (!season) return [];
 
-  const client = await createServerClient();
   const { data, error } = await client
     .from("rounds")
     .select("id")
@@ -56,6 +70,12 @@ export async function getActiveSeasonRoundIds(leagueId?: string, roundType: Roun
 
 const getLatestFinishedSeasonCached = cache(async (leagueId: string) => {
   const client = await createServerClient();
+  try {
+    const api = await leagueApiFor(client);
+    if (api) return await api.getLatestFinishedSeason(leagueId);
+  } catch {
+    return null;
+  }
   const { data, error } = await client
     .from("seasons")
     .select("stats_snapshot")
@@ -183,11 +203,35 @@ export async function finishSeason(confirmation: string) {
     return { success: false, error: 'Digite exatamente "Terminar" para confirmar.' };
   }
 
-  const client = await getAdminClient();
-  if (!client) return { success: false, error: "Somente administradores podem terminar temporadas." };
+  const account = await getCurrentAccount();
+  if (!account.user || !account.isAdmin) {
+    return { success: false, error: "Somente administradores podem terminar temporadas." };
+  }
 
   const selectedLeague = await getSelectedLeague();
   if (!selectedLeague) return { success: false, error: "Escolha uma pelada no lobby." };
+  try {
+    const api = await leagueApiFor(account.client);
+    if (api) {
+      const result = await api.finishSeason(selectedLeague.id, confirmation);
+      revalidatePath("/");
+      revalidatePath("/ranking");
+      revalidatePath("/rodadas");
+      revalidatePath("/jogadores");
+      revalidatePath("/mais");
+      revalidateTag("season", "max");
+      revalidateTag("season-history", "max");
+      revalidateTag("rounds", "max");
+      revalidateTag("ranking", "max");
+      return { success: true, ...result };
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof LeagueApiError ? error.message : "Não foi possível terminar a temporada.",
+    };
+  }
+  const client = account.client;
   const { data: league, error: leagueError } = await client
     .from("leagues")
     .select("id, name")

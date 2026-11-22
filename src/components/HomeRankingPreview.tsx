@@ -58,12 +58,13 @@ export async function HomeRankingPreview() {
       <div className="glass-card overflow-hidden">
         {entries.length ? entries.slice(0, 5).map((stats, index) => {
           const name = stats.player?.name || "Desconhecido";
-          const bannerAssetKey = stats.cosmetics?.bannerAssetKey || null;
+          const equipped = stats.cosmetics;
+          const bannerAssetKey = equipped?.bannerAssetKey || null;
           const bannerImage = cosmeticHighResolutionImage(bannerAssetKey);
           return <Link href={`/jogadores/${stats.player.id}`} key={stats.player.id} className={`group relative isolate flex min-h-[88px] items-center gap-3 overflow-hidden px-4 py-3.5 transition-colors hover:bg-surface-hover ${index < Math.min(entries.length, 5) - 1 ? "border-b border-border" : ""}`}>
             {bannerImage && <><Image src={bannerImage} alt="" fill quality={80} sizes="(max-width: 640px) 100vw, 720px" className="pointer-events-none -z-20 object-cover opacity-70 transition-transform duration-500 group-hover:scale-[1.035]" style={{ objectPosition: cosmeticBackgroundPosition("banner", bannerAssetKey) }} /><span aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(4,18,10,.98)_0%,rgba(4,18,10,.94)_30%,rgba(4,18,10,.62)_64%,rgba(4,18,10,.78)_100%)]" /></>}
             <span className={`rank-badge ${index < 3 ? `rank-${index + 1}` : "bg-surface text-muted"}`}>{index + 1}</span>
-            <PlayerAvatar name={name} playerId={stats.player.id} avatarUrl={stats.player.avatar_url} frameKey={stats.cosmetics?.frameKey} auraKey={stats.cosmetics?.auraKey} className="h-9 w-9 flex-shrink-0 rounded-full border border-border bg-surface-hover text-xs font-bold text-muted" />
+            <PlayerAvatar name={name} playerId={stats.player.id} avatarUrl={stats.player.avatar_url} frameKey={equipped?.frameKey} auraKey={equipped?.auraKey} className="h-9 w-9 flex-shrink-0 rounded-full border border-border bg-surface-hover text-xs font-bold text-muted" />
             <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-foreground">{name}</p><CombatBeltBadges belts={stats.achievementBelts} compact /><div className="mt-0.5 flex items-center gap-2 text-[10px] text-muted"><span className="flex items-center gap-1"><Football className="h-3 w-3" /> {stats.goals}</span><span className="flex items-center gap-1"><Target className="h-3 w-3" /> {stats.assists}</span></div></div>
             <div className="text-right"><p className="stat-number gradient-text text-lg">{formatRankingPoints(stats.points)}</p><p className="text-[10px] font-medium text-muted">pts</p></div>
           </Link>;

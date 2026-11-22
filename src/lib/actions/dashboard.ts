@@ -1,235 +1,194 @@
 "use server";
 
-import { getActiveSeason } from "./seasons";
-import { isDashboardCallupVisible, readDashboardCallups } from "../dashboard-callups";
 import { getCurrentAccount } from "../auth";
-import { getEventWeather } from "../weather";
+import { isDashboardCallupVisible, readDashboardCallups } from "../dashboard-callups";
+import { getSelectedLeague } from "../league-context";
+import { measureMatchStep } from "../match-performance";
+import { homeTraceId } from "../home-performance";
+import type { HomeLiveMatch } from "@/components/LiveMatchBanner";
+import type { ActiveCallupData, UserCallupEntry } from "@/components/OpenCallupBanner";
 
-export async function getDashboardData() {
-  try {
-    const account = await getCurrentAccount();
-    const season = await getActiveSeason();
-    if (!season) throw new Error("Temporada ativa não encontrada. Execute a migration 005.");
+type DashboardClient = Awaited<ReturnType<typeof getCurrentAccount>>["client"];
+type RoundPreview = {
+  id: string;
+  number: number;
+  date: string;
+  start_time?: string | null;
+  status: "draft" | "active";
+  preparation_stage?: "prelist" | "teams_ready";
+  stadium_id?: string | null;
+  stadium_name?: string | null;
+  stadium_map_url?: string | null;
+  round_type: "official" | "friendly";
+  participant_count: number;
+};
+type AgendaCallup = ActiveCallupData & {
+  roundId: string | null;
+  stadiumId: string | null;
+  userEntry: UserCallupEntry;
+};
+type AgendaModel = {
+  league: { stadium_name?: string | null; stadium_map_url?: string | null; event_duration_minutes?: number; match_duration?: number };
+  rounds: RoundPreview[];
+  callups: Array<{
+    id: string;
+    round_id: string | null;
+    date: string;
+    start_time: string | null;
+    stadium_id: string | null;
+    stadium_name: string | null;
+    stadium_map_url: string | null;
+    round_type: AgendaCallup["roundType"];
+    capacity: number;
+    waitlist_capacity: number;
+    confirmed: number;
+    waiting: number;
+    userEntry: UserCallupEntry;
+  }>;
+  liveMatch: HomeLiveMatch | null;
+};
 
-    const { data: readModelData, error: readModelError } = await account.client.rpc("get_home_read_model", {
-      p_season_id: season.id,
-      p_league_id: season.league_id,
-    });
-    const readModel = !readModelError && readModelData && typeof readModelData === "object"
-      ? readModelData as any
-      : null;
-
-    // 1. Próxima Rodada (draft ou active)
-    const nextRoundPromise = readModel ? Promise.resolve({ data: readModel.nextRound }) : account.client
-      .from("rounds")
-      .select("*, round_players(count)")
-      .in("status", ["draft", "active"])
-      .eq("season_id", season.id)
-      .eq("round_type", "official")
-      .order("date", { ascending: true })
-      .order("start_time", { ascending: true })
-      .limit(1)
-      .single();
-
-    // 2. Última Rodada (finished) com partidas e times
-    const lastRoundPromise = readModel ? Promise.resolve({ data: readModel.lastRound }) : account.client
-      .from("rounds")
-      .select(`
-        *,
-        matches(
-          *,
-          match_events(
-            *,
-            player:player_id (id, name, avatar_url),
-            assist_player:assist_player_id (id, name, avatar_url)
-          )
-        ),
-        teams(*)
-      `)
-      .eq("status", "finished")
-      .eq("season_id", season.id)
-      .eq("round_type", "official")
-      .order("date", { ascending: false })
-      .limit(1)
-      .single();
-
-    const nextFriendlyPromise = readModel ? Promise.resolve({ data: readModel.nextFriendly }) : account.client
-      .from("rounds")
-      .select("*, round_players(count)")
-      .in("status", ["draft", "active"])
-      .eq("season_id", season.id)
-      .eq("round_type", "friendly")
-      .order("date", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-
-    const liveMatchPromise = readModel ? Promise.resolve({ data: readModel.liveMatch }) : account.client
-      .from("matches")
-      .select(`
-        id,
-        score_a,
-        score_b,
-        status,
-        timer_started_at,
-        timer_accumulated_seconds,
-        round:round_id!inner (id, number, season_id),
-        teamA:team_a_id (id, name, position, color, crest_url),
-        teamB:team_b_id (id, name, position, color, crest_url)
-      `)
-      .eq("status", "live")
-      .eq("round.season_id", season.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    const leaguePromise = readModel ? Promise.resolve({ data: readModel.league }) : account.client
-      .from("leagues")
-      .select("match_duration, preseason_enabled, stadium_name, stadium_map_url, event_duration_minutes")
-      .eq("id", season.league_id)
-      .single();
-
-    const activeCallupsPromise = readDashboardCallups(account.client, season.league_id);
-
-    const [
-      { data: nextRoundData },
-      { data: nextFriendlyData },
-      { data: lastRoundData },
-      { data: liveMatchData },
-      { data: leagueData },
-      { data: activeCallupsData },
-    ] = await Promise.all([
-      nextRoundPromise,
-      nextFriendlyPromise,
-      lastRoundPromise,
-      liveMatchPromise,
-      leaguePromise,
-      activeCallupsPromise,
-    ]);
-
-    // Convocacoes ligadas a rodadas iniciadas/finalizadas deixam de ser destaque.
-    const visibleCallups = (activeCallupsData || []).filter((callup: any) => isDashboardCallupVisible(callup));
-
-    const stadiumIds = [...new Set([
-      nextRoundData?.stadium_id,
-      ...visibleCallups.map((callup: any) => callup.stadium_id),
-    ].filter(Boolean))];
-    const { data: stadiumRows } = stadiumIds.length
-      ? await account.client.from("stadiums").select("id, latitude, longitude").in("id", stadiumIds)
-      : { data: [] };
-    const stadiumsById = new Map((stadiumRows || []).map((stadium: any) => [stadium.id, stadium]));
-    const eventDurationMinutes = leagueData?.event_duration_minutes || 120;
-    const roundStadium: any = stadiumsById.get(nextRoundData?.stadium_id);
-    const [roundWeather, ...callupWeather] = await Promise.all([
-      getEventWeather({
-        latitude: roundStadium?.latitude,
-        longitude: roundStadium?.longitude,
-        date: nextRoundData?.date,
-        startTime: nextRoundData?.start_time,
-        durationMinutes: eventDurationMinutes,
-      }),
-      ...visibleCallups.map((callup: any) => {
-        const stadium: any = stadiumsById.get(callup.stadium_id);
-        return getEventWeather({
-          latitude: stadium?.latitude,
-          longitude: stadium?.longitude,
-          date: callup.date,
-          startTime: callup.start_time || "08:00",
-          durationMinutes: eventDurationMinutes,
-        });
-      }),
-    ]);
-
-    const mappedCallups = visibleCallups.map((callup: any, index: number) => ({
-      id: callup.id,
-      roundId: callup.round?.id || null,
-      date: callup.date,
-      startTime: callup.start_time || "08:00",
-      stadiumName: callup.stadium_name || leagueData?.stadium_name || null,
-      stadiumMapUrl: callup.stadium_map_url || leagueData?.stadium_map_url || null,
-      roundType: callup.round_type,
-      capacity: callup.capacity,
-      waitlistCapacity: callup.waitlist_capacity,
-      confirmed: (callup.callup_entries || []).filter((entry: any) => entry.status === "confirmed").length,
-      waiting: (callup.callup_entries || []).filter((entry: any) => entry.status === "waitlist").length,
-      weather: callupWeather[index],
-      entries: (callup.callup_entries || []).map((entry: any) => ({
-        playerId: entry.player_id,
-        status: entry.status as "confirmed" | "waitlist",
-        position: entry.position,
-      })),
-    }));
-
-    let liveMatch = liveMatchData;
-    if (liveMatchData && (liveMatchData.teamA?.position == null || liveMatchData.teamB?.position == null)) {
-      const liveTeamIds = [liveMatchData.teamA?.id, liveMatchData.teamB?.id].filter(Boolean);
-      const { data: liveTeamPositions } = liveTeamIds.length
-        ? await account.client.from("teams").select("id, position").in("id", liveTeamIds)
-        : { data: [] };
-      const positionByTeamId = new Map((liveTeamPositions || []).map((team: any) => [team.id, team.position]));
-      liveMatch = {
-        ...liveMatchData,
-        teamA: liveMatchData.teamA ? { ...liveMatchData.teamA, position: positionByTeamId.get(liveMatchData.teamA.id) } : null,
-        teamB: liveMatchData.teamB ? { ...liveMatchData.teamB, position: positionByTeamId.get(liveMatchData.teamB.id) } : null,
-      };
-    }
-    
-    // Processamento da Última Rodada (mapear os times nas partidas)
-    let processedLastRound = null;
-    if (lastRoundData) {
-      const formattedMatches = lastRoundData.matches.map((m: any) => {
-        const teamA = lastRoundData.teams.find((t: any) => t.id === m.team_a_id);
-        const teamB = lastRoundData.teams.find((t: any) => t.id === m.team_b_id);
-        return {
-          ...m,
-          teamA,
-          teamB
-        };
-      });
-      processedLastRound = {
-        ...lastRoundData,
-        matches: formattedMatches.sort((a: any, b: any) => (a.match_order || 0) - (b.match_order || 0))
-      };
-    }
-
-    const matchingOfficialCallup = mappedCallups.find((callup: any) =>
-      callup.roundType === "official" && (callup.roundId === nextRoundData?.id || callup.date === nextRoundData?.date),
-    );
-    const matchingFriendlyCallup = mappedCallups.find((callup: any) =>
-      callup.roundType === "friendly" && (callup.roundId === nextFriendlyData?.id || callup.date === nextFriendlyData?.date),
-    );
-    const roundPlayersCount = nextRoundData?.round_players?.[0]?.count || 0;
-    const effectiveConfirmed = roundPlayersCount > 0 ? roundPlayersCount : (matchingOfficialCallup?.confirmed || 0);
-
-    const friendlyPlayersCount = nextFriendlyData?.round_players?.[0]?.count || 0;
-    const effectiveFriendlyConfirmed = friendlyPlayersCount > 0 ? friendlyPlayersCount : (matchingFriendlyCallup?.confirmed || 0);
-
-    return {
-      success: true,
-      data: {
-        nextRound: nextRoundData ? {
-          ...nextRoundData,
-          confirmedPlayers: effectiveConfirmed
-        } : null,
-        nextFriendly: nextFriendlyData ? {
-          ...nextFriendlyData,
-          confirmedPlayers: effectiveFriendlyConfirmed,
-        } : null,
-        liveMatch,
-        matchDuration: leagueData?.match_duration || 7,
-        venue: {
-          name: nextRoundData?.stadium_name || leagueData?.stadium_name || null,
-          mapUrl: nextRoundData?.stadium_map_url || leagueData?.stadium_map_url || null,
-        },
-        nextRoundWeather: matchingOfficialCallup?.weather || roundWeather,
-        eventDurationMinutes,
-        preseasonEnabled: leagueData?.preseason_enabled === true,
-        activeCallup: mappedCallups[0] || null,
-        activeCallups: mappedCallups,
-        lastRound: processedLastRound,
-      }
-    };
-  } catch (err: any) {
-    console.error("Erro ao buscar dados do dashboard:", err);
-    return { success: false, error: err.message };
+function formatAgenda({ league, rounds, callups, liveMatch }: AgendaModel) {
+  const activeCallups: AgendaCallup[] = callups.map((callup) => ({
+    id: callup.id,
+    roundId: callup.round_id,
+    date: callup.date,
+    startTime: callup.start_time || "08:00",
+    stadiumId: callup.stadium_id,
+    stadiumName: callup.stadium_name || league.stadium_name,
+    stadiumMapUrl: callup.stadium_map_url || league.stadium_map_url,
+    roundType: callup.round_type,
+    capacity: callup.capacity,
+    waitlistCapacity: callup.waitlist_capacity,
+    confirmed: callup.confirmed,
+    waiting: callup.waiting,
+    userEntry: callup.userEntry,
+  }));
+  function nextRound(type: RoundPreview["round_type"]) {
+    const round = rounds.find((candidate) => candidate.round_type === type);
+    if (!round) return null;
+    const callup = activeCallups.find((item) => item.roundType === type && (item.roundId === round.id || item.date === round.date));
+    return { ...round, confirmedPlayers: round.participant_count || callup?.confirmed || 0 };
   }
+  const official = nextRound("official");
+  return {
+    nextRound: official,
+    nextFriendly: nextRound("friendly"),
+    activeCallups,
+    liveMatch,
+    venue: {
+      name: official?.stadium_name || league.stadium_name,
+      mapUrl: official?.stadium_map_url || league.stadium_map_url,
+    },
+    matchDuration: league.match_duration || 7,
+    eventDurationMinutes: league.event_duration_minutes || 120,
+  };
+}
+
+async function readCompatibleAgenda(client: DashboardClient, leagueId: string, playerId: string | null): Promise<AgendaModel> {
+  const [season, callups] = await Promise.all([
+    client.from("seasons").select("id").eq("league_id", leagueId).eq("status", "active").order("id").limit(1).maybeSingle(),
+    readDashboardCallups(client, leagueId),
+  ]);
+  if (season.error || callups.error) throw season.error || callups.error;
+  const result = season.data
+    ? await client.rpc("get_home_agenda_read_model", { p_season_id: season.data.id, p_league_id: leagueId })
+    : await client.from("leagues").select("match_duration, stadium_name, stadium_map_url, event_duration_minutes").eq("id", leagueId).single();
+  if (result.error || !result.data) throw result.error || new Error("Agenda sem dados");
+
+  return {
+    league: season.data ? result.data.league : result.data,
+    rounds: [result.data.nextRound, result.data.nextFriendly].filter(Boolean).map((round) => ({
+      ...round, participant_count: round.round_players?.[0]?.count || 0,
+    })),
+    liveMatch: result.data.liveMatch || null,
+    callups: (callups.data || []).flatMap((item) => {
+      const round = Array.isArray(item.round) ? item.round[0] : item.round;
+      if (!isDashboardCallupVisible({ round })) return [];
+      const entries = item.callup_entries || [];
+      const userEntry = entries.find((entry) => entry.player_id === playerId
+        && (entry.status === "confirmed" || entry.status === "waitlist"));
+      return [{
+        ...item,
+        round_id: round?.id || null,
+        confirmed: entries.filter((entry) => entry.status === "confirmed").length,
+        waiting: entries.filter((entry) => entry.status === "waitlist").length,
+        userEntry: userEntry ? { playerId: userEntry.player_id, status: userEntry.status as "confirmed" | "waitlist", position: userEntry.position } : null,
+      }];
+    }),
+  };
+}
+
+export async function getHomeAgenda(trace?: string) {
+  const traceId = homeTraceId(trace);
+  const [account, league] = await measureMatchStep("load_home", "account_context", () =>
+    Promise.all([getCurrentAccount(), getSelectedLeague()]), traceId);
+  if (!account.user || !league) return null;
+
+  const leagueId = league.id;
+  async function readV2() {
+    const { data, error } = await account.client.rpc("get_home_agenda_v2", { p_league_id: leagueId });
+    if (error || !data?.league) throw error || new Error("Agenda sem dados");
+    return data as AgendaModel;
+  }
+
+  if (process.env.HOME_AGENDA_V2_ENABLED === "true") {
+    try {
+      return formatAgenda(await measureMatchStep("load_home", "agenda_v2", readV2, traceId));
+    } catch {
+      // Durante a implantação, a função nova pode ainda não estar disponível.
+    }
+  }
+  return formatAgenda(await measureMatchStep("load_home", "agenda_compat", () =>
+    readCompatibleAgenda(account.client, league.id, account.profile?.player_id || null), traceId));
+}
+
+const MATCH_PREVIEW = "id, team_a_id, team_b_id, score_a, score_b, match_order, teamA:team_a_id(id,name,color,position,crest_url), teamB:team_b_id(id,name,color,position,crest_url)";
+const PREVIEW_COUNT = 5;
+
+async function readRoundMatchScores(client: DashboardClient, roundId: string, preview: boolean) {
+  const query = client.from("matches").select(MATCH_PREVIEW, preview ? { count: "exact" } : undefined)
+    .eq("round_id", roundId).order("match_order").order("id");
+  const result = await (preview ? query.limit(PREVIEW_COUNT) : query);
+  if (result.error) throw result.error;
+  return { matches: result.data || [], totalMatches: result.count ?? result.data?.length ?? 0 };
+}
+
+export async function getHomeLastRound() {
+  return measureMatchStep("load_home", "last_round_preview", async () => {
+    const [account, league] = await Promise.all([getCurrentAccount(), getSelectedLeague()]);
+    if (!account.user || !league) return null;
+    const { data: season, error: seasonError } = await account.client.from("seasons").select("id")
+      .eq("league_id", league.id).eq("status", "active").order("id").limit(1).maybeSingle();
+    if (seasonError) throw seasonError;
+    if (!season) return null;
+    const { data: round, error } = await account.client.from("rounds").select("id, number, date")
+      .eq("league_id", league.id).eq("season_id", season.id).eq("round_type", "official").eq("status", "finished")
+      .order("date", { ascending: false }).order("number", { ascending: false }).limit(1).maybeSingle();
+    if (error) throw error;
+    if (!round) return null;
+    return { ...round, ...await readRoundMatchScores(account.client, round.id, true) };
+  });
+}
+
+async function requireFinishedHomeRound(roundId: string) {
+  const [account, league] = await Promise.all([getCurrentAccount(), getSelectedLeague()]);
+  if (!account.user || !league) throw new Error("Rodada indisponível");
+  const { data, error } = await account.client.from("rounds").select("id")
+    .eq("id", roundId).eq("league_id", league.id).eq("round_type", "official").eq("status", "finished").maybeSingle();
+  if (error || !data) throw new Error("Rodada indisponível");
+  return account.client;
+}
+
+export async function getHomeRoundMoreMatches(roundId: string) {
+  return (await readRoundMatchScores(await requireFinishedHomeRound(roundId), roundId, false)).matches;
+}
+
+export async function getHomeMatchGoals(roundId: string, matchId: string) {
+  const client = await requireFinishedHomeRound(roundId);
+  const { data, error } = await client.from("match_events")
+    .select("id,match_id,event_type,player_id,assist_player_id,team_id,minute,elapsed_seconds,player:player_id(id,name),assist_player:assist_player_id(id,name),match:match_id!inner(round_id)")
+    .eq("match_id", matchId).eq("match.round_id", roundId).eq("event_type", "goal").order("created_at").order("id");
+  if (error) throw new Error("Não foi possível carregar os gols.");
+  return data || [];
 }

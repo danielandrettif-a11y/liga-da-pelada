@@ -14,11 +14,7 @@ import {
   Users,
   X,
 } from "@/components/icons";
-import { BQTheBestButton } from "@/components/BQTheBestButton";
-import { WeatherBadge } from "@/components/WeatherBadge";
-import type { MonthlyAwardWinner } from "@/lib/monthly-awards";
 import { useDialogViewport } from "@/lib/useDialogViewport";
-import type { EventWeather } from "@/lib/weather";
 
 type NextRound = {
   id: string;
@@ -35,17 +31,15 @@ export function NextRoundBanner({
   isAdmin = false,
   venue,
   eventDurationMinutes = 120,
-  weather,
-  awardsPeriodStart,
-  awardWinners = [],
+  weatherBadge,
+  awards,
 }: {
   round: NextRound | null;
   isAdmin?: boolean;
   venue?: { name?: string | null; mapUrl?: string | null } | null;
   eventDurationMinutes?: number;
-  weather?: EventWeather | null;
-  awardsPeriodStart: string;
-  awardWinners?: MonthlyAwardWinner[];
+  weatherBadge?: React.ReactNode;
+  awards?: React.ReactNode;
 }) {
   const [showAdminActions, setShowAdminActions] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -208,7 +202,7 @@ export function NextRoundBanner({
               </span>
             )}
 
-            <WeatherBadge weather={weather} locationName={venue?.name} />
+            {weatherBadge}
           </div>}
         </div>
 
@@ -216,7 +210,7 @@ export function NextRoundBanner({
             quebrar em mais de uma linha, então uma posição absoluta acabava
             cobrindo o último ícone/convocado. */}
         <div className="mt-auto pt-2">
-          <BQTheBestButton periodStart={awardsPeriodStart} winners={awardWinners} />
+          {awards}
         </div>
       </div>
 

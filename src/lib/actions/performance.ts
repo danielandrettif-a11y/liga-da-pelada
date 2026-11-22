@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { operationsApi } from "@/modules/operations/infrastructure/operations-api-session";
 
 export type PerformanceSummaryRow = {
   kind: string;
@@ -14,6 +15,10 @@ export type PerformanceSummaryRow = {
 };
 
 export async function getPerformanceSummary(hours = 24): Promise<PerformanceSummaryRow[]> {
+  const opsApi = await operationsApi();
+  if (opsApi) {
+    return opsApi.getPerformanceSummary(hours);
+  }
   const client = await createClient();
   const { data, error } = await client.rpc("get_app_performance_summary", {
     p_hours: Math.max(1, Math.min(720, Math.trunc(hours))),

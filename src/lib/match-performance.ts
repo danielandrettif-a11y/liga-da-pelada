@@ -1,6 +1,6 @@
 import { reportServerEvent } from "@/lib/observability";
 
-export type MatchOperation = "create_match" | "register_goal" | "finish_match";
+export type MatchOperation = "create_match" | "register_goal" | "finish_match" | "finish_round" | "join_callup" | "leave_callup" | "add_callup_players" | "load_home";
 
 type MatchStepSample = { durationMs: number; failed: boolean };
 export type MatchStepSummary = {
@@ -45,6 +45,7 @@ function recordMatchStep(
   step: string,
   durationMs: number,
   success: boolean,
+  traceId?: string,
 ) {
   console.info(
     JSON.stringify({
@@ -53,6 +54,7 @@ function recordMatchStep(
       step,
       durationMs,
       success,
+      traceId,
     }),
   );
   const key = `${operation}:${step}`;
@@ -65,7 +67,7 @@ function recordMatchStep(
     name: step,
     value: durationMs,
     success,
-    metadata: { operation },
+    metadata: { operation, ...(traceId ? { traceId } : {}) },
   });
 
   const configured = Number(process.env.MATCH_PERF_SUMMARY_EVERY || 20);
@@ -87,6 +89,7 @@ export async function measureMatchStep<T>(
   operation: MatchOperation,
   step: string,
   run: () => Promise<T>,
+  traceId?: string,
 ): Promise<T> {
   const diagnosticsEnabled =
     process.env.MATCH_PERF_DIAGNOSTICS === "1" ||
@@ -99,7 +102,7 @@ export async function measureMatchStep<T>(
   const sampleRate = Number.isFinite(configuredRate)
     ? Math.min(1, Math.max(0, configuredRate))
     : 0.25;
-  if (!diagnosticsEnabled || Math.random() > sampleRate) return run();
+  if (!diagnosticsEnabled || (!traceId && Math.random() > sampleRate)) return run();
   const startedAt = performance.now();
   let success = false;
   try {
@@ -112,6 +115,7 @@ export async function measureMatchStep<T>(
       step,
       Math.round(performance.now() - startedAt),
       success,
+      traceId,
     );
   }
 }
