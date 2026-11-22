@@ -23,7 +23,7 @@ RUN groupadd --system nextjs && useradd --system --gid nextjs nextjs
 COPY --from=build --chown=nextjs:nextjs /app/.next/standalone ./
 COPY --from=build --chown=nextjs:nextjs /app/.next/static ./.next/static
 COPY --from=build --chown=nextjs:nextjs /app/public ./public
-COPY scripts/start-official-env.cjs /usr/local/bin/start-official-env.cjs
+COPY start-official-env.cjs /usr/local/bin/start-official-env.cjs
 EXPOSE 3000
 CMD ["node", "/usr/local/bin/start-official-env.cjs", "nextjs", "/app/server.js"]
 
