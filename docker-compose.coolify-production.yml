@@ -2,13 +2,12 @@ services:
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.coolify-oficial
     restart: unless-stopped
     init: true
     stop_grace_period: 30s
-    env_file:
-      - path: /opt/liga-pelada-oficial/backend.env
-        format: raw
+    volumes:
+      - /opt/liga-pelada-oficial/backend.env:/run/liga/runtime.env:ro
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 10s
@@ -23,14 +22,15 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.coolify-oficial
-      secrets:
-        - public_build_env
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:?Configure a URL publica}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:?Configure a chave publica}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:?Configure a URL do aplicativo}
     restart: unless-stopped
     init: true
     stop_grace_period: 30s
-    env_file:
-      - path: /opt/liga-pelada-oficial/frontend.env
-        format: raw
+    volumes:
+      - /opt/liga-pelada-oficial/frontend.env:/run/liga/runtime.env:ro
     environment:
       IDENTITY_BACKEND_URL: http://backend:3001
       NODE_OPTIONS: --max-http-header-size=65536
@@ -49,10 +49,6 @@ services:
       proxy:
         aliases:
           - liga-pelada-oficial-frontend
-
-secrets:
-  public_build_env:
-    file: /opt/liga-pelada-oficial/public-build.env
 
 networks:
   app:
