@@ -808,11 +808,12 @@ textarea {
 .ranking-podium-nameplate.cosmetic-nameplate.cosmetic-nameplate--compact {
   width: 100%;
   min-width: 0;
-  min-height: 3.15rem;
+  min-height: 0;
+  height: 100%;
   max-width: none;
   justify-content: center;
   overflow: hidden;
-  padding: .34rem 13% .36rem;
+  padding: .2rem 18%;
   background-size: 100% 100%;
 }
 

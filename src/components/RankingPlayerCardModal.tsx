@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ChevronDown, Medal, Share2, Sparkles, Target, Trophy, X } from "@/components/icons";
 import type { RankingEntry } from "@/lib/ranking";
 import { PlayerAvatar } from "./PlayerAvatar";
+import { CombatBeltBadges } from "./CombatBeltBadges";
 import { cosmeticNameplateImage } from "@/lib/fantasy/cosmetics";
 import {
   buildRankingCardContent,
@@ -557,6 +558,11 @@ export function RankingPlayerCardModal({ entry, position, onClose, scoringMode =
           </div>
         </div>
 
+        {Boolean(entry.achievementBelts?.length) && (
+          <div className="mx-auto mb-2 w-[88%]">
+            <CombatBeltBadges belts={entry.achievementBelts} compact centered />
+          </div>
+        )}
         {entry.fitness && <div className="mx-auto -mt-1 grid w-[88%] grid-cols-2 gap-2 rounded-xl border border-white/10 bg-[#07150d]/95 p-2 text-center shadow-xl">
           <div><p className="font-athletic text-sm font-black text-accent">{entry.fitness.distanceKm} km</p><p className="text-[7px] font-black uppercase text-muted">Distância Ranked</p></div>
           <div><p className="font-athletic text-sm font-black text-accent">{entry.fitness.averageSpeedKmh} km/h</p><p className="text-[7px] font-black uppercase text-muted">Velocidade média</p></div>
