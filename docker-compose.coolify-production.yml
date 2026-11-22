@@ -1,0 +1,120 @@
+# Coolify production resource. Use the official Supabase project and route only frontend:3000.
+name: liga-da-pelada
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
+    environment:
+      - PORT=3001
+      - DATABASE_URL=${DATABASE_URL:?DATABASE_URL obrigatoria}
+      - SUPABASE_INTERNAL_URL=${SUPABASE_INTERNAL_URL:?SUPABASE_INTERNAL_URL obrigatoria}
+      - SUPABASE_PUBLISHABLE_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY:?NEXT_PUBLIC_SUPABASE_ANON_KEY obrigatoria}
+      - SUPABASE_PUBLIC_URL=${NEXT_PUBLIC_SUPABASE_URL:?NEXT_PUBLIC_SUPABASE_URL obrigatoria}
+      - APP_PUBLIC_URL=${APP_PUBLIC_URL:?APP_PUBLIC_URL obrigatoria}
+      - MATCH_PERF_DIAGNOSTICS=${MATCH_PERF_DIAGNOSTICS:-0}
+      # Ativação de todas as APIs modulares DDD
+      - ENABLE_GOAL_API=true
+      - ENABLE_LEAGUE_API=true
+      - ENABLE_IDENTITY_API=true
+      - ENABLE_ROSTER_API=true
+      - ENABLE_CALLUPS_API=true
+      - ENABLE_ROUNDS_API=true
+      - ENABLE_MATCHES_API=true
+      - ENABLE_NOTIFICATIONS_API=true
+      - ENABLE_STATISTICS_API=true
+      - ENABLE_FINANCE_API=false
+      # A ponte de Cartola ainda não atingiu paridade com o fluxo existente.
+      - ENABLE_FANTASY_API=false
+      - ENABLE_CARDS_API=false
+      - ENABLE_COSMETICS_API=false
+      - ENABLE_COLLECTIVE_API=true
+      # O BQ Manager usa banco próprio; a ponte modular ainda não preserva seus comandos.
+      - ENABLE_INTEGRATIONS_API=false
+      - ENABLE_OPERATIONS_API=true
+      # Serviços opcionais (cronômetro, notificações push e emails)
+      - MATCH_TIMER_WEBHOOK_SECRET=${MATCH_TIMER_WEBHOOK_SECRET:?MATCH_TIMER_WEBHOOK_SECRET obrigatorio com Notifications API}
+      - QSTASH_TOKEN=${QSTASH_TOKEN:-}
+      - QSTASH_URL=${QSTASH_URL:-}
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY:-}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY:-}
+      - VAPID_SUBJECT=${VAPID_SUBJECT:-}
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+      - RESEND_FROM_EMAIL=${RESEND_FROM_EMAIL:-}
+      - EMAIL_UNSUBSCRIBE_SECRET=${EMAIL_UNSUBSCRIBE_SECRET:?EMAIL_UNSUBSCRIBE_SECRET obrigatorio com Notifications API}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:?NEXT_PUBLIC_SUPABASE_URL obrigatoria}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        NEXT_PUBLIC_APP_URL: ${APP_PUBLIC_URL:?APP_PUBLIC_URL obrigatoria}
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL:?NEXT_PUBLIC_SUPABASE_URL obrigatoria}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - SUPABASE_INTERNAL_URL=${SUPABASE_INTERNAL_URL:?SUPABASE_INTERNAL_URL obrigatoria}
+      - APP_PUBLIC_URL=${APP_PUBLIC_URL:?APP_PUBLIC_URL obrigatoria}
+      - MATCH_PERF_DIAGNOSTICS=${MATCH_PERF_DIAGNOSTICS:-0}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - MATCH_TIMER_WEBHOOK_SECRET=${MATCH_TIMER_WEBHOOK_SECRET:?MATCH_TIMER_WEBHOOK_SECRET obrigatorio com Notifications API}
+      - BQ_MANAGER_SUPABASE_URL=${BQ_MANAGER_SUPABASE_URL:-}
+      - BQ_MANAGER_SUPABASE_SERVICE_ROLE_KEY=${BQ_MANAGER_SUPABASE_SERVICE_ROLE_KEY:-}
+      # Comunicação de rede interna com o backend Fastify
+      - INTERNAL_BACKEND_URL=http://backend:3001
+      - BACKEND_API_URL=http://backend:3001
+      # Flags para consumo das APIs modulares pelo frontend
+      - CALLUPS_API_ENABLED=true
+      - CALLUPS_BACKEND_URL=http://backend:3001
+      - CARDS_API_ENABLED=false
+      - CARDS_BACKEND_URL=http://backend:3001
+      - COLLECTIVE_API_ENABLED=true
+      - COSMETICS_API_ENABLED=false
+      - FANTASY_API_ENABLED=false
+      - FANTASY_BACKEND_URL=http://backend:3001
+      - FINANCE_API_ENABLED=false
+      - FINANCE_BACKEND_URL=http://backend:3001
+      - IDENTITY_API_ENABLED=true
+      - IDENTITY_BACKEND_URL=http://backend:3001
+      - INTEGRATIONS_API_ENABLED=false
+      - LEAGUE_API_ENABLED=true
+      - LEAGUE_BACKEND_URL=http://backend:3001
+      - MATCHES_API_ENABLED=true
+      - MATCHES_BACKEND_URL=http://backend:3001
+      - MATCH_GOAL_BACKEND_URL=http://backend:3001
+      - NOTIFICATIONS_API_ENABLED=true
+      - NOTIFICATIONS_BACKEND_URL=http://backend:3001
+      - OPERATIONS_API_ENABLED=true
+      - ROSTER_API_ENABLED=true
+      - ROSTER_BACKEND_URL=http://backend:3001
+      - ROUNDS_API_ENABLED=true
+      - ROUNDS_BACKEND_URL=http://backend:3001
+      - STATISTICS_API_ENABLED=true
+      - HOME_AGENDA_V2_ENABLED=${HOME_AGENDA_V2_ENABLED:-false}
+      - STATISTICS_BACKEND_URL=http://backend:3001
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/',{redirect:'manual'}).then(r=>{if(r.status>=500)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
