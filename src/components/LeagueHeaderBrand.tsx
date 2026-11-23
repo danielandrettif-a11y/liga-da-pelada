@@ -12,6 +12,11 @@ export async function LeagueHeaderBrand() {
       <span className="line-clamp-2 break-words py-0.5 font-club text-lg uppercase leading-[1.08] text-accent sm:line-clamp-1">
         {league?.name || "Pelada BQ"}
       </span>
+      {process.env.APP_ENVIRONMENT === "homologacao" && (
+        <span className="mt-1 inline-block rounded border border-amber-400/70 bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-black uppercase leading-none tracking-wide text-amber-300">
+          BQ Teste
+        </span>
+      )}
       <span className="mt-1 block text-[10px] font-normal uppercase leading-none text-muted">Toque para trocar</span>
     </span>
   </Link>;
