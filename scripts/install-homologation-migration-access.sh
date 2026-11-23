@@ -9,11 +9,12 @@ readonly account_home=/var/lib/liga-migrate-homolog
 readonly runner=/usr/local/sbin/liga-homolog-migrate
 readonly dispatcher=/usr/local/sbin/liga-homolog-migrate-ssh
 readonly sudo_rule=/etc/sudoers.d/liga-homolog-migrate
+readonly database_container=teste-supabase-db
 
 [[ "$EUID" == 0 && "$#" == 2 ]] || { echo "Execute como root com a chave pública e o arquivo do executor." >&2; exit 1; }
 [[ "$1" =~ ^ssh-ed25519\ [A-Za-z0-9+/]+={0,2}$ && -f "$2" ]] || { echo "Chave pública ou executor inválido." >&2; exit 1; }
 for tool in sudo visudo git docker ssh-keygen flock useradd; do command -v "$tool" >/dev/null; done
-docker exec homolog-supabase-db psql -X -U postgres -d postgres -Atq \
+docker exec "$database_container" psql -X -U postgres -d postgres -Atq \
   -v ON_ERROR_STOP=1 -c "SELECT to_regprocedure('public.get_home_agenda_v2(uuid)') IS NOT NULL" |
   grep -qx t
 
