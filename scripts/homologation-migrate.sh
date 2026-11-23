@@ -7,10 +7,11 @@ readonly state=/var/lib/liga-homolog-migrations
 readonly remote=https://github.com/danielandrettif-a11y/liga-da-pelada.git
 readonly branch=codex/homologacao-coolify
 readonly baseline=370
+readonly database_container=${SUPABASE_DB_CONTAINER:-teste-supabase-db}
 
 fail() { printf '%s\n' "$*" >&2; exit 1; }
 db() {
-  docker exec homolog-supabase-db psql -X -U postgres -d postgres \
+  docker exec "$database_container" psql -X -U postgres -d postgres \
     -v ON_ERROR_STOP=1 "$@"
 }
 
@@ -34,7 +35,7 @@ flock -w 30 9 || fail "Já existe uma migração em andamento."
 
 ledger_exists=$(db -Atqc "SELECT to_regclass('homolog_migrations.applied') IS NOT NULL")
 if [[ "$1" == status ]]; then
-  printf 'Banco: homolog-supabase-db. Marco confirmado: 370 (agenda v2).\n'
+  printf 'Banco: %s. Marco confirmado: 370 (agenda v2).\n' "$database_container"
   if [[ "$ledger_exists" == t ]]; then
     db -c 'SELECT version, filename, git_commit, applied_at FROM homolog_migrations.applied ORDER BY version'
   else
