@@ -102,6 +102,22 @@ describe("pgMatchRepository", () => {
     expect(result.roundId).toBe(roundId);
   });
 
+  it("deleteMatch removes a live match while its round is open", async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("is_league_admin")) return { rows: [{ allowed: true }] };
+      if (sql.includes("FOR UPDATE OF match_item")) {
+        return { rows: [{ round_id: roundId, status: "live", round_status: "active" }] };
+      }
+      return { rows: [] };
+    });
+
+    const pool = { connect: vi.fn().mockResolvedValue({ query, release: vi.fn() }) } as unknown as Pool;
+    const result = await pgMatchRepository(pool).deleteMatch(matchId, leagueId, actor);
+
+    expect(result.roundId).toBe(roundId);
+    expect(query).toHaveBeenCalledWith("DELETE FROM public.matches WHERE id = $1::uuid", [matchId]);
+  });
+
   it("builds the complete lineup before calling the idempotent creation RPC", async () => {
     const playerAId = "00000000-0000-4000-8000-000000000006";
     const playerBId = "00000000-0000-4000-8000-000000000007";

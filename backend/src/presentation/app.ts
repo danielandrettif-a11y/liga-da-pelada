@@ -37,6 +37,7 @@ import type {
   PlayerProfileRepository,
 } from "../contexts/roster/application/save-player-profile.js";
 import type { CallupRepository } from "../contexts/callups/application/manage-callups.js";
+import type { CallupEventSource } from "../contexts/callups/application/callup-events.js";
 import type { RoundRepository } from "../contexts/rounds/application/manage-rounds.js";
 import { registerGoalRoutes } from "../contexts/matches/presentation/goals-route.js";
 import { registerLeagueRoutes } from "../contexts/leagues/presentation/leagues-route.js";
@@ -159,6 +160,7 @@ export function createApp(dependencies: {
   playerProfileRepository?: PlayerProfileRepository;
   playerAvatarStorage?: PlayerAvatarStorage;
   callupRepository?: CallupRepository;
+  callupEvents?: CallupEventSource;
   roundRepository?: RoundRepository;
   matchRepository?: MatchRepository;
   matchTimerScheduler?: MatchTimerScheduler;
@@ -276,6 +278,10 @@ export function createApp(dependencies: {
     throw new Error("Dependências de estatísticas são obrigatórias quando ENABLE_STATISTICS_API=true.");
   }
   const app = Fastify({ logger: dependencies.logger ?? true });
+  if (dependencies.callupEvents) {
+    app.addHook("onReady", () => dependencies.callupEvents!.start());
+    app.addHook("onClose", () => dependencies.callupEvents!.stop());
+  }
   if (process.env.MATCH_PERF_DIAGNOSTICS === "1") {
     app.addHook("onRequest", (_request, _reply, done) => {
       const timing = { authMs: 0, poolWaitMs: 0, transactionMs: 0, transactions: 0 };
@@ -430,6 +436,7 @@ export function createApp(dependencies: {
     registerCallupRoutes(app, {
       verifier: dependencies.verifier,
       repository: dependencies.callupRepository,
+      events: dependencies.callupEvents,
     });
   }
   if (dependencies.roundsEnabled && dependencies.roundRepository) {

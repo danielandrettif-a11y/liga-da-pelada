@@ -30,6 +30,7 @@ import { pgPlayerStatisticsRepository } from "./contexts/roster/infrastructure/p
 import { pgPlayerProfileRepository } from "./contexts/roster/infrastructure/pg-player-profile-repository.js";
 import { supabasePlayerAvatarStorage } from "./contexts/roster/infrastructure/supabase-player-avatar-storage.js";
 import { pgCallupRepository } from "./contexts/callups/infrastructure/pg-callup-repository.js";
+import { pgCallupEventSource } from "./contexts/callups/infrastructure/pg-callup-event-source.js";
 import { pgRoundRepository } from "./contexts/rounds/infrastructure/pg-round-repository.js";
 import { pgMatchRepository } from "./contexts/matches/infrastructure/pg-match-repository.js";
 import { pgInboxRepository } from "./contexts/notifications/infrastructure/pg-inbox-repository.js";
@@ -155,6 +156,7 @@ const app = createApp({
     authUrl || "http://127.0.0.1:54321", publicUrl || "http://127.0.0.1:54321", publishableKey || "",
   ),
   callupRepository: pgCallupRepository(pool),
+  callupEvents: pgCallupEventSource(pool),
   roundRepository: pgRoundRepository(pool),
   matchRepository: pgMatchRepository(pool),
   matchTimerScheduler: qstashMatchTimerScheduler({

@@ -45,7 +45,11 @@ function amount(value: number | null | undefined) {
  * Fonte única da pontuação Ranked. Delega para calculateBQBasePoints para
  * garantir paridade com o Cartola nos 8 scouts básicos.
  */
-export function calculateRankedPoints(stats: RankedScoringStats, snapshot?: BQBaseScoringSnapshot) {
+export function calculateRankedPoints(
+  stats: RankedScoringStats,
+  snapshot?: BQBaseScoringSnapshot,
+  options: { suppressGoalkeeperRewards?: boolean } = {},
+) {
   const scoring = snapshot ?? BQ_SCORING_V5;
   if (Number(scoring.version || 0) >= 11) {
     return calculateColumnCRankedPoints(stats.lineRole || "ATA", {
@@ -71,13 +75,13 @@ export function calculateRankedPoints(stats: RankedScoringStats, snapshot?: BQBa
       twoGoalsConceded: scoring.defenderTwoGoalsConceded,
       ownGoal: scoring.ownGoal,
     }, {
-      appearance: scoring.goalkeeperAppearance,
-      goal: scoring.defenderGoal,
-      assist: scoring.defenderAssist,
-      conceded: scoring.goalkeeperGoalConceded,
-      cleanSheet: scoring.goalkeeperCleanSheet,
-      oneGoal: scoring.goalkeeperOneGoal,
-      ownGoal: scoring.ownGoal,
+      appearance: options.suppressGoalkeeperRewards ? 0 : scoring.goalkeeperAppearance,
+      goal: options.suppressGoalkeeperRewards ? 0 : scoring.defenderGoal,
+      assist: options.suppressGoalkeeperRewards ? 0 : scoring.defenderAssist,
+      conceded: options.suppressGoalkeeperRewards ? 0 : scoring.goalkeeperGoalConceded,
+      cleanSheet: options.suppressGoalkeeperRewards ? 0 : scoring.goalkeeperCleanSheet,
+      oneGoal: options.suppressGoalkeeperRewards ? 0 : scoring.goalkeeperOneGoal,
+      ownGoal: options.suppressGoalkeeperRewards ? 0 : scoring.ownGoal,
     });
   }
   const bqStats: BQPlayerStats = {
@@ -87,8 +91,8 @@ export function calculateRankedPoints(stats: RankedScoringStats, snapshot?: BQBa
     draws: amount(stats.draws),
     losses: amount(stats.losses),
     ownGoals: amount(stats.ownGoals),
-    goalkeeperAppearances: amount(stats.goalkeeperAppearances),
-    goalkeeperGoalsConceded: amount(stats.goalkeeperGoalsConceded),
+    goalkeeperAppearances: options.suppressGoalkeeperRewards ? 0 : amount(stats.goalkeeperAppearances),
+    goalkeeperGoalsConceded: options.suppressGoalkeeperRewards ? 0 : amount(stats.goalkeeperGoalsConceded),
   };
   return calculateBQBasePoints(scoring, bqStats);
 }

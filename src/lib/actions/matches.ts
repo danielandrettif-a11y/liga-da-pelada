@@ -937,7 +937,6 @@ export async function deleteMatch(matchId: string) {
 
     if (matchError) throw new Error(matchError.message);
     if (!match) return { success: false, error: "Partida não encontrada." };
-    if (match.status === "live") return { success: false, error: "Encerre a partida antes de apagá-la." };
     if ((match as any).round?.status === "finished") {
       return { success: false, error: "A rodada já foi encerrada. Use a correção da rodada para preservar o histórico." };
     }

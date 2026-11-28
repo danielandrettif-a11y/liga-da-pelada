@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createCallupRealtimeRefresh } from "@/lib/callup-realtime-refresh";
 import type { CallupWithEntries } from "@/lib/actions/callups";
-import { supabase } from "@/lib/supabase";
 import { apiClient } from "@/modules/shared/infrastructure/api-client";
 
 const request = apiClient({ fallback: "Não foi possível atualizar a lista." });
@@ -82,15 +81,33 @@ export function useCallupPresence({
       inFlight?.abort();
       scheduler.request();
     };
-    const channel = supabase
-      .channel(`callup-list-${callup.id}`)
-      .on("postgres_changes", {
-        event: "*", schema: "public", table: "callup_entries", filter: `callup_id=eq.${callup.id}`,
-      }, scheduler.request)
-      .on("postgres_changes", {
-        event: "UPDATE", schema: "public", table: "callups", filter: `id=eq.${callup.id}`,
-      }, refreshPage)
-      .subscribe();
+    const eventQuery = new URLSearchParams({ leagueId: callup.league_id, callupId: callup.id });
+    const events = new EventSource(`/api/backend/callups/events?${eventQuery}`);
+    let fallbackInterval: number | null = null;
+    const startFallback = () => {
+      if (fallbackInterval !== null) return;
+      fallbackInterval = window.setInterval(() => {
+        if (document.visibilityState === "visible") scheduler.request();
+      }, 15_000);
+    };
+    const stopFallback = () => {
+      if (fallbackInterval === null) return;
+      window.clearInterval(fallbackInterval);
+      fallbackInterval = null;
+    };
+    events.addEventListener("open", stopFallback);
+    events.addEventListener("error", startFallback);
+    events.addEventListener("snapshot", (event) => {
+      try {
+        const current = JSON.parse((event as MessageEvent<string>).data) as Pick<CallupWithEntries, "id" | "updated_at" | "entries">;
+        if (current.id !== callup.id) return;
+        setSnapshot({ source: callup, entries: current.entries });
+        if (current.updated_at !== callup.updated_at) refresh();
+      } catch {
+        scheduler.request();
+      }
+    });
+    events.addEventListener("refresh", refreshPage);
 
     const refreshOnReturn = () => {
       if (document.visibilityState === "visible") refreshPage();
@@ -101,9 +118,10 @@ export function useCallupPresence({
       refreshEntriesRef.current = null;
       inFlight?.abort();
       scheduler.dispose();
+      events.close();
+      stopFallback();
       window.removeEventListener("focus", refreshOnReturn);
       document.removeEventListener("visibilitychange", refreshOnReturn);
-      void supabase.removeChannel(channel);
     };
   }, [allowDirectRead, callup, refreshRoute]);
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AlertTriangle, Check, ChevronDown, Loader2 } from "@/components/icons";
 import { setRoundPlayerAvailability } from "@/lib/actions/rounds";
 
@@ -19,12 +20,17 @@ export function RoundAvailabilityManager({
   entries: AvailabilityPlayer[];
   canManage: boolean;
 }) {
+  const router = useRouter();
   const [pendingPlayerId, setPendingPlayerId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [isOpen, setIsOpen] = useState(false);
-  const visibleEntries = canManage ? entries : entries.filter((entry) => entry.availability_status === "injured");
-  const injuredCount = entries.filter((entry) => entry.availability_status === "injured").length;
-  const availableCount = entries.length - injuredCount;
+  const [localEntries, setLocalEntries] = useState(entries);
+
+  useEffect(() => setLocalEntries(entries), [entries]);
+
+  const visibleEntries = canManage ? localEntries : localEntries.filter((entry) => entry.availability_status === "injured");
+  const injuredCount = localEntries.filter((entry) => entry.availability_status === "injured").length;
+  const availableCount = localEntries.length - injuredCount;
   const sortedEntries = [...visibleEntries]
     .filter((entry) => entry.players)
     .sort((a, b) => {
@@ -34,10 +40,19 @@ export function RoundAvailabilityManager({
 
   async function toggle(entry: AvailabilityPlayer) {
     const nextStatus = entry.availability_status === "injured" ? "available" : "injured";
+    const previous = localEntries;
+    setLocalEntries((current) => current.map((item) => item.player_id === entry.player_id
+      ? { ...item, availability_status: nextStatus }
+      : item));
     setPendingPlayerId(entry.player_id);
     setMessage("");
     const result = await setRoundPlayerAvailability(roundId, entry.player_id, nextStatus);
-    if (!result.success) setMessage(result.error || "Não foi possível alterar a disponibilidade.");
+    if (!result.success) {
+      setLocalEntries(previous);
+      setMessage(result.error || "Não foi possível alterar a disponibilidade.");
+    } else {
+      router.refresh();
+    }
     setPendingPlayerId(null);
   }
 
