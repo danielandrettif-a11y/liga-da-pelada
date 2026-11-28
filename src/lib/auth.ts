@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { cache } from "react";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { PROXY_AUTH_HEADER, verifyProxyAuthUser } from "./proxy-auth-header";
 
 export type AccountRole = "admin" | "player";
 
@@ -21,9 +22,19 @@ export function readAccountMemberships(client: Awaited<ReturnType<typeof createC
     .eq("is_active", true);
 }
 
+async function readProxyAuthHeader(): Promise<string | null> {
+  try {
+    const headerStore = await headers();
+    return typeof headerStore?.get === "function" ? headerStore.get(PROXY_AUTH_HEADER) : null;
+  } catch {
+    return null;
+  }
+}
+
 export const getCurrentAccount = cache(async function getCurrentAccount() {
-  const client = await createClient();
-  const { data: { user } } = await client.auth.getUser();
+  const [client, proxyHeader] = await Promise.all([createClient(), readProxyAuthHeader()]);
+  const proxyUser = verifyProxyAuthUser(proxyHeader);
+  const user = proxyUser || (await client.auth.getUser()).data.user;
 
   if (!user) {
     return { client, user: null, profile: null, memberships: [], membershipError: null, isAdmin: false };

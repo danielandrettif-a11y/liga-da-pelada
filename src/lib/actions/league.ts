@@ -1,6 +1,8 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { after } from "next/server";
+import { leagueConfigTag } from "../cache-tags";
 import { getAdminClient } from "../auth";
 import { MAX_PLAYERS_PER_TEAM, MAX_TEAMS_PER_ROUND, MIN_TEAMS_PER_ROUND } from "../constants";
 import { getSelectedLeague } from "../league-context";
@@ -27,6 +29,18 @@ function storagePathFromPublicUrl(url: string | null | undefined) {
   const marker = `/storage/v1/object/public/${BRANDING_BUCKET}/`;
   const index = url.indexOf(marker);
   return index >= 0 ? decodeURIComponent(url.slice(index + marker.length)) : null;
+}
+
+function scheduleLeagueConfigRevalidation(leagueId: string, fn: () => void) {
+  const run = () => {
+    revalidateTag(leagueConfigTag(leagueId), "max");
+    fn();
+  };
+  try {
+    after(run);
+  } catch {
+    run();
+  }
 }
 
 export async function getLeagueConfig() {
@@ -63,10 +77,12 @@ export async function updateLeagueName(leagueId: string, name: string) {
     const api = await leagueApiFor(client);
     if (api) {
       const result = await api.updateName(leagueId, normalizedName);
-      revalidatePath("/", "layout");
-      revalidatePath("/admin/liga");
-      revalidatePath("/lobby");
-      revalidatePath("/peladas");
+      scheduleLeagueConfigRevalidation(leagueId, () => {
+        revalidatePath("/", "layout");
+        revalidatePath("/admin/liga");
+        revalidatePath("/lobby");
+        revalidatePath("/peladas");
+      });
       return { success: true as const, name: result.name };
     }
   } catch (error) {
@@ -87,10 +103,12 @@ export async function updateLeagueName(leagueId: string, name: string) {
     return { success: false as const, error: DUPLICATE_LEAGUE_NAME_MESSAGE };
   }
   if (error || !data) return { success: false as const, error: error?.message || "Não foi possível alterar o nome." };
-  revalidatePath("/", "layout");
-  revalidatePath("/admin/liga");
-  revalidatePath("/lobby");
-  revalidatePath("/peladas");
+  scheduleLeagueConfigRevalidation(leagueId, () => {
+    revalidatePath("/", "layout");
+    revalidatePath("/admin/liga");
+    revalidatePath("/lobby");
+    revalidatePath("/peladas");
+  });
   return { success: true as const, name: data.name };
 }
 
@@ -117,9 +135,11 @@ export async function updateLeagueVisibility(leagueId: string, visibility: "priv
       error: error instanceof LeagueApiError ? error.message : "Não foi possível alterar a visibilidade.",
     };
   }
-  revalidatePath("/admin/liga");
-  revalidatePath("/peladas");
-  revalidatePath("/lobby");
+  scheduleLeagueConfigRevalidation(leagueId, () => {
+    revalidatePath("/admin/liga");
+    revalidatePath("/peladas");
+    revalidatePath("/lobby");
+  });
   return { success: true };
 }
 
@@ -149,10 +169,12 @@ export async function updateLeagueBranding(leagueId: string, formData: FormData)
     const api = await leagueApiFor(account.client);
     if (api) {
       const result = await api.updateBranding(leagueId, formData);
-      revalidatePath("/admin/liga");
-      revalidatePath("/lobby");
-      revalidatePath("/peladas");
-      revalidatePath("/", "layout");
+      scheduleLeagueConfigRevalidation(leagueId, () => {
+        revalidatePath("/admin/liga");
+        revalidatePath("/lobby");
+        revalidatePath("/peladas");
+        revalidatePath("/", "layout");
+      });
       return { success: true as const, ...result };
     }
   } catch (error) {
@@ -195,10 +217,12 @@ export async function updateLeagueBranding(leagueId: string, formData: FormData)
     updates.cover_url !== undefined ? storagePathFromPublicUrl(current.cover_url) : null,
   ].filter((path): path is string => Boolean(path) && !uploadedPaths.includes(path!));
   if (previousPaths.length) await account.client.storage.from(BRANDING_BUCKET).remove(previousPaths);
-  revalidatePath("/admin/liga");
-  revalidatePath("/lobby");
-  revalidatePath("/peladas");
-  revalidatePath("/", "layout");
+  scheduleLeagueConfigRevalidation(leagueId, () => {
+    revalidatePath("/admin/liga");
+    revalidatePath("/lobby");
+    revalidatePath("/peladas");
+    revalidatePath("/", "layout");
+  });
   return { success: true as const, logoUrl: updates.logo_url, coverUrl: updates.cover_url, accentColor: updates.accent_color };
 }
 
@@ -213,8 +237,10 @@ export async function updatePreSeasonEnabled(id: string, enabled: boolean) {
     const api = await leagueApiFor(account.client);
     if (api) {
       await api.setPreseason(id, enabled);
-      revalidatePath("/");
-      revalidatePath("/mais");
+      scheduleLeagueConfigRevalidation(id, () => {
+        revalidatePath("/");
+        revalidatePath("/mais");
+      });
       return { success: true };
     }
     const client = await getAdminClient();
@@ -227,8 +253,10 @@ export async function updatePreSeasonEnabled(id: string, enabled: boolean) {
 
     if (error) throw new Error(error.message);
 
-    revalidatePath("/");
-    revalidatePath("/mais");
+    scheduleLeagueConfigRevalidation(id, () => {
+      revalidatePath("/");
+      revalidatePath("/mais");
+    });
     return { success: true };
   } catch (err: any) {
     console.error("Erro ao alterar pré-temporada:", err);
@@ -287,12 +315,14 @@ export async function updateLeagueConfig(
         stadium_map_url: normalizedMapUrl,
         event_duration_minutes: eventDurationMinutes,
       });
-      revalidatePath("/admin/liga");
-      revalidatePath("/admin/rodada");
-      revalidatePath("/admin/prelistas");
-      revalidatePath("/convocacao");
-      revalidatePath("/mais");
-      revalidatePath("/cartola");
+      scheduleLeagueConfigRevalidation(id, () => {
+        revalidatePath("/admin/liga");
+        revalidatePath("/admin/rodada");
+        revalidatePath("/admin/prelistas");
+        revalidatePath("/convocacao");
+        revalidatePath("/mais");
+        revalidatePath("/cartola");
+      });
       return { success: true };
     }
     const client = await getAdminClient();
@@ -335,12 +365,14 @@ export async function updateLeagueConfig(
 
     if (error) throw new Error(error.message);
 
-    revalidatePath("/admin/liga");
-    revalidatePath("/admin/rodada");
-    revalidatePath("/admin/prelistas");
-    revalidatePath("/convocacao");
-    revalidatePath("/mais");
-    revalidatePath("/cartola");
+    scheduleLeagueConfigRevalidation(id, () => {
+      revalidatePath("/admin/liga");
+      revalidatePath("/admin/rodada");
+      revalidatePath("/admin/prelistas");
+      revalidatePath("/convocacao");
+      revalidatePath("/mais");
+      revalidatePath("/cartola");
+    });
     return { success: true };
   } catch (err: any) {
     console.error("Erro ao atualizar liga:", err);

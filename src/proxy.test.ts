@@ -27,10 +27,12 @@ vi.mock("@/lib/siteUrl", () => ({ requestOrigin: () => "https://example.com" }))
 
 import proxy from "./proxy";
 import { ENTRY_FLOW_DONE_COOKIE, ENTRY_FLOW_VERSION } from "@/lib/entry-flow";
+import { PROXY_AUTH_HEADER, verifyProxyAuthUser } from "@/lib/proxy-auth-header";
 
-function request(path: string) {
+function request(path: string, extraHeaders?: Record<string, string>) {
+  const headers = new Headers(extraHeaders);
   return {
-    headers: new Headers(),
+    headers,
     nextUrl: new URL(path, "https://example.com"),
     cookies: {
       get: (name: string) => name === "active_league_id"
@@ -74,5 +76,20 @@ describe("proxy league access", () => {
       { league_id: "league-1", role: "player", leagues: { feature_tier: "complete" } },
     ] });
     expect(await proxy(request("/admin/liga"))).toEqual({ redirect: "/lobby" });
+  });
+
+  it("strips spoofed proxy auth headers and signs verified user", async () => {
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "proxy-test-secret";
+    const validUuid = "11111111-1111-4111-8111-111111111111";
+    mocks.getUser.mockResolvedValue({ data: { user: { id: validUuid, email: "a@b.com", user_metadata: { name: "Ana" } } } });
+    mocks.memberships.mockResolvedValue({ data: [
+      { league_id: "league-1", role: "player", leagues: { feature_tier: "complete" } },
+    ] });
+    await proxy(request("/ranking", { [PROXY_AUTH_HEADER]: "spoofed.token" }));
+    const lastCall = (mocks.next.mock.calls.at(-1) as unknown[] | undefined)?.[0] as { request?: { headers?: Headers } } | undefined;
+    const signed = lastCall?.request?.headers?.get(PROXY_AUTH_HEADER);
+    expect(signed).toBeTruthy();
+    expect(signed).not.toBe("spoofed.token");
+    expect(verifyProxyAuthUser(signed)).toMatchObject({ id: validUuid, email: "a@b.com" });
   });
 });

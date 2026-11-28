@@ -26,11 +26,11 @@ services:
       - ENABLE_MATCHES_API=true
       - ENABLE_NOTIFICATIONS_API=true
       - ENABLE_STATISTICS_API=true
-      - ENABLE_FINANCE_API=false
+      - ENABLE_FINANCE_API=true
       # A ponte de Cartola ainda não atingiu paridade com o fluxo existente.
       - ENABLE_FANTASY_API=false
-      - ENABLE_CARDS_API=false
-      - ENABLE_COSMETICS_API=false
+      - ENABLE_CARDS_API=true
+      - ENABLE_COSMETICS_API=true
       - ENABLE_COLLECTIVE_API=true
       # O BQ Manager usa banco próprio; a ponte modular ainda não preserva seus comandos.
       - ENABLE_INTEGRATIONS_API=false
@@ -91,13 +91,13 @@ services:
       # Flags para consumo das APIs modulares pelo frontend
       - CALLUPS_API_ENABLED=true
       - CALLUPS_BACKEND_URL=http://liga-coolify-homologacao-api:3001
-      - CARDS_API_ENABLED=false
+      - CARDS_API_ENABLED=true
       - CARDS_BACKEND_URL=http://liga-coolify-homologacao-api:3001
       - COLLECTIVE_API_ENABLED=true
-      - COSMETICS_API_ENABLED=false
+      - COSMETICS_API_ENABLED=true
       - FANTASY_API_ENABLED=false
       - FANTASY_BACKEND_URL=http://liga-coolify-homologacao-api:3001
-      - FINANCE_API_ENABLED=false
+      - FINANCE_API_ENABLED=true
       - FINANCE_BACKEND_URL=http://liga-coolify-homologacao-api:3001
       - IDENTITY_API_ENABLED=true
       - IDENTITY_BACKEND_URL=http://liga-coolify-homologacao-api:3001
@@ -115,7 +115,7 @@ services:
       - ROUNDS_API_ENABLED=true
       - ROUNDS_BACKEND_URL=http://liga-coolify-homologacao-api:3001
       - STATISTICS_API_ENABLED=true
-      - HOME_AGENDA_V2_ENABLED=${HOME_AGENDA_V2_ENABLED:-false}
+      - HOME_AGENDA_V2_ENABLED=${HOME_AGENDA_V2_ENABLED:-true}
       - STATISTICS_BACKEND_URL=http://liga-coolify-homologacao-api:3001
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/',{redirect:'manual'}).then(r=>{if(r.status>=500)process.exit(1)}).catch(()=>process.exit(1))"]

@@ -1,18 +1,28 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { after } from "next/server";
 import { getCurrentAccount } from "../auth";
+import { leagueStadiumsTag } from "../cache-tags";
 import { getSelectedLeague } from "../league-context";
 import { createClient as createServerClient } from "../supabase/server";
 import type { Stadium } from "../types";
 import { LeagueApiError } from "@/modules/leagues/infrastructure/http-league-gateway";
 import { leagueApiFor } from "@/modules/leagues/infrastructure/league-api-session";
 
-function revalidateStadiumViews() {
-  revalidatePath("/mais");
-  revalidatePath("/mais/estadios");
-  revalidatePath("/convocacao");
-  revalidatePath("/admin/rodada");
+function revalidateStadiumViews(leagueId?: string) {
+  const run = () => {
+    if (leagueId) revalidateTag(leagueStadiumsTag(leagueId), "max");
+    revalidatePath("/mais");
+    revalidatePath("/mais/estadios");
+    revalidatePath("/convocacao");
+    revalidatePath("/admin/rodada");
+  };
+  try {
+    after(run);
+  } catch {
+    run();
+  }
 }
 
 function errorMessage(error: unknown, fallback: string): string {
@@ -112,7 +122,7 @@ export async function saveStadium(formData: FormData): Promise<
       const stadium = await api.saveStadium(league.id, {
         id, name, address, google_maps_url: googleMapsUrl, latitude, longitude,
       });
-      revalidateStadiumViews();
+      revalidateStadiumViews(league.id);
       return { success: true, stadium };
     }
 
@@ -164,7 +174,7 @@ export async function saveStadium(formData: FormData): Promise<
       savedStadium = data as Stadium;
     }
 
-    revalidateStadiumViews();
+    revalidateStadiumViews(league.id);
     return { success: true, stadium: savedStadium };
   } catch (error) {
     console.error("Erro ao salvar estádio:", error);
@@ -191,7 +201,7 @@ export async function deleteStadium(stadiumId: string) {
         .eq("league_id", league.id);
       if (error) throw error;
     }
-    revalidateStadiumViews();
+    revalidateStadiumViews(league.id);
     return { success: true };
   } catch (error) {
     console.error("Erro ao excluir estádio:", error);
@@ -219,7 +229,7 @@ export async function reorderStadiums(stadiumIds: string[]) {
       const failure = results.find((result) => result.error)?.error;
       if (failure) throw failure;
     }
-    revalidateStadiumViews();
+    revalidateStadiumViews(league.id);
     return { success: true };
   } catch (error) {
     console.error("Erro ao reordenar estádios:", error);

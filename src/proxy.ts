@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { ENTRY_FLOW_DONE_COOKIE, ENTRY_FLOW_PENDING_COOKIE, ENTRY_FLOW_VERSION, isEntryFlowScreen } from '@/lib/entry-flow'
+import { PROXY_AUTH_HEADER, signProxyAuthUser } from '@/lib/proxy-auth-header'
 import { requestOrigin } from '@/lib/siteUrl'
 import { supabaseServerConfig } from '@/lib/supabase/server-config'
 import { homeTraceId } from '@/lib/home-performance'
@@ -9,9 +10,13 @@ export default async function proxy(request: NextRequest) {
   // O Fastify valida a sessão e o PostgreSQL aplica o escopo da liga nesta leitura.
   if (request.nextUrl.pathname === '/api/backend/callups/active') return NextResponse.next()
 
+  const forwardedHeaders = new Headers(request.headers)
+  // Nunca aceitar identidade pré-assinada enviada pelo cliente.
+  forwardedHeaders.delete(PROXY_AUTH_HEADER)
+
   let supabaseResponse = NextResponse.next({
     request: {
-      headers: request.headers,
+      headers: forwardedHeaders,
     },
   })
 
@@ -26,9 +31,11 @@ export default async function proxy(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({
-            request,
+            request: {
+              headers: forwardedHeaders,
+            },
           })
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
@@ -43,6 +50,23 @@ export default async function proxy(request: NextRequest) {
   const authStartedAt = performance.now()
   const { data: { user } } = await supabase.auth.getUser()
   const authDuration = performance.now() - authStartedAt
+  if (user) {
+    const signedUser = signProxyAuthUser(user)
+    if (signedUser) {
+      forwardedHeaders.set(PROXY_AUTH_HEADER, signedUser)
+      const nextResponse = NextResponse.next({
+        request: {
+          headers: forwardedHeaders,
+        },
+      })
+      if (typeof supabaseResponse.cookies?.getAll === 'function') {
+        supabaseResponse.cookies.getAll().forEach((cookie) => {
+          nextResponse.cookies.set(cookie)
+        })
+      }
+      supabaseResponse = nextResponse
+    }
+  }
   const traceId = pathname === '/' ? homeTraceId(request.nextUrl.searchParams.get('home_trace')) : undefined
   if (traceId) console.info(JSON.stringify({
     event: 'match_step', operation: 'load_home', step: 'proxy_auth',
