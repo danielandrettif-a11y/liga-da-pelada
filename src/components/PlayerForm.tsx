@@ -238,6 +238,8 @@ export function PlayerForm({
     formData.set("remove_active_avatar", String(removeActiveAvatar));
     formData.set("remove_alternate_avatar", String(removeAlternateAvatar));
     formData.set("use_alternate_avatar", String(useAlternateAsActive));
+    formData.delete("avatar_active");
+    formData.delete("avatar_alternate");
     if (croppedActiveAvatar) formData.set("avatar_active", croppedActiveAvatar, croppedActiveAvatar.name);
     if (croppedAlternateAvatar) formData.set("avatar_alternate", croppedAlternateAvatar, croppedAlternateAvatar.name);
 

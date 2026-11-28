@@ -45,10 +45,12 @@ async function parseMultipart(request: FastifyRequest) {
       const active = part.fieldname === "avatar_active" || part.fieldname === "avatar";
       const alternate = part.fieldname === "avatar_alternate";
       if (!active && !alternate) throw new InvalidPlayerManagementError("Arquivo de foto desconhecido.");
+      const bytes = await part.toBuffer();
+      if (bytes.byteLength === 0 && !part.filename) continue;
       if ((active && activeAvatar) || (alternate && alternateAvatar)) {
         throw new InvalidPlayerManagementError("Arquivo de foto duplicado.");
       }
-      const asset = { contentType: part.mimetype, bytes: await part.toBuffer() };
+      const asset = { contentType: part.mimetype, bytes };
       if (active) activeAvatar = asset;
       else alternateAvatar = asset;
     } else {

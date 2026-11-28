@@ -599,4 +599,65 @@ describe("roster HTTP routes", () => {
       { userId: "verified-user" },
     );
   });
+
+  it("ignores empty browser file inputs when saving dual positions without uploading photos", async () => {
+    const { app, playerProfileRepository } = fixture(true);
+    const leagueId = "00000000-0000-4000-8000-000000000010";
+    const playerId = "00000000-0000-4000-8000-000000000001";
+    playerProfileRepository.getSaveAccess.mockResolvedValue({
+      isLeagueAdmin: true,
+      isOwner: false,
+      current: {
+        profileBio: null,
+        avatarUrl: "https://cdn.test/active.png",
+        avatarAlternateUrl: "https://cdn.test/alt.png",
+        memberCategory: "player",
+        isSelectable: true,
+        playerProfile: "offensive",
+        primaryPosition: "ATA",
+        secondaryPosition: null,
+        overallTraits: ["offensive"],
+        isGoalkeeper: false,
+      },
+    });
+    const boundary = "----ligaEmptyAvatarBoundary";
+    const payload = Buffer.from(
+      [
+        ["name", "Daniel Andretti"],
+        ["member_category", "player"],
+        ["player_profile", "offensive"],
+        ["primary_position", "MEI"],
+        ["secondary_position", "ATA"],
+        ["remove_active_avatar", "false"],
+        ["remove_alternate_avatar", "false"],
+        ["use_alternate_avatar", "false"],
+      ].map(([k, v]) => `--${boundary}\r\nContent-Disposition: form-data; name="${k}"\r\n\r\n${v}\r\n`).join("")
+      + `--${boundary}\r\nContent-Disposition: form-data; name="avatar_active"; filename=""\r\nContent-Type: application/octet-stream\r\n\r\n\r\n`
+      + `--${boundary}\r\nContent-Disposition: form-data; name="avatar_alternate"; filename=""\r\nContent-Type: application/octet-stream\r\n\r\n\r\n`
+      + `--${boundary}--\r\n`,
+    );
+    const response = await app.inject({
+      method: "PATCH",
+      url: `/api/roster/leagues/${leagueId}/players/${playerId}/profile`,
+      headers: {
+        authorization: "Bearer valid-token",
+        "content-type": `multipart/form-data; boundary=${boundary}`,
+      },
+      payload,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ playerId });
+    expect(playerProfileRepository.saveProfile).toHaveBeenCalledWith(
+      leagueId,
+      expect.objectContaining({
+        playerId,
+        primaryPosition: "MEI",
+        secondaryPosition: "ATA",
+        avatarUrl: "https://cdn.test/active.png",
+        avatarAlternateUrl: "https://cdn.test/alt.png",
+      }),
+      false,
+      { userId: "verified-user" },
+    );
+  });
 });
