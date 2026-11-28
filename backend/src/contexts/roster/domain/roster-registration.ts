@@ -1,3 +1,5 @@
+export type RegistrationOriginType = "self_email" | "registered_by_admin" | "registered_by_user" | "legacy";
+
 export type PlayerRegistrationEvent = {
   id: number;
   player_id: string | null;
@@ -6,6 +8,11 @@ export type PlayerRegistrationEvent = {
   member_category: "player" | "guest" | "wag" | "supporter";
   source: "legacy" | "site_signup" | "admin";
   created_by_user_id: string | null;
+  created_by_name: string | null;
+  created_by_avatar_url: string | null;
+  origin_type: RegistrationOriginType;
+  signup_email: string | null;
+  signup_provider: string | null;
   created_at: string;
 };
 

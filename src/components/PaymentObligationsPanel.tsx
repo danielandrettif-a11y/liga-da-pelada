@@ -23,6 +23,7 @@ type Props = {
   initialObligations: PaymentObligation[];
   players: PaymentPlayer[];
   currentPlayerId: string | null;
+  canEdit?: boolean;
   canManage: boolean;
   roundId: string;
   expenseItems: ExpenseItem[];
@@ -31,7 +32,7 @@ type Props = {
   round: PaymentRound;
 };
 
-export function PaymentObligationsPanel({ initialObligations, players, currentPlayerId, canManage, roundId, expenseItems, initialExpenseSelections, chargeLines, round }: Props) {
+export function PaymentObligationsPanel({ initialObligations, players, currentPlayerId, canEdit = false, canManage, roundId, expenseItems, initialExpenseSelections, chargeLines, round }: Props) {
   const router = useRouter();
   const [obligations, setObligations] = useState(initialObligations);
   const [pendingPlayerId, setPendingPlayerId] = useState<string | null>(null);
@@ -91,7 +92,7 @@ export function PaymentObligationsPanel({ initialObligations, players, currentPl
 
   async function togglePlayer(playerId: string, paid: boolean) {
     const rows = rowsByPlayer.get(playerId) || [];
-    if (!rows.length || (!canManage && playerId !== currentPlayerId)) return;
+    if (!rows.length || (!canManage && !canEdit)) return;
     const previous = obligations;
     setPendingPlayerId(playerId);
     setMessage("");
@@ -158,14 +159,14 @@ export function PaymentObligationsPanel({ initialObligations, players, currentPl
       })}{!expenseItems.length && <p className="rounded-xl border border-border bg-background/50 p-3 text-xs text-muted">Nenhum item cadastrado na caixinha.</p>}<button type="button" disabled={pending} onClick={saveExpensePlan} className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3 text-xs font-black text-background disabled:opacity-40"><Save className="h-4 w-4" /> Salvar itens</button></div>}
     </article>}
 
-    <div className="flex items-end justify-between"><div><h2 className="text-sm font-black text-foreground">Quem já pagou</h2><p className="text-[11px] text-muted">{paidCount} de {visiblePlayers.length} pagamentos confirmados</p></div>{!canManage && <span className="flex items-center gap-1 text-[9px] font-bold uppercase text-muted"><LockKeyhole className="h-3 w-3" /> Lista completa · edição individual</span>}</div>
+    <div className="flex items-end justify-between"><div><h2 className="text-sm font-black text-foreground">Quem já pagou</h2><p className="text-[11px] text-muted">{paidCount} de {visiblePlayers.length} pagamentos confirmados</p></div>{!canManage && <span className="flex items-center gap-1 text-[9px] font-bold uppercase text-muted"><LockKeyhole className="h-3 w-3" /> {canEdit ? "Lista completa · confirmação liberada" : "Lista completa · somente leitura"}</span>}</div>
     {message && <p role="status" className={`rounded-xl p-3 text-xs font-bold ${message.includes("Não") ? "bg-danger/10 text-danger" : "bg-accent/10 text-accent"}`}>{message}</p>}
 
     <div className="glass-card overflow-hidden">
       {visiblePlayers.map((player, index) => {
         const totals = playerTotals.get(player.id) || { due: 0, paid: 0, complete: false };
         const lines = chargeLines.filter((line) => line.player_id === player.id);
-        const canToggle = canManage || player.id === currentPlayerId;
+        const canToggle = canManage || canEdit;
         return <label key={player.id} className={`flex items-center gap-3 p-3 ${index < visiblePlayers.length - 1 ? "border-b border-border" : ""} ${canToggle ? "cursor-pointer hover:bg-surface-hover" : ""}`}><input type="checkbox" checked={totals.complete} disabled={!canToggle || pendingPlayerId !== null || totals.due <= 0} onChange={(event) => togglePlayer(player.id, event.target.checked)} className="h-5 w-5 shrink-0 accent-[var(--accent)]" /><PlayerAvatar name={player.name} avatarUrl={player.avatar_url} className="h-10 w-10 shrink-0 rounded-full border border-border bg-surface-hover text-xs font-bold text-muted" /><div className="min-w-0 flex-1"><p className={`truncate text-sm font-bold ${totals.complete ? "text-accent" : "text-foreground"}`}>{player.name}</p><PlayerProfileBadge profile={player.player_profile} isGoalkeeper={player.is_goalkeeper} />{lines.length > 0 && <p className="mt-1 line-clamp-2 text-[9px] leading-4 text-muted">{lines.map((line) => `${line.label} ${currency.format(line.amount)}`).join(" · ")}</p>}</div><div className="shrink-0 text-right"><p className="text-[8px] font-black uppercase tracking-wider text-muted">Total</p><p className="text-xs font-black text-foreground">{currency.format(totals.due)}</p><span className={`text-[9px] font-black uppercase ${totals.complete ? "text-accent" : totals.paid > 0 ? "text-warning" : "text-muted"}`}>{pendingPlayerId === player.id ? "Salvando…" : totals.complete ? "Pago" : totals.paid > 0 ? "Parcial" : "Pendente"}</span></div></label>;
       })}
       {visiblePlayers.length === 0 && <p className="p-8 text-center text-sm text-muted">Nenhum jogador nesta rodada.</p>}

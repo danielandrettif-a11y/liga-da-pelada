@@ -69,6 +69,11 @@ function registrationEvent(row: RegistrationRow): PlayerRegistrationEvent {
   return {
     ...row,
     id: Number(row.id),
+    created_by_name: row.created_by_name ?? null,
+    created_by_avatar_url: row.created_by_avatar_url ?? null,
+    origin_type: row.origin_type ?? (row.source === "admin" ? "registered_by_admin" : row.source === "site_signup" ? "self_email" : "legacy"),
+    signup_email: row.signup_email ?? null,
+    signup_provider: row.signup_provider ?? null,
     created_at: row.created_at instanceof Date ? row.created_at.toISOString() : new Date(row.created_at).toISOString(),
   };
 }
@@ -78,17 +83,10 @@ export function pgRosterRegistrationRepository(pool: Pool): RosterRegistrationRe
     listHistory: (leagueId, actor) => authenticated(pool, actor, async (client) => {
       await requireLeagueAdmin(client, leagueId);
       const result = await client.query<RegistrationRow>(
-        `SELECT event.id, event.player_id,
-                COALESCE(player.name, event.player_name) AS player_name,
-                COALESCE(NULLIF(player.avatar_url, ''), event.avatar_url) AS avatar_url,
-                COALESCE(player.member_category, event.member_category) AS member_category,
-                event.source, event.created_by_user_id, event.created_at
-           FROM public.player_registration_events event
-           JOIN public.league_members member ON member.player_id = event.player_id
-             AND member.league_id = $1::uuid AND member.is_active
-           LEFT JOIN public.players player ON player.id = event.player_id
-          ORDER BY event.created_at DESC, event.id DESC
-          LIMIT 1000`,
+        `SELECT id, player_id, player_name, avatar_url, member_category, source,
+                created_by_user_id, created_by_name, created_by_avatar_url,
+                origin_type, signup_email, signup_provider, created_at
+           FROM public.get_league_registration_history($1::uuid)`,
         [leagueId],
       );
       return result.rows.map(registrationEvent);

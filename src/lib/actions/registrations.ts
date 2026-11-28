@@ -29,59 +29,16 @@ export async function getRegistrationHistory(): Promise<PlayerRegistrationEvent[
     console.error("Erro ao buscar historico de cadastros:", error);
     return [];
   }
-  const rosterPlayerIds = await getSelectedRosterPlayerIds();
-  if (!rosterPlayerIds.length) return [];
 
-  const { data, error } = await account.client
-    .from("player_registration_events")
-    .select("id, player_id, player_name, avatar_url, member_category, source, created_by_user_id, created_at")
-    .in("player_id", rosterPlayerIds)
-    .order("created_at", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(1000);
+  const { data, error } = await account.client.rpc("get_league_registration_history", {
+    p_league_id: league.id,
+  });
 
   if (error) {
     console.error("Erro ao buscar historico de cadastros:", error);
     return [];
   }
-  const events = data as PlayerRegistrationEvent[];
-  const creatorIds = [...new Set(events.map((event) => event.created_by_user_id).filter((id): id is string => Boolean(id)))];
-  const { data: creators } = creatorIds.length
-    ? await account.client
-        .from("account_profiles")
-        .select("user_id, players(name, avatar_url)")
-        .in("user_id", creatorIds)
-    : { data: [] };
-  const creatorsById = new Map((creators || []).map((profile) => {
-    const player = Array.isArray(profile.players) ? profile.players[0] : profile.players;
-    return [profile.user_id, player || null];
-  }));
-  const playerIds = events.map((event) => event.player_id).filter((id): id is string => Boolean(id));
-  if (playerIds.length === 0) return events.map((event) => ({
-    ...event,
-    created_by_name: event.created_by_user_id ? creatorsById.get(event.created_by_user_id)?.name || null : null,
-    created_by_avatar_url: event.created_by_user_id ? creatorsById.get(event.created_by_user_id)?.avatar_url || null : null,
-  }));
-  const { data: currentPlayers } = await account.client
-    .from("players")
-    .select("id, name, avatar_url, member_category")
-    .in("id", playerIds);
-  const currentById = new Map((currentPlayers || []).map((player) => [player.id, player]));
-  return events.map((event) => {
-    const current = event.player_id ? currentById.get(event.player_id) : null;
-    return current ? {
-      ...event,
-      player_name: current.name,
-      avatar_url: current.avatar_url || event.avatar_url,
-      member_category: current.member_category,
-      created_by_name: event.created_by_user_id ? creatorsById.get(event.created_by_user_id)?.name || null : null,
-      created_by_avatar_url: event.created_by_user_id ? creatorsById.get(event.created_by_user_id)?.avatar_url || null : null,
-    } : {
-      ...event,
-      created_by_name: event.created_by_user_id ? creatorsById.get(event.created_by_user_id)?.name || null : null,
-      created_by_avatar_url: event.created_by_user_id ? creatorsById.get(event.created_by_user_id)?.avatar_url || null : null,
-    };
-  }) as PlayerRegistrationEvent[];
+  return (data || []) as PlayerRegistrationEvent[];
 }
 
 export async function getRosterUnreadState(): Promise<RosterUnreadState> {

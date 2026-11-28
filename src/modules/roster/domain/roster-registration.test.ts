@@ -3,11 +3,23 @@ import { isPlayerRegistrationEvent } from "./roster-registration";
 
 const event = {
   id: 1, player_id: "player-1", player_name: "Convidado", avatar_url: null,
-  member_category: "guest", source: "admin", created_by_user_id: null,
+  member_category: "guest", source: "site_signup", created_by_user_id: "user-1",
+  created_by_name: "Daniel", created_by_avatar_url: null,
+  origin_type: "registered_by_user", signup_email: null, signup_provider: null,
   created_at: "2026-10-20T10:00:00.000Z",
 };
 
 describe("roster registration contract", () => {
   it("accepts a complete registration event", () => expect(isPlayerRegistrationEvent(event)).toBe(true));
-  it("rejects malformed history data", () => expect(isPlayerRegistrationEvent({ ...event, source: "unknown" })).toBe(false));
+  it("accepts a self signup event with email and provider", () => expect(isPlayerRegistrationEvent({
+    ...event,
+    member_category: "player",
+    origin_type: "self_email",
+    signup_email: "atleta@pelada.com",
+    signup_provider: "email",
+  })).toBe(true));
+  it("rejects malformed history data", () => {
+    expect(isPlayerRegistrationEvent({ ...event, source: "unknown" })).toBe(false);
+    expect(isPlayerRegistrationEvent({ ...event, origin_type: "unknown" })).toBe(false);
+  });
 });

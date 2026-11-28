@@ -26,6 +26,8 @@ function repository(): RosterRegistrationRepository {
   return {
     listHistory: vi.fn().mockResolvedValue([{ id: 1, player_id: guestId, player_name: "Convidado",
       avatar_url: null, member_category: "guest", source: "admin", created_by_user_id: null,
+      created_by_name: null, created_by_avatar_url: null, origin_type: "registered_by_admin",
+      signup_email: null, signup_provider: null,
       created_at: "2026-10-20T10:00:00.000Z" }]),
     listMergeCandidates: vi.fn().mockResolvedValue([candidate]),
     mergePlayers: vi.fn().mockResolvedValue(["00000000-0000-4000-8000-000000000100"]),
