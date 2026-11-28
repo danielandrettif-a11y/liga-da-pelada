@@ -35,7 +35,7 @@ export async function createCroppedAvatar(source: string, crop: Area) {
   );
 
   const blob = await new Promise<Blob | null>((resolve) => {
-    canvas.toBlob(resolve, "image/webp", 0.9);
+    canvas.toBlob(resolve, "image/webp", 0.8);
   });
 
   if (!blob) throw new Error("Não foi possível recortar a foto.");

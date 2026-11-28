@@ -674,7 +674,7 @@ export async function calculateRoundStats(roundId: string) {
       const overallPositions = overallByPlayer.get(stats.player_id)?.positions;
       const player = playerById.get(stats.player_id);
       const primaryTrait = Array.isArray(player?.overall_traits) ? player.overall_traits[0] : null;
-      const suppressGoalkeeperRewardsForScoring = !columnCActive && suppressGoalkeeperRewards;
+      const suppressGoalkeeperRewardsForScoring = suppressGoalkeeperRewards;
       const lineRole = stats.player_profile_locked === "defensive" ? "DEF" : "ATA";
       const fallbackRole = primaryTrait === "defensive" ? "DEF" : primaryTrait === "midfield" ? "MEI" : "ATA";
       const roleWeights: RankingRoleWeight[] = !countsForRanking || stats.games <= 0 || !player?.is_competitive_profile_complete
@@ -712,7 +712,7 @@ export async function calculateRoundStats(roundId: string) {
         draws: stats.draws,
         losses: stats.losses,
         ownGoals: stats.own_goals,
-        goalkeeperAppearances: suppressGoalkeeperRewardsForScoring ? 0 : stats.goalkeeper_games,
+        goalkeeperAppearances: stats.goalkeeper_games,
         goalkeeperGoalsConceded: stats.goals_conceded,
         goalkeeperGoals: stats.goalkeeper_goals,
         goalkeeperAssists: stats.goalkeeper_assists,
@@ -722,7 +722,7 @@ export async function calculateRoundStats(roundId: string) {
         defensiveCleanGames: stats.ranking_defensive_clean_games,
         defensiveOneGoalGames: stats.ranking_defensive_one_goal_games,
         lineRole,
-        }, scoringSnapshot) : 0,
+        }, scoringSnapshot, { suppressGoalkeeperRewards: suppressGoalkeeperRewardsForScoring }) : 0,
       };
     });
     if (statsArray.length > 0) {
@@ -758,6 +758,58 @@ export async function calculateRoundStats(roundId: string) {
   } catch (err: any) {
     console.error("Erro calcular estatísticas:", err);
     return { success: false, error: err.message };
+  }
+}
+
+export async function suppressRoundGoalkeeperPoints(roundId: string) {
+  try {
+    const client = await getAdminClient();
+    if (!client) return { success: false, error: "Somente administradores podem corrigir a pontuação." };
+    const league = await getSelectedLeague();
+    if (!league || league.role !== "admin") return { success: false, error: "Rodada fora da pelada selecionada." };
+
+    const { data: round, error: roundError } = await client.from("rounds")
+      .select("id, status, round_type")
+      .eq("id", roundId).eq("league_id", league.id).maybeSingle();
+    if (roundError || !round) return { success: false, error: "Rodada não encontrada." };
+    if (round.status !== "finished" || round.round_type !== "official") {
+      return { success: false, error: "A correção só pode ser aplicada a uma rodada oficial encerrada." };
+    }
+
+    const { error: updateError } = await client.from("rounds")
+      .update({ suppress_goalkeeper_rewards: true })
+      .eq("id", roundId).eq("league_id", league.id);
+    if (updateError) throw new Error(updateError.message);
+
+    const { data: fantasyRound, error: fantasyRoundError } = await client.from("fantasy_rounds")
+      .select("id, settings_snapshot").eq("round_id", roundId).maybeSingle();
+    if (fantasyRoundError) throw new Error(fantasyRoundError.message);
+    if (fantasyRound) {
+      const snapshot = (fantasyRound.settings_snapshot || {}) as Record<string, unknown>;
+      const { error: fantasyUpdateError } = await client.from("fantasy_rounds").update({
+        settings_snapshot: {
+          ...snapshot,
+          goalkeeper_appearance_points: 0,
+          goal_conceded_points: 0,
+          goalkeeper_slot_appearance_points: 0,
+          goalkeeper_slot_goal_conceded_points: 0,
+          goalkeeper_slot_clean_sheet_points: 0,
+          goalkeeper_slot_one_goal_points: 0,
+        },
+      }).eq("id", fantasyRound.id);
+      if (fantasyUpdateError) throw new Error(fantasyUpdateError.message);
+    }
+
+    const recalculation = await calculateRoundStats(roundId);
+    if (!recalculation.success) {
+      return {
+        success: false,
+        error: `A regra foi salva, mas o reprocessamento falhou: ${recalculation.error || "tente novamente"}.`,
+      };
+    }
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível corrigir a pontuação de goleiro." };
   }
 }
 

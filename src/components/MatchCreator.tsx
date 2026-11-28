@@ -10,6 +10,7 @@ import { TeamReferenceBadge } from "./TeamReferenceBadge";
 import { canTeamLendToMatch, pickFairSubstitute } from "@/lib/substitution-draw";
 import { buildStructuralLoans } from "@/lib/underfilled-rounds";
 import { shouldExcludeReplacementScoring } from "@/lib/scoring-eligibility";
+import { buildRoundMatchAvailability } from "@/lib/round-match-availability";
 
 type MatchCreatorProps = {
   round: any;
@@ -76,10 +77,11 @@ export function MatchCreator({
     teams.flatMap((team: any) => (team.team_players || []).map((entry: any) => [entry.player_id, team.id] as const)),
   ), [teams]);
   const selectedTeamIds = useMemo(() => [teamAId, teamBId].filter(Boolean), [teamAId, teamBId]);
-  const availability = useMemo(() => new Map(
-    (round?.round_players || []).map((entry: any) => [entry.player_id, entry.availability_status || "available"]),
-  ), [round?.round_players]);
-  const usesArrivalOrder = false;
+  const availability = useMemo(
+    () => buildRoundMatchAvailability(round?.round_players, round?.formation_mode),
+    [round?.formation_mode, round?.round_players],
+  );
+  const usesArrivalOrder = Boolean(round?.arrival_order_enabled);
   const previousMatch = useMemo(() => [...(round?.matches || [])].sort((a: any, b: any) =>
     (b.match_order || 0) - (a.match_order || 0) || String(b.created_at).localeCompare(String(a.created_at)),
   )[0], [round?.matches]);
@@ -88,10 +90,15 @@ export function MatchCreator({
     () => teams.filter((team: any) => selectedTeamIds.includes(team.id)),
     [teams, selectedTeamIds],
   );
-  const injuredPlayers = useMemo(() => selectedTeams.flatMap((team: any) =>
+  const unavailablePlayers = useMemo(() => selectedTeams.flatMap((team: any) =>
     (team.team_players || [])
-      .filter((entry: any) => availability.get(entry.player_id) === "injured")
-      .map((entry: any) => ({ team, player: entry.players, playerId: entry.player_id, reason: "Machucado" })),
+      .filter((entry: any) => availability.get(entry.player_id) !== "available")
+      .map((entry: any) => ({
+        team,
+        player: entry.players,
+        playerId: entry.player_id,
+        reason: availability.get(entry.player_id) === "injured" ? "Machucado" : "Ainda não chegou",
+      })),
   ), [selectedTeams, availability]);
   // Cobertura de desfalque não depende do rodízio do último jogo: qualquer
   // atleta presente de um time que não participa deste confronto pode entrar.
@@ -107,12 +114,12 @@ export function MatchCreator({
     .filter((entry: any) => entry.player);
   const forcedAbsenceGoalkeeperByTeam = useMemo(() => {
     const forced = new Map<string, string>();
-    for (const entry of injuredPlayers) {
+    for (const entry of unavailablePlayers) {
       const replacementId = replacementByAbsent[entry.playerId];
       if (replacementId && !forced.has(entry.team.id)) forced.set(entry.team.id, replacementId);
     }
     return forced;
-  }, [injuredPlayers, replacementByAbsent]);
+  }, [unavailablePlayers, replacementByAbsent]);
   const previousLoanCount = useMemo(() => {
     const counts = new Map<string, number>();
     for (const match of round?.matches || []) {
@@ -152,7 +159,7 @@ export function MatchCreator({
       loan.targetTeamId === team.id && loan.rotationOrder === 1,
     );
     const players = (team.team_players || [])
-      .filter((entry: any) => availability.get(entry.player_id) !== "injured")
+      .filter((entry: any) => availability.get(entry.player_id) === "available")
       .map((entry: any) => ({
         id: entry.player_id,
         name: entry.players?.name || "Jogador",
@@ -242,7 +249,7 @@ export function MatchCreator({
     setSubstitutionNotice(null);
   }, [teamAId, teamBId]);
 
-  const missingSubstitutionKey = injuredPlayers
+  const missingSubstitutionKey = unavailablePlayers
     .filter((entry: any) => !replacementByAbsent[entry.playerId])
     .map((entry: any) => entry.playerId)
     .sort()
@@ -254,7 +261,7 @@ export function MatchCreator({
     const usedNow = new Set(Object.values(replacementByAbsent).filter(Boolean));
     const next = { ...replacementByAbsent };
     const notice: Array<{ absent: string; replacement: string }> = [];
-    for (const entry of injuredPlayers.filter((item: any) => !next[item.playerId])) {
+    for (const entry of unavailablePlayers.filter((item: any) => !next[item.playerId])) {
       const picked = pickFairSubstitute<{ playerId: string; player: any; team: any }>(waitingPlayers, previousLoanCount, usedNow);
       if (!picked) continue;
       next[entry.playerId] = picked.playerId;
@@ -403,7 +410,7 @@ export function MatchCreator({
       return;
     }
 
-    const uncoveredPlayers = injuredPlayers.filter((entry: any) => !replacementByAbsent[entry.playerId]);
+    const uncoveredPlayers = unavailablePlayers.filter((entry: any) => !replacementByAbsent[entry.playerId]);
     if (uncoveredPlayers.length > 0) {
       setError(`Escolha substitutos para as ${uncoveredPlayers.length} vaga(s) desfalcadas.`);
       return;
@@ -427,7 +434,7 @@ export function MatchCreator({
       goalkeeper_a_id: goalkeeperByTeam[teamAId],
       goalkeeper_b_id: goalkeeperByTeam[teamBId],
       ...(refereeOptions?.enabled ? { referee_choice: refereeChoice } : {}),
-      replacements: injuredPlayers
+      replacements: unavailablePlayers
         .filter((entry: any) => replacementByAbsent[entry.playerId])
         .map((entry: any) => ({
           team_id: entry.team.id,
@@ -883,20 +890,20 @@ export function MatchCreator({
       {selectedTeamIds.length === 2 && (
         <section className="glass-card overflow-hidden animate-fade-in-up">
           <div className="flex items-center gap-3 border-b border-border bg-surface px-4 py-3">
-            <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${injuredPlayers.length > 0 ? "bg-danger/15 text-danger" : "bg-success/10 text-success"}`}>
-              {injuredPlayers.length > 0 ? <AlertTriangle className="h-4.5 w-4.5" /> : <Check className="h-4.5 w-4.5" />}
+            <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${unavailablePlayers.length > 0 ? "bg-danger/15 text-danger" : "bg-success/10 text-success"}`}>
+              {unavailablePlayers.length > 0 ? <AlertTriangle className="h-4.5 w-4.5" /> : <Check className="h-4.5 w-4.5" />}
             </span>
             <div>
               <h2 className="text-sm font-black text-foreground">Escalacao da partida</h2>
               <p className="text-[10px] font-semibold text-muted">
-                {injuredPlayers.length > 0 ? `${injuredPlayers.length} desfalque(s) para cobrir` : "Todos os jogadores estao disponiveis"}
+                {unavailablePlayers.length > 0 ? `${unavailablePlayers.length} desfalque(s) para cobrir` : "Todos os jogadores estao disponiveis"}
               </p>
             </div>
           </div>
 
-          {injuredPlayers.length > 0 && (
+          {unavailablePlayers.length > 0 && (
             <div className="space-y-4 p-4">
-              {injuredPlayers.map((entry: any) => {
+              {unavailablePlayers.map((entry: any) => {
                 const usedByAnother = new Set(
                   Object.entries(replacementByAbsent)
                     .filter(([absentId]) => absentId !== entry.playerId)

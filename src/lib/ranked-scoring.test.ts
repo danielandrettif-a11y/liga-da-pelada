@@ -4,6 +4,30 @@ import { calculateFantasyPlayerPoints } from "./fantasy/engine";
 import { buildRankedPointBreakdown, calculateRankedPoints, RANKED_SCORING } from "./ranked-scoring";
 
 describe("Pontuação Ranked — BQ v5", () => {
+  it("remove todas as contribuições de goleiro quando a rodada solicita a supressão", () => {
+    const scoring = {
+      version: 14,
+      goal: 4,
+      assist: 2.5,
+      win: 3,
+      draw: 1,
+      loss: -2.5,
+      ownGoal: -3,
+      goalkeeperAppearance: 2,
+      goalkeeperGoalConceded: -1,
+      defenderGoal: 5,
+      defenderAssist: 3,
+      goalkeeperCleanSheet: 4,
+      goalkeeperOneGoal: 2,
+    };
+    expect(calculateRankedPoints({
+      goals: 1,
+      goalkeeperGoals: 1,
+      goalkeeperAppearances: 1,
+      goalkeeperGoalsConceded: 1,
+      lineRole: "ATA",
+    }, scoring, { suppressGoalkeeperRewards: true })).toBe(0);
+  });
   it("TESTE 1: vitória vale +3", () => {
     expect(calculateRankedPoints({ wins: 1 })).toBe(3);
   });

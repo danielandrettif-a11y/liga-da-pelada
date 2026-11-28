@@ -53,7 +53,10 @@ export default async function RodadaDetalhePage({
     roundPromise,
     accountPromise,
     roundPromise.then((currentRound) => currentRound?.status === "finished"
-      ? getRoundStatistics(currentRound.id)
+      ? getRoundStatistics(currentRound.id).catch((error) => {
+          console.error("Falha ao carregar estatísticas da rodada:", currentRound.id, error);
+          return null;
+        })
       : null),
     selectedLeaguePromise,
   ]);
@@ -271,7 +274,7 @@ export default async function RodadaDetalhePage({
                           {isLive && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />}
                           {isFinished ? "Finalizada" : isLive ? "Ao vivo" : "Aguardando"}
                         </span>
-                        {account.isAdmin && round.status !== "finished" && !isLive && <DeleteMatchButton matchId={match.id} matchNumber={index + 1} />}
+                        {account.isAdmin && round.status !== "finished" && <DeleteMatchButton matchId={match.id} matchNumber={index + 1} />}
                       </div>
                     </div>
                     <Link href={`/partidas/${match.id}`} className="block">

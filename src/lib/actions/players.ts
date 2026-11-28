@@ -906,7 +906,9 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
       .from(AVATAR_BUCKET)
       .upload(uploadedPath, bytes, {
         contentType: avatar.type,
-        cacheControl: "3600",
+        // Cada envio recebe um caminho novo. O arquivo pode ficar imutável no
+        // navegador/CDN e evita baixar a mesma foto em todas as telas.
+        cacheControl: "31536000",
         upsert: false,
       });
 

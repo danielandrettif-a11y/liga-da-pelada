@@ -380,13 +380,13 @@ export function calculateRoundStatRows(context: RoundCalculationContext): RoundS
     row.points = countsForRanking ? calculateRankedPoints({
       wins: row.wins, goals: row.goals, assists: row.assists, draws: row.draws, losses: row.losses,
       ownGoals: row.own_goals,
-      goalkeeperAppearances: !columnC && round.suppress_goalkeeper_rewards ? 0 : row.goalkeeper_games,
+      goalkeeperAppearances: row.goalkeeper_games,
       goalkeeperGoalsConceded: row.goals_conceded, goalkeeperGoals: row.goalkeeper_goals,
       goalkeeperAssists: row.goalkeeper_assists, goalkeeperOwnGoals: row.goalkeeper_own_goals,
       goalkeeperCleanSheets: row.clean_sheets, teamGoalsConceded: row.team_goals_conceded,
       defensiveCleanGames: row.ranking_defensive_clean_games,
       defensiveOneGoalGames: row.ranking_defensive_one_goal_games, lineRole,
-    }, scoring) : 0;
+    }, scoring, { suppressGoalkeeperRewards: round.suppress_goalkeeper_rewards }) : 0;
     return row;
   });
 }

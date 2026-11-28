@@ -237,7 +237,11 @@ const inferOneGoalGames = (games: number, cleanSheets: number, goalsConceded: nu
 const inferTwoGoalGames = (goalsConceded: number, oneGoalGames: number) =>
   Math.max(0, (count(goalsConceded) - count(oneGoalGames)) / 2);
 
-export function calculateRankedPoints(stats: RankedScoringStats, snapshot: BQBaseScoringSnapshot): number {
+export function calculateRankedPoints(
+  stats: RankedScoringStats,
+  snapshot: BQBaseScoringSnapshot,
+  options: { suppressGoalkeeperRewards?: boolean } = {},
+): number {
   if (Number(snapshot.version || 0) < 11) {
     return (
       count(stats.goals) * cents(snapshot.goal)
@@ -246,8 +250,8 @@ export function calculateRankedPoints(stats: RankedScoringStats, snapshot: BQBas
       + count(stats.draws) * cents(snapshot.draw)
       + count(stats.losses) * cents(snapshot.loss)
       + count(stats.ownGoals) * cents(snapshot.ownGoal)
-      + count(stats.goalkeeperAppearances) * cents(snapshot.goalkeeperAppearance)
-      + count(stats.goalkeeperGoalsConceded) * cents(snapshot.goalkeeperGoalConceded)
+      + count(stats.goalkeeperAppearances) * cents(options.suppressGoalkeeperRewards ? 0 : snapshot.goalkeeperAppearance)
+      + count(stats.goalkeeperGoalsConceded) * cents(options.suppressGoalkeeperRewards ? 0 : snapshot.goalkeeperGoalConceded)
     ) / 100;
   }
 
@@ -275,7 +279,7 @@ export function calculateRankedPoints(stats: RankedScoringStats, snapshot: BQBas
   const goalkeeperOneGoalGames = progressive
     ? inferOneGoalGames(count(stats.goalkeeperAppearances), count(stats.goalkeeperCleanSheets), count(stats.goalkeeperGoalsConceded))
     : 0;
-  const goalkeeper = (
+  const goalkeeper = options.suppressGoalkeeperRewards ? 0 : (
     count(stats.goalkeeperAppearances) * cents(snapshot.goalkeeperAppearance)
     + count(stats.goalkeeperGoals) * cents(snapshot.defenderGoal ?? 5)
     + count(stats.goalkeeperAssists) * cents(snapshot.defenderAssist ?? 3)
