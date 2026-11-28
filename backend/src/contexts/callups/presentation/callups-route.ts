@@ -23,6 +23,7 @@ import {
 } from "../application/manage-callups.js";
 import { InvalidCallupError, CallupVersionConflict } from "../domain/callup.js";
 import { CallupPersistenceError } from "../infrastructure/pg-callup-repository.js";
+import type { CallupEventSource } from "../application/callup-events.js";
 
 const leagueParams = {
   type: "object",
@@ -61,6 +62,7 @@ function sendFailure(error: unknown, request: FastifyRequest, reply: FastifyRepl
 export function registerCallupRoutes(app: FastifyInstance, dependencies: {
   verifier: UserVerifier;
   repository: CallupRepository;
+  events?: CallupEventSource;
 }): void {
   // Lista convocações ativas
   app.get<{ Params: { leagueId: string }; Querystring: { inviteCallupId?: string } }>(
@@ -80,6 +82,92 @@ export function registerCallupRoutes(app: FastifyInstance, dependencies: {
       } catch (error) {
         return sendFailure(error, request, reply);
       }
+    },
+  );
+
+  if (dependencies.events) app.get<{ Params: { leagueId: string; callupId: string } }>(
+    "/api/callups/leagues/:leagueId/:callupId/events",
+    { schema: { params: callupParams } },
+    async (request, reply) => {
+      const authentication = await authenticateBearer(request, dependencies.verifier);
+      if ("error" in authentication) return reply.code(authentication.error.statusCode).send(authentication.error);
+
+      let activeCallups;
+      try {
+        activeCallups = await listActiveCallups(
+          request.params.leagueId,
+          authentication.actor,
+          dependencies.repository,
+          request.params.callupId,
+        );
+      } catch (error) {
+        return sendFailure(error, request, reply);
+      }
+      const initialCallup = activeCallups.find((callup) => callup.id === request.params.callupId);
+      if (!initialCallup) return reply.code(404).send({ message: "Convocação não encontrada." });
+
+      reply.hijack();
+      reply.raw.writeHead(200, {
+        "content-type": "text/event-stream; charset=utf-8",
+        "cache-control": "private, no-cache, no-transform",
+        connection: "keep-alive",
+        "x-accel-buffering": "no",
+      });
+
+      let closed = false;
+      let refreshing = false;
+      let refreshQueued = false;
+      let eventId = 0;
+      const send = (event: string, data: unknown) => {
+        if (closed || reply.raw.destroyed) return;
+        eventId += 1;
+        reply.raw.write(`id: ${eventId}\nevent: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      };
+      const sendSnapshot = async () => {
+        if (refreshing) {
+          refreshQueued = true;
+          return;
+        }
+        refreshing = true;
+        try {
+          const callups = await listActiveCallups(
+            request.params.leagueId,
+            authentication.actor,
+            dependencies.repository,
+            request.params.callupId,
+          );
+          const current = callups.find((callup) => callup.id === request.params.callupId);
+          if (current) send("snapshot", { id: current.id, updated_at: current.updated_at, entries: current.entries });
+          else send("refresh", { reason: "callup-unavailable" });
+        } catch (error) {
+          request.log.warn({ err: error }, "callup SSE refresh failed");
+          send("refresh", { reason: "snapshot-failed" });
+        } finally {
+          refreshing = false;
+          if (refreshQueued) {
+            refreshQueued = false;
+            void sendSnapshot();
+          }
+        }
+      };
+
+      send("snapshot", { id: initialCallup.id, updated_at: initialCallup.updated_at, entries: initialCallup.entries });
+      const unsubscribe = dependencies.events!.subscribe((event) => {
+        if (event.leagueId === request.params.leagueId && event.callupId === request.params.callupId) {
+          void sendSnapshot();
+        }
+      });
+      const heartbeat = setInterval(() => {
+        if (!closed && !reply.raw.destroyed) reply.raw.write(": heartbeat\n\n");
+      }, 15_000);
+      const cleanup = () => {
+        if (closed) return;
+        closed = true;
+        clearInterval(heartbeat);
+        unsubscribe();
+      };
+      request.raw.once("close", cleanup);
+      reply.raw.once("close", cleanup);
     },
   );
 

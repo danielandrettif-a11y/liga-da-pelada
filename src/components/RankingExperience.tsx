@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import {
   ArrowDown,
@@ -26,9 +26,18 @@ import { RANKED_GOALKEEPER_SCORING_RULES, RANKED_SCORING_RULES } from "@/lib/ran
 import { useUrlState } from "@/lib/useUrlState";
 import { CombatBeltBadges } from "./CombatBeltBadges";
 
-const RankingPlayerCardModal = dynamic(() =>
-  import("./RankingPlayerCardModal").then((module) => module.RankingPlayerCardModal),
-);
+const loadRankingPlayerCardModal = () =>
+  import("./RankingPlayerCardModal").then((module) => module.RankingPlayerCardModal);
+
+const RankingPlayerCardModal = dynamic(loadRankingPlayerCardModal, {
+  loading: () => (
+    <div className="mobile-dialog-backdrop z-[99999] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+      <p className="rounded-xl border border-accent/30 bg-[#07150d] px-4 py-3 text-xs font-black text-accent">
+        Abrindo carta…
+      </p>
+    </div>
+  ),
+});
 
 type Props = {
   data: RankingExperienceData;
@@ -161,6 +170,11 @@ export function RankingExperience({ data, currentPlayerId, initialView = "season
   const [selected, setSelected] = useState<{ entry: RankingEntry; position: number } | null>(null);
   const [sharing, setSharing] = useState(false);
   const [shareMessage, setShareMessage] = useState("");
+
+  useEffect(() => {
+    const preload = window.setTimeout(() => void loadRankingPlayerCardModal(), 300);
+    return () => window.clearTimeout(preload);
+  }, []);
 
   const sourceEntries = view === "latest" && data.latestRound
     ? data.latestRound.entries
@@ -438,6 +452,7 @@ export function RankingExperience({ data, currentPlayerId, initialView = "season
                 <PlayerAvatar
                   name={entry.player.name}
                   avatarUrl={entry.player.avatar_url}
+                  clickable={false}
                   frameKey={entry.cosmetics?.frameKey}
                   auraKey={entry.cosmetics?.auraKey}
                   className="h-11 w-11 shrink-0 rounded-full border border-border bg-surface text-xs font-black text-foreground"
@@ -491,6 +506,7 @@ export function RankingExperience({ data, currentPlayerId, initialView = "season
           <PlayerAvatar
             name={pinnedEntry.player.name}
             avatarUrl={pinnedEntry.player.avatar_url}
+            clickable={false}
             frameKey={pinnedEntry.cosmetics?.frameKey}
             auraKey={pinnedEntry.cosmetics?.auraKey}
             className="h-10 w-10 rounded-full border border-accent/40 bg-surface text-xs font-black"

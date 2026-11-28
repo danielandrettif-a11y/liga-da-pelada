@@ -1343,6 +1343,11 @@
     },
     {
       "context": "statistics",
+      "source": "src/lib/actions/stats.ts",
+      "name": "suppressRoundGoalkeeperPoints"
+    },
+    {
+      "context": "statistics",
       "source": "src/lib/actions/team-standings.ts",
       "name": "getSeasonTeamStandings"
     }

@@ -581,7 +581,6 @@ export function pgMatchRepository(pool: Pool, now: () => number = Date.now): Mat
         );
         const match = matchRes.rows[0];
         if (!match) throw new MatchPersistenceError("Partida não encontrada na pelada selecionada.", 404);
-        if (match.status === "live") throw new MatchPersistenceError("Encerre a partida antes de apagá-la.", 409);
         if (match.round_status === "finished") {
           throw new MatchPersistenceError("A rodada já foi encerrada. Use a correção da rodada para preservar o histórico.", 409);
         }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   BQ_SCORING_V5,
+  calculateRankedPoints,
   DEFAULT_COLUMN_C_SCORING,
   rankingRulesToSnapshot,
   ScoringPolicyValidationError,
@@ -9,6 +10,16 @@ import {
 } from "./scoring-policy.js";
 
 describe("scoring-policy domain", () => {
+  it("suppresses every goalkeeper contribution without turning it into a line scout", () => {
+    expect(calculateRankedPoints({
+      goals: 1,
+      goalkeeperGoals: 1,
+      goalkeeperAppearances: 1,
+      goalkeeperGoalsConceded: 1,
+      lineRole: "ATA",
+    }, { ...BQ_SCORING_V5, version: 14 }, { suppressGoalkeeperRewards: true })).toBe(0);
+  });
+
   describe("validateBQScoringSnapshot", () => {
     it("validates a standard BQ v5 snapshot", () => {
       const result = validateBQScoringSnapshot(BQ_SCORING_V5);

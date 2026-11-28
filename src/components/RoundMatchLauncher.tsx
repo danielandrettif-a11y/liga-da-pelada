@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, X } from "@/components/icons";
 import { MatchCreator } from "./MatchCreator";
+import { getRoundMatchStateVersion } from "@/lib/round-match-availability";
 
 type Props = {
   round: any;
@@ -13,9 +14,10 @@ export function RoundMatchLauncher({ round, userId }: Props) {
   const [open, setOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const openStartedAtRef = useRef<number | null>(null);
+  const roundStateVersion = getRoundMatchStateVersion(round.round_players);
   const draftStorageKey = useMemo(
-    () => `match-draft:${userId}:${round.league_id}:${round.id}:${round.matches?.length || 0}`,
-    [round.id, round.league_id, round.matches?.length, userId],
+    () => `match-draft:${userId}:${round.league_id}:${round.id}:${round.matches?.length || 0}:${roundStateVersion}`,
+    [round.id, round.league_id, round.matches?.length, roundStateVersion, userId],
   );
 
   useEffect(() => {

@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeftRight, ChevronDown, Loader2 } from "@/components/icons";
 import { addRoundEmergencySubstitute, openCallupReplacementVacancy, transferRoundPlayerIdentity, zeroPlayerRoundPoints } from "@/lib/actions/rounds";
+import { suppressRoundGoalkeeperPoints } from "@/lib/actions/stats";
 import type { Player } from "@/lib/types";
 import { formatTeamNameWithReference } from "@/lib/team-reference";
 
@@ -49,6 +50,19 @@ export function RoundAdminPlayerTools({ roundId, status, participants, teams, al
     });
   }
 
+  function removeGoalkeeperPoints() {
+    if (status !== "finished") return;
+    if (window.prompt("Digite REMOVER GOL para confirmar a correção da rodada inteira.") !== "REMOVER GOL") return;
+    setMessage("");
+    startTransition(async () => {
+      const result = await suppressRoundGoalkeeperPoints(roundId);
+      setMessage(result.success
+        ? "Pontuação gerada no gol removida do Ranked e do Cartola nesta rodada."
+        : result.error || "Não foi possível corrigir a pontuação de goleiro.");
+      if (result.success) router.refresh();
+    });
+  }
+
   function openVacancy() {
     if (!vacancyPlayerId) return;
     if (window.prompt("Digite ABRIR VAGA para confirmar.") !== "ABRIR VAGA") return;
@@ -85,6 +99,13 @@ export function RoundAdminPlayerTools({ roundId, status, participants, teams, al
           )}
           {status === "finished" && (
             <div className="space-y-2 border-t border-border pt-3">
+              <div className="space-y-2 border-b border-border pb-3">
+                <div>
+                  <p className="text-[10px] font-black uppercase text-warning">Remover pontuação de goleiro da rodada</p>
+                  <p className="mt-1 text-[10px] text-muted">Reprocessa todos os jogadores e o Cartola. Os scouts e o histórico das partidas continuam registrados.</p>
+                </div>
+                <button type="button" disabled={pending} onClick={removeGoalkeeperPoints} className="flex w-full items-center justify-center gap-2 rounded-xl border border-warning/40 bg-warning/10 py-3 text-xs font-black text-warning disabled:opacity-40">{pending && <Loader2 className="h-4 w-4 animate-spin" />}Remover pontos de goleiro</button>
+              </div>
               <div>
                 <p className="text-[10px] font-black uppercase text-muted">Zerar pontuação de um jogador</p>
                 <p className="mt-1 text-[10px] text-muted">Corrige somente esta rodada; o placar e os demais jogadores permanecem iguais.</p>

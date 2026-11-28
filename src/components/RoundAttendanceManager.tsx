@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Check, ChevronDown, Loader2, Users } from "@/components/icons";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { setRoundAttendanceBulk, setRoundPlayerAttendance } from "@/lib/actions/rounds";
@@ -17,6 +18,7 @@ export function RoundAttendanceManager({ roundId, entries, canManage }: {
   entries: AttendanceEntry[];
   canManage: boolean;
 }) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [bulkLoading, setBulkLoading] = useState(false);
@@ -58,6 +60,8 @@ export function RoundAttendanceManager({ roundId, entries, canManage }: {
     if (!result.success) {
       setLocalEntries(previous);
       setMessage(result.error || "Não foi possível atualizar a presença.");
+    } else {
+      router.refresh();
     }
     setPendingId(null);
   }
@@ -79,6 +83,8 @@ export function RoundAttendanceManager({ roundId, entries, canManage }: {
     if (!result.success) {
       setLocalEntries(previous);
       setMessage(result.error || "Não foi possível atualizar as presenças.");
+    } else {
+      router.refresh();
     }
     setBulkLoading(false);
   }
