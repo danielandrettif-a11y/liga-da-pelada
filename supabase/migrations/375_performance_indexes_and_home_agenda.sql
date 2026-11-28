@@ -13,8 +13,8 @@ CREATE INDEX IF NOT EXISTS callup_invite_access_user_callup_idx
 CREATE INDEX IF NOT EXISTS match_goalkeeper_stints_match_team_idx
   ON public.match_goalkeeper_stints (match_id, team_id);
 
-CREATE INDEX IF NOT EXISTS fantasy_cosmetics_active_category_idx
-  ON public.fantasy_cosmetics (is_active, category);
+CREATE INDEX IF NOT EXISTS fantasy_cosmetics_slot_rarity_idx
+  ON public.fantasy_cosmetics (slot, rarity);
 
 CREATE OR REPLACE FUNCTION public.is_league_member(p_league_id uuid)
 RETURNS boolean
