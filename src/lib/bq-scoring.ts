@@ -29,6 +29,26 @@ export type BQBaseScoringSnapshot = {
   teamGoalConceded?: number;
   goalkeeperCleanSheet?: number;
   goalkeeperOneGoal?: number;
+  positionRules?: PositionScoringRules;
+  primaryWeight?: number;
+  secondaryWeight?: number;
+  lineCleanSheetMinShare?: number;
+  goalkeeperGoal?: number;
+  goalkeeperAssist?: number;
+  goalkeeperOwnGoal?: number;
+};
+
+export type LinePosition = "DEF" | "MEI" | "ALA" | "ATA";
+export type PositionScoringRule = {
+  goal: number; assist: number; cleanSheet: number; conceded: number; ownGoal: number;
+};
+export type PositionScoringRules = Record<LinePosition, PositionScoringRule>;
+
+export const DEFAULT_POSITION_SCORING: PositionScoringRules = {
+  DEF: { goal: 4.5, assist: 2.5, cleanSheet: 3, conceded: -1, ownGoal: -3 },
+  MEI: { goal: 4.5, assist: 3.5, cleanSheet: 1, conceded: -0.6, ownGoal: -3 },
+  ALA: { goal: 4.75, assist: 3, cleanSheet: 1.5, conceded: -0.8, ownGoal: -3 },
+  ATA: { goal: 5.5, assist: 2.5, cleanSheet: 0, conceded: -0.4, ownGoal: -3 },
 };
 
 /** Estatísticas brutas de um atleta na rodada. */
@@ -111,6 +131,22 @@ export function normalizeBQScoringSnapshot(
   const source = value || {};
   const numeric = (camel: string, snake: string, fallback: number) =>
     Number(source[camel] ?? source[snake] ?? fallback);
+  const rulesSource = source.positionRules && typeof source.positionRules === "object"
+    ? source.positionRules as Record<string, unknown> : {};
+  const positionRules = Object.fromEntries(
+    (Object.keys(DEFAULT_POSITION_SCORING) as LinePosition[]).map((position) => {
+      const candidate = rulesSource[position] && typeof rulesSource[position] === "object"
+        ? rulesSource[position] as Record<string, unknown> : {};
+      const fallback = DEFAULT_POSITION_SCORING[position];
+      return [position, {
+        goal: Number(candidate.goal ?? fallback.goal),
+        assist: Number(candidate.assist ?? fallback.assist),
+        cleanSheet: Number(candidate.cleanSheet ?? fallback.cleanSheet),
+        conceded: Number(candidate.conceded ?? fallback.conceded),
+        ownGoal: Number(candidate.ownGoal ?? fallback.ownGoal),
+      }];
+    }),
+  ) as PositionScoringRules;
   return {
     version: numeric("version", "scoring_version", BQ_SCORING_V5.version),
     goal: numeric("goal", "goal_points", BQ_SCORING_V5.goal),
@@ -138,6 +174,13 @@ export function normalizeBQScoringSnapshot(
     teamGoalConceded: numeric("teamGoalConceded", "line_goal_conceded_points", -0.5),
     goalkeeperCleanSheet: numeric("goalkeeperCleanSheet", "goalkeeper_slot_clean_sheet_points", 4),
     goalkeeperOneGoal: numeric("goalkeeperOneGoal", "goalkeeper_slot_one_goal_points", 2),
+    positionRules,
+    primaryWeight: numeric("primaryWeight", "primary_position_weight", 0.7),
+    secondaryWeight: numeric("secondaryWeight", "secondary_position_weight", 0.3),
+    lineCleanSheetMinShare: numeric("lineCleanSheetMinShare", "line_clean_sheet_min_share", 0.5),
+    goalkeeperGoal: numeric("goalkeeperGoal", "goalkeeper_goal_points", 5),
+    goalkeeperAssist: numeric("goalkeeperAssist", "goalkeeper_assist_points", 3),
+    goalkeeperOwnGoal: numeric("goalkeeperOwnGoal", "goalkeeper_own_goal_points", -3),
   };
 }
 

@@ -15,6 +15,8 @@ export type FantasyPerformance = {
   assists: number;
   ownGoals?: number;
   playerProfile?: "offensive" | "midfield" | "defensive" | null;
+  primaryPosition?: "DEF" | "MEI" | "ALA" | "ATA" | null;
+  secondaryPosition?: "DEF" | "MEI" | "ALA" | "ATA" | null;
   goalkeeperGames?: number;
   goalsConceded?: number;
   goalkeeperGoals?: number;
@@ -154,13 +156,13 @@ export function buildFantasyGoalkeeperSlotBreakdown(
         )
       : 0;
     const rows = [
-      ["goalkeeperGoals", "Gols enquanto estava no gol", stats.goalkeeperGoals, configurableColumnC ? settings.defenderGoalPoints : 5],
-      ["goalkeeperAssists", "Assistências enquanto estava no gol", stats.goalkeeperAssists, configurableColumnC ? settings.defenderAssistPoints : 3],
+      ["goalkeeperGoals", "Gols enquanto estava no gol", stats.goalkeeperGoals, scoringVersion >= 15 ? settings.goalkeeperGoalPoints : (configurableColumnC ? settings.defenderGoalPoints : 5)],
+      ["goalkeeperAssists", "Assistências enquanto estava no gol", stats.goalkeeperAssists, scoringVersion >= 15 ? settings.goalkeeperAssistPoints : (configurableColumnC ? settings.defenderAssistPoints : 3)],
       ["goalkeeperGames", "Atuações no gol", stats.goalkeeperGames, settings.suppressGoalkeeperRewards ? 0 : (configurableColumnC ? settings.goalkeeperSlotAppearancePoints : 1)],
       ["goalsConceded", "Gols sofridos enquanto estava no gol", stats.goalsConceded, configurableColumnC ? settings.goalkeeperSlotGoalConcededPoints : -0.5],
       ["cleanSheets", "Faixa GOL · 0 gols sofridos", stats.cleanSheets, cleanSheetPoints],
       ["goalkeeperOneGoalGames", "Faixa GOL · 1 gol sofrido", oneGoalGames, settings.goalkeeperSlotOneGoalPoints],
-      ["goalkeeperOwnGoals", "Gols contra enquanto estava no gol", stats.goalkeeperOwnGoals, configurableColumnC ? settings.ownGoalPoints : -3],
+      ["goalkeeperOwnGoals", "Gols contra enquanto estava no gol", stats.goalkeeperOwnGoals, scoringVersion >= 15 ? settings.goalkeeperOwnGoalPoints : (configurableColumnC ? settings.ownGoalPoints : -3)],
     ] as const;
     return rows.flatMap(([key, label, countValue, unitPoints]) => {
       const count = Number(countValue || 0);
@@ -188,7 +190,8 @@ export function calculateFantasyGoalkeeperSlotPoints(
   stats: FantasyGoalkeeperSlotStats,
   settings: FantasySettings = DEFAULT_FANTASY_SETTINGS,
 ) {
-  if (Number(settings.scoringVersion || 0) >= 11) {
+  const scoringVersion = Number(settings.scoringVersion || 0);
+  if (scoringVersion >= 11) {
     return calculateColumnCGoalkeeperPoints({
       goalkeeperGames: stats.goalkeeperGames,
       goalkeeperGoals: stats.goalkeeperGoals,
@@ -196,14 +199,14 @@ export function calculateFantasyGoalkeeperSlotPoints(
       goalkeeperOwnGoals: stats.goalkeeperOwnGoals,
       goalkeeperGoalsConceded: stats.goalsConceded,
       goalkeeperCleanSheets: stats.cleanSheets,
-    }, Number(settings.scoringVersion || 0), Number(settings.scoringVersion || 0) >= 13 ? {
+    }, scoringVersion, scoringVersion >= 13 ? {
       appearance: settings.suppressGoalkeeperRewards ? 0 : settings.goalkeeperSlotAppearancePoints,
-      goal: settings.defenderGoalPoints,
-      assist: settings.defenderAssistPoints,
+      goal: scoringVersion >= 15 ? settings.goalkeeperGoalPoints : settings.defenderGoalPoints,
+      assist: scoringVersion >= 15 ? settings.goalkeeperAssistPoints : settings.defenderAssistPoints,
       conceded: settings.goalkeeperSlotGoalConcededPoints,
       cleanSheet: settings.goalkeeperSlotCleanSheetPoints,
       oneGoal: settings.goalkeeperSlotOneGoalPoints,
-      ownGoal: settings.ownGoalPoints,
+      ownGoal: scoringVersion >= 15 ? settings.goalkeeperOwnGoalPoints : settings.ownGoalPoints,
     } : {});
   }
   return buildFantasyGoalkeeperSlotBreakdown(stats, settings)
@@ -234,6 +237,13 @@ export function getFantasyRankedScoringSnapshot(
     teamGoalConceded: settings.lineGoalConcededPoints,
     goalkeeperCleanSheet: settings.goalkeeperSlotCleanSheetPoints,
     goalkeeperOneGoal: settings.goalkeeperSlotOneGoalPoints,
+    positionRules: settings.positionScoringRules,
+    primaryWeight: settings.primaryPositionWeight,
+    secondaryWeight: settings.secondaryPositionWeight,
+    lineCleanSheetMinShare: settings.lineCleanSheetMinShare,
+    goalkeeperGoal: settings.goalkeeperGoalPoints,
+    goalkeeperAssist: settings.goalkeeperAssistPoints,
+    goalkeeperOwnGoal: settings.goalkeeperOwnGoalPoints,
   };
 }
 
@@ -244,6 +254,8 @@ export function calculateFantasyRankedPoints(
     cleanSheets?: number; goalkeeperGoals?: number; goalkeeperAssists?: number;
     goalkeeperOwnGoals?: number; wins?: number; draws?: number; losses?: number;
     playerProfile?: "offensive" | "midfield" | "defensive" | null;
+    primaryPosition?: "DEF" | "MEI" | "ALA" | "ATA" | null;
+    secondaryPosition?: "DEF" | "MEI" | "ALA" | "ATA" | null;
   },
   settings: FantasySettings = DEFAULT_FANTASY_SETTINGS,
 ) {
@@ -264,6 +276,8 @@ export function calculateFantasyRankedPoints(
     defensiveCleanGames: stats.defensiveCleanGames,
     defensiveOneGoalGames: stats.defensiveOneGoalGames,
     lineRole: stats.playerProfile === "defensive" ? "DEF" : "ATA",
+    primaryPosition: stats.primaryPosition,
+    secondaryPosition: stats.secondaryPosition,
   }, getFantasyRankedScoringSnapshot(settings));
 }
 
@@ -276,6 +290,8 @@ export function calculateFantasySlotPoints(
     goalkeeperOwnGoals?: number; goalkeeperWins?: number; goalkeeperDraws?: number;
     goalkeeperLosses?: number; wins?: number; draws?: number; losses?: number;
     playerProfile?: "offensive" | "midfield" | "defensive" | null;
+    primaryPosition?: "DEF" | "MEI" | "ALA" | "ATA" | null;
+    secondaryPosition?: "DEF" | "MEI" | "ALA" | "ATA" | null;
   },
   slotRole: FantasySlotRole,
   settings: FantasySettings = DEFAULT_FANTASY_SETTINGS,

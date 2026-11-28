@@ -138,6 +138,7 @@ describe("httpRosterGateway", () => {
     const player = {
       id: playerId, name: "Jogador", nickname: null, profile_bio: null, avatar_url: null,
       avatar_alternate_url: null, player_profile: "offensive", initial_player_profile: "offensive",
+      primary_position: null, secondary_position: null,
       profile_decision_source: "initial", profile_source_round_id: null, overall_traits: ["offensive"],
       overall_seed_mode: "observed", is_goalkeeper: false, member_category: "player", is_selectable: true,
       is_competitive_profile_complete: false, show_fitness_stats: false, registration_source: "admin",
@@ -163,6 +164,7 @@ describe("httpRosterGateway", () => {
       id: "00000000-0000-4000-8000-000000000001", name: "Jogador", nickname: null,
       profile_bio: null, avatar_url: null, avatar_alternate_url: null, player_profile: "offensive",
       initial_player_profile: "offensive", profile_decision_source: "initial", profile_source_round_id: null,
+      primary_position: null, secondary_position: null,
       overall_traits: ["offensive"], overall_seed_mode: "observed", is_goalkeeper: false,
       member_category: "player", is_selectable: true, is_competitive_profile_complete: false,
       show_fitness_stats: false, registration_source: "admin", profile_scope: "persistent",
@@ -202,6 +204,7 @@ describe("httpRosterGateway", () => {
     const player = {
       id: playerId, name: "Convidado", nickname: null, profile_bio: null, avatar_url: "active.jpg",
       avatar_alternate_url: "alternate.jpg", player_profile: "offensive", initial_player_profile: "offensive",
+      primary_position: null, secondary_position: null,
       profile_decision_source: "initial", profile_source_round_id: null, overall_traits: ["offensive"],
       overall_seed_mode: "observed", is_goalkeeper: false, member_category: "guest", is_selectable: true,
       is_competitive_profile_complete: false, show_fitness_stats: false, registration_source: "admin",
@@ -263,6 +266,7 @@ describe("httpRosterGateway", () => {
       id: "00000000-0000-4000-8000-000000000002", name: "Atleta", nickname: null,
       profile_bio: null, avatar_url: null, avatar_alternate_url: null, player_profile: "offensive",
       initial_player_profile: "offensive", profile_decision_source: "initial", profile_source_round_id: null,
+      primary_position: null, secondary_position: null,
       overall_traits: ["offensive"], overall_seed_mode: "observed", is_goalkeeper: false,
       member_category: "player", is_selectable: true, is_competitive_profile_complete: false,
       show_fitness_stats: false, registration_source: "site_signup", profile_scope: "persistent",

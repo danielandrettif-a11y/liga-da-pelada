@@ -3,6 +3,7 @@ import type { Player } from "@/lib/types";
 export type RosterPlayer = Player;
 
 const profiles = new Set(["offensive", "midfield", "defensive"]);
+const linePositions = new Set(["DEF", "MEI", "ALA", "ATA"]);
 const categories = new Set(["player", "guest", "wag", "supporter"]);
 const seedModes = new Set(["legacy_tag", "observed"]);
 const registrationSources = new Set(["legacy", "site_signup", "admin"]);
@@ -19,6 +20,8 @@ export function isRosterPlayer(value: unknown): value is RosterPlayer {
     && nullableString(player.nickname) && nullableString(player.profile_bio)
     && nullableString(player.avatar_url) && nullableString(player.avatar_alternate_url)
     && (player.player_profile === null || profiles.has(String(player.player_profile)))
+    && (player.primary_position === null || linePositions.has(String(player.primary_position)))
+    && (player.secondary_position === null || linePositions.has(String(player.secondary_position)))
     && (player.initial_player_profile === null || profiles.has(String(player.initial_player_profile)))
     && (player.profile_decision_source === null
       || player.profile_decision_source === "initial" || player.profile_decision_source === "overall")

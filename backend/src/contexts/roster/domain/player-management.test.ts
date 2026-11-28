@@ -14,7 +14,8 @@ describe("player management domain", () => {
       is_selectable: false,
     })).toEqual({
       name: "Convidado   BQ", nickname: "BQ", avatarUrl: null, memberCategory: "guest",
-      playerProfile: "offensive", overallTraits: ["offensive", "defensive"], isSelectable: true,
+      playerProfile: "offensive", primaryPosition: null, secondaryPosition: null,
+      overallTraits: ["offensive", "defensive"], isSelectable: true,
     });
   });
 

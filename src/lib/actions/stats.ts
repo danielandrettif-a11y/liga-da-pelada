@@ -52,6 +52,8 @@ type RankingStatsRow = {
   ranking_position_bonus: number;
   ranking_points: number;
   player_profile_locked: "defensive" | "midfield" | "offensive" | null;
+  primary_position_locked: "DEF" | "MEI" | "ALA" | "ATA" | null;
+  secondary_position_locked: "DEF" | "MEI" | "ALA" | "ATA" | null;
   profile_decision_source: "initial" | "overall" | null;
   profile_appearance_number: number | null;
   profile_def_overall: number | null;
@@ -261,6 +263,8 @@ function aggregateRankingRows(
         defensiveCleanGames: r.ranking_defensive_clean_games,
         defensiveOneGoalGames: r.ranking_defensive_one_goal_games,
         lineRole: r.player_profile_locked === "defensive" ? "DEF" : "ATA",
+        primaryPosition: r.primary_position_locked,
+        secondaryPosition: r.secondary_position_locked,
         ownGoals: r.own_goals,
       }, scoringSnapshot);
       const roleWeights = parseRankingRoleWeights(r.ranking_role_weights);
@@ -964,6 +968,8 @@ async function getRankingExperienceDataUncached(includeEnrichment = true): Promi
       ranking_position_bonus,
       ranking_points,
       player_profile_locked,
+      primary_position_locked,
+      secondary_position_locked,
       profile_decision_source,
       profile_appearance_number,
       profile_def_overall,

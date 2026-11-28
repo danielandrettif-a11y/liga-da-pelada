@@ -202,3 +202,46 @@ describe("Auditoria de equilíbrio DEF/VOL × ATA/ALA — Coluna C v14", () => {
     expect(calculateRankedPoints({ ...stats, lineRole: "ATA" }, scoring)).toBe(expectedAta);
   });
 });
+
+describe("Pontuação dual por posição — v15", () => {
+  const scoring = {
+    version: 15, goal: 4, assist: 2.5, win: 0, draw: 0, loss: 0, ownGoal: -3,
+    goalkeeperAppearance: 1, goalkeeperGoalConceded: -0.5,
+    goalkeeperCleanSheet: 4, goalkeeperOneGoal: 2,
+    primaryWeight: 0.7, secondaryWeight: 0.3,
+  };
+
+  it.each([
+    ["DEF", "MEI"], ["DEF", "ALA"], ["DEF", "ATA"],
+    ["MEI", "DEF"], ["MEI", "ALA"], ["MEI", "ATA"],
+    ["ALA", "DEF"], ["ALA", "MEI"], ["ALA", "ATA"],
+    ["ATA", "DEF"], ["ATA", "MEI"], ["ATA", "ALA"],
+  ] as const)("calcula a combinação %s/%s sem duplicar scouts", (primaryPosition, secondaryPosition) => {
+    const points = calculateRankedPoints({
+      goals: 1, assists: 1, ownGoals: 1, teamGoalsConceded: 2, defensiveCleanGames: 0,
+      primaryPosition, secondaryPosition,
+    }, scoring);
+    expect(Number.isFinite(points)).toBe(true);
+    expect(buildRankedPointBreakdown({ goals: 1, assists: 1, ownGoals: 1, teamGoalsConceded: 2,
+      primaryPosition, secondaryPosition }, scoring)).toHaveLength(4);
+  });
+
+  it("preserva precisão interna e arredonda somente o total final", () => {
+    expect(calculateRankedPoints({ goals: 3, primaryPosition: "ALA", secondaryPosition: "ATA" }, scoring)).toBe(14.93);
+  });
+
+  it("inverter primária e secundária altera o resultado", () => {
+    const defMei = calculateRankedPoints({ assists: 1, primaryPosition: "DEF", secondaryPosition: "MEI" }, scoring);
+    const meiDef = calculateRankedPoints({ assists: 1, primaryPosition: "MEI", secondaryPosition: "DEF" }, scoring);
+    expect(defMei).toBe(2.8);
+    expect(meiDef).toBe(3.2);
+  });
+
+  it("mantém os scouts de goleiro fora da ponderação dual", () => {
+    expect(calculateRankedPoints({
+      goalkeeperAppearances: 1, goalkeeperGoals: 1, goalkeeperAssists: 1,
+      goalkeeperGoalsConceded: 1, goalkeeperCleanSheets: 0,
+      primaryPosition: "DEF", secondaryPosition: "ATA",
+    }, scoring)).toBe(10.5);
+  });
+});

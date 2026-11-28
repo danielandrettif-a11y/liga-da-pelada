@@ -1,4 +1,4 @@
-import { BQ_SCORING_V5 } from "../bq-scoring";
+import { BQ_SCORING_V5, DEFAULT_POSITION_SCORING, type PositionScoringRules } from "../bq-scoring";
 import { COLUMN_C_SCORING, COLUMN_C_SCORING_VERSION } from "../column-c-scoring";
 
 export type FantasySettings = {
@@ -39,6 +39,13 @@ export type FantasySettings = {
   attackerGoalPoints: number;
   attackerAssistPoints: number;
   lineGoalConcededPoints: number;
+  positionScoringRules: PositionScoringRules;
+  primaryPositionWeight: number;
+  secondaryPositionWeight: number;
+  lineCleanSheetMinShare: number;
+  goalkeeperGoalPoints: number;
+  goalkeeperAssistPoints: number;
+  goalkeeperOwnGoalPoints: number;
   captainMultiplier: number;
   topScorerPredictionPoints: number;
   topAssistPredictionPoints: number;
@@ -132,6 +139,13 @@ export const DEFAULT_FANTASY_SETTINGS: FantasySettings = {
   attackerGoalPoints: COLUMN_C_SCORING.ATA.goal,
   attackerAssistPoints: COLUMN_C_SCORING.ATA.assist,
   lineGoalConcededPoints: COLUMN_C_SCORING.ATA.conceded,
+  positionScoringRules: DEFAULT_POSITION_SCORING,
+  primaryPositionWeight: 0.7,
+  secondaryPositionWeight: 0.3,
+  lineCleanSheetMinShare: 0.5,
+  goalkeeperGoalPoints: COLUMN_C_SCORING.GOL.goal,
+  goalkeeperAssistPoints: COLUMN_C_SCORING.GOL.assist,
+  goalkeeperOwnGoalPoints: BQ_SCORING_V5.ownGoal,
   captainMultiplier: 1.5,
   topScorerPredictionPoints: 8,
   topAssistPredictionPoints: 6,
@@ -213,6 +227,8 @@ const FANTASY_SETTING_COLUMNS = {
   goalkeeperLossPoints: "goalkeeper_loss_points", goalkeeperAppearancePoints: "goalkeeper_appearance_points", goalConcededPoints: "goal_conceded_points", teamGoalConcededPoints: "team_goal_conceded_points", ownGoalPoints: "own_goal_points",
   defenderGoalPoints: "defender_goal_points", defenderAssistPoints: "defender_assist_points", defenderCleanSheetPoints: "defender_clean_sheet_points", defenderOneGoalPoints: "defender_one_goal_points", defenderOneGoalConcededPoints: "defender_one_goal_conceded_points", defenderTwoGoalsConcededPoints: "defender_two_goals_conceded_points", attackerAssistPoints: "attacker_assist_points", lineGoalConcededPoints: "line_goal_conceded_points",
   goalkeeperSlotCleanSheetPoints: "goalkeeper_slot_clean_sheet_points", goalkeeperSlotOneGoalPoints: "goalkeeper_slot_one_goal_points",
+  primaryPositionWeight: "primary_position_weight", secondaryPositionWeight: "secondary_position_weight", lineCleanSheetMinShare: "line_clean_sheet_min_share",
+  goalkeeperGoalPoints: "goalkeeper_goal_points", goalkeeperAssistPoints: "goalkeeper_assist_points", goalkeeperOwnGoalPoints: "goalkeeper_own_goal_points",
   captainMultiplier: "captain_multiplier", topScorerPredictionPoints: "top_scorer_prediction_points", topAssistPredictionPoints: "top_assist_prediction_points", topTeamPredictionPoints: "top_team_prediction_points",
   recentWeight: "recent_weight", kingOfWinsPoints: "king_of_wins_points", mvpPredictionPoints: "mvp_prediction_points", betOfRoundPoints: "bet_of_round_points",
   winRateWeight: "win_rate_weight", historicalWeight: "historical_weight", consistencyWeight: "consistency_weight", smoothingGames: "smoothing_games", maxPriceIncrease: "max_price_increase", maxPriceDecrease: "max_price_decrease",
@@ -250,6 +266,8 @@ export function normalizeFantasySettingsRow(row: Record<string, unknown> | null)
     normalized[property] = Number(row[column] ?? fallback);
   }
   normalized.goalkeeperLossPoints = Number(row.goalkeeper_loss_points ?? row.loss_points ?? -1);
+  normalized.positionScoringRules = row.position_scoring_rules && typeof row.position_scoring_rules === "object"
+    ? row.position_scoring_rules : DEFAULT_POSITION_SCORING;
   normalized.betRequiredRanks = [1, 2, 3, 4].map((band) => Number(row[`bet_rank_band_${band}`] ?? 6 - band));
   normalized.scoreGoalRewards = [1, 2, 3, 4].map((band) => Number(row[`score_goal_reward_band_${band}`] ?? [7, 6, 4, 3][band - 1]));
   return normalized as FantasySettings;

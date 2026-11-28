@@ -8,6 +8,14 @@ import { getStatisticsApiSession } from "@/modules/statistics/infrastructure/sta
 export type ReprocessPreviewResult = {
   can_reprocess: boolean;
   reason?: string;
+  scoring_version?: number;
+  missing_positions_count?: number;
+  missing_positions?: Array<{
+    player_id: string;
+    name: string;
+    primary_position: string | null;
+    secondary_position: string | null;
+  }>;
   season_id?: string;
   rounds_count?: number;
   lineups_count?: number;
@@ -24,6 +32,12 @@ export type ReprocessPreviewResult = {
     total_points: number;
     rounds_played: number;
   }>;
+  historical_limitations?: {
+    untimed_goal_rounds_count: number;
+    legacy_goalkeeper_matches_count: number;
+    legacy_fantasy_rounds_count: number;
+    no_slot_fantasy_rounds_count: number;
+  };
 };
 
 export type ReprocessExecutionResult = {
@@ -80,18 +94,8 @@ export async function executeReprocessSeason(): Promise<ReprocessExecutionResult
       return { success: false, error: error instanceof Error ? error.message : "Erro ao executar reprocessamento." };
     }
   }
-  const { data, error } = await account.client.rpc("reprocess_active_season_v5", {
-    p_league_id: league.id,
-  });
-
-  if (error) {
-    console.error("Erro ao executar reprocessamento:", error);
-    return { success: false, error: error.message };
-  }
-
-  revalidatePath("/admin");
-  revalidatePath("/cartola");
-  revalidatePath("/ranking");
-
-  return data as ReprocessExecutionResult;
+  return {
+    success: false,
+    error: "O reprocessamento v15 exige o backend de estatísticas ativo para reconstruir a linha do tempo das partidas.",
+  };
 }

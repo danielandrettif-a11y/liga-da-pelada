@@ -1,4 +1,4 @@
-import type { MemberCategory, PlayerProfile } from "./player-catalog.js";
+import type { LinePosition, MemberCategory, PlayerProfile } from "./player-catalog.js";
 import { InvalidPlayerManagementError } from "./player-management.js";
 
 export type PlayerAvatarAsset = {
@@ -12,6 +12,8 @@ export type PlayerProfileForm = {
   nickname: string | null;
   profileBio: string | null;
   playerProfile: "offensive" | "defensive";
+  primaryPosition: LinePosition | null;
+  secondaryPosition: LinePosition | null;
   overallTraits: ("offensive" | "defensive")[];
   memberCategory: MemberCategory;
   isSelectable: boolean;
@@ -29,6 +31,8 @@ export type CurrentEditablePlayer = {
   memberCategory: MemberCategory;
   isSelectable: boolean;
   playerProfile: PlayerProfile | null;
+  primaryPosition: LinePosition | null;
+  secondaryPosition: LinePosition | null;
   overallTraits: PlayerProfile[];
   isGoalkeeper: boolean;
 };
@@ -47,6 +51,8 @@ export type SavePlayerProfileCommand = {
   avatarUrl: string | null;
   avatarAlternateUrl: string | null;
   playerProfile: "offensive" | "defensive" | null;
+  primaryPosition: LinePosition | null;
+  secondaryPosition: LinePosition | null;
   overallTraits: ("offensive" | "defensive")[];
   isGoalkeeper: boolean;
   memberCategory: MemberCategory;
@@ -80,6 +86,12 @@ function profile(value: unknown): "offensive" | "defensive" {
   if (value === undefined || value === "offensive" || value === "midfield") return "offensive";
   if (value === "defensive") return "defensive";
   throw new InvalidPlayerManagementError("Escolha um perfil de jogo válido.");
+}
+
+function position(value: unknown, label: string): LinePosition | null {
+  if (value === undefined || value === null || value === "") return null;
+  if (value === "DEF" || value === "MEI" || value === "ALA" || value === "ATA") return value;
+  throw new InvalidPlayerManagementError(`${label} inválida.`);
 }
 
 function traits(value: unknown): ("offensive" | "defensive")[] {
@@ -128,11 +140,18 @@ export function parsePlayerProfileForm(input: Record<string, unknown> & {
   activeAvatar?: { contentType: string; bytes: Uint8Array } | null;
   alternateAvatar?: { contentType: string; bytes: Uint8Array } | null;
 }): PlayerProfileForm {
+  const primaryPosition = position(input.primary_position, "Posição primária");
+  const secondaryPosition = position(input.secondary_position, "Posição secundária");
+  if (primaryPosition && secondaryPosition && primaryPosition === secondaryPosition) {
+    throw new InvalidPlayerManagementError("As posições primária e secundária precisam ser diferentes.");
+  }
   return {
     name: text(input.name, "O nome", 120, true)!,
     nickname: text(input.nickname, "O apelido", 60),
     profileBio: text(input.profile_bio, "O texto do perfil", 500),
     playerProfile: profile(input.player_profile),
+    primaryPosition,
+    secondaryPosition,
     overallTraits: traits(input.overall_traits),
     memberCategory: category(input.member_category ?? "player"),
     isSelectable: input.is_selectable !== false && input.is_selectable !== "false",
@@ -176,6 +195,10 @@ export function resolvePlayerProfileCommand(
     avatarAlternateUrl,
     playerProfile: isNonPlaying ? null : access.isLeagueAdmin
       ? input.playerProfile : access.current!.playerProfile === "defensive" ? "defensive" : "offensive",
+    primaryPosition: isNonPlaying ? null : access.isLeagueAdmin
+      ? input.primaryPosition : access.current!.primaryPosition,
+    secondaryPosition: isNonPlaying ? null : access.isLeagueAdmin
+      ? input.secondaryPosition : access.current!.secondaryPosition,
     overallTraits: isNonPlaying ? [] : access.isLeagueAdmin
       ? input.overallTraits : access.current!.overallTraits.filter((item) => item !== "midfield") as ("offensive" | "defensive")[],
     isGoalkeeper: isNonPlaying ? false : access.current?.isGoalkeeper ?? false,

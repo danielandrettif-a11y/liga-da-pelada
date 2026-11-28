@@ -6,7 +6,7 @@ import { Camera, ImagePlus, Trash2 } from "@/components/icons";
 import { deletePlayer, savePlayer, swapPlayerAvatars } from "@/lib/actions/players";
 import { setPlayerSpeedRating } from "@/lib/actions/speed-draw";
 import { setPlayerPrivateBalanceTag } from "@/lib/actions/private-balance-tags";
-import type { MemberCategory, Player, PlayerProfile, PrivateBalanceTag } from "@/lib/types";
+import type { LinePosition, MemberCategory, Player, PlayerProfile, PrivateBalanceTag } from "@/lib/types";
 import { AvatarCropModal } from "./AvatarCropModal";
 import { PlayerAvatar } from "./PlayerAvatar";
 import { PLAYER_PROFILE_OPTIONS } from "@/lib/playerProfiles";
@@ -16,6 +16,12 @@ import { canAdminAssignOfficialCategory } from "@/lib/player-member-category";
 
 const MAX_SOURCE_SIZE = 20 * 1024 * 1024;
 type AvatarSlot = "active" | "alternate";
+const LINE_POSITION_OPTIONS: Array<{ value: LinePosition; label: string; description: string }> = [
+  { value: "DEF", label: "DEF", description: "Proteção defensiva e bônus sem sofrer gols" },
+  { value: "MEI", label: "MEI", description: "Criação de jogadas e assistências" },
+  { value: "ALA", label: "ALA", description: "Equilíbrio entre ataque e defesa" },
+  { value: "ATA", label: "ATA", description: "Finalização e gols marcados" },
+];
 
 export function PlayerForm({
   player,
@@ -69,6 +75,8 @@ export function PlayerForm({
   const [overallTraits, setOverallTraits] = useState<PlayerProfile[]>(initialOverallTraits);
   const [primaryOverallTrait, setPrimaryOverallTrait] = useState<PlayerProfile | null>(initialOverallTraits[0] || null);
   const [secondaryOverallTrait, setSecondaryOverallTrait] = useState<PlayerProfile | null>(initialOverallTraits[1] || null);
+  const [primaryPosition, setPrimaryPosition] = useState<LinePosition | "">(player?.primary_position || "");
+  const [secondaryPosition, setSecondaryPosition] = useState<LinePosition | "">(player?.secondary_position || "");
 
   useEffect(() => {
     return () => {
@@ -206,6 +214,11 @@ export function PlayerForm({
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (mode === "admin" && (memberCategory === "player" || memberCategory === "guest")
+      && (!primaryPosition || !secondaryPosition || primaryPosition === secondaryPosition)) {
+      setError("Escolha duas posições diferentes para o jogador.");
+      return;
+    }
     setLoading(true);
     setError("");
 
@@ -457,7 +470,9 @@ export function PlayerForm({
           <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] font-bold">
             <span className={player?.name?.trim() ? "text-success" : "text-warning"}>{player?.name?.trim() ? "✓" : "○"} Nome</span>
             <span className={player?.avatar_url ? "text-success" : "text-warning"}>{player?.avatar_url ? "✓" : "○"} Foto</span>
-            <span className={player?.player_profile ? "text-success" : "text-warning"}>{player?.player_profile ? "✓" : "○"} Posição</span>
+            <span className={player?.primary_position && player?.secondary_position ? "text-success" : "text-warning"}>
+              {player?.primary_position && player?.secondary_position ? "✓" : "○"} Posições
+            </span>
             <span className={overallTraits.length >= 1 && overallTraits.length <= 2 ? "text-success" : "text-warning"}>
               {overallTraits.length >= 1 && overallTraits.length <= 2 ? "✓" : "○"} Estilo pelo ADM
             </span>
@@ -488,33 +503,49 @@ export function PlayerForm({
         </div>
       )}
 
-      {(memberCategory === "player" || memberCategory === "guest") && <fieldset className="space-y-2">
-        <legend className="text-xs font-bold text-muted uppercase tracking-wider">
-          Perfil de jogo
+      {(memberCategory === "player" || memberCategory === "guest") && <fieldset className="space-y-3 rounded-2xl border border-accent/25 bg-accent/5 p-4">
+        <legend className="px-1 text-xs font-bold uppercase tracking-wider text-accent">
+          Posições da Ranked
         </legend>
-        <div className="grid gap-2">
-          {PLAYER_PROFILE_OPTIONS.map((option) => (
-            <label
-              key={option.value}
-              className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-surface-hover px-4 py-3 has-[:checked]:border-accent has-[:checked]:bg-accent/5"
+        <input type="hidden" name="player_profile" value={primaryPosition === "DEF" ? "defensive" : "offensive"} />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="space-y-1.5 text-xs font-bold text-muted">
+            Posição primária · 70%
+            <select
+              name="primary_position"
+              value={primaryPosition}
+              disabled={mode !== "admin"}
+              onChange={(event) => {
+                const next = event.target.value as LinePosition | "";
+                setPrimaryPosition(next);
+                if (next && next === secondaryPosition) setSecondaryPosition("");
+              }}
+              className="w-full rounded-xl border border-border bg-surface-hover px-4 py-3 text-sm text-foreground outline-none focus:border-accent disabled:opacity-70"
             >
-              <input
-                type="radio"
-                name="player_profile"
-                value={option.value}
-                defaultChecked={(player?.player_profile === "defensive" ? "defensive" : "offensive") === option.value}
-                disabled={mode !== "admin"}
-                className="mt-0.5 h-4 w-4"
-              />
-              <span>
-                <span className="block text-sm font-bold text-foreground">{option.label}</span>
-                <span className="block text-[11px] leading-4 text-muted">{option.description}</span>
-              </span>
-            </label>
-          ))}
+              <option value="">Selecione</option>
+              {LINE_POSITION_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label} · {option.description}</option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-1.5 text-xs font-bold text-muted">
+            Posição secundária · 30%
+            <select
+              name="secondary_position"
+              value={secondaryPosition}
+              disabled={mode !== "admin"}
+              onChange={(event) => setSecondaryPosition(event.target.value as LinePosition | "")}
+              className="w-full rounded-xl border border-border bg-surface-hover px-4 py-3 text-sm text-foreground outline-none focus:border-accent disabled:opacity-70"
+            >
+              <option value="">Selecione</option>
+              {LINE_POSITION_OPTIONS.filter((option) => option.value !== primaryPosition).map((option) => (
+                <option key={option.value} value={option.value}>{option.label} · {option.description}</option>
+              ))}
+            </select>
+          </label>
         </div>
         <p className="text-[10px] leading-4 text-muted">
-          Tag fixa definida pelo ADM. Ela determina a regra DEF/VOL ou ATA/ALA na Ranked e nas próximas rodadas do Cartola; rodadas encerradas permanecem congeladas. GOL continua sendo uma vaga livre.
+          As posições são congeladas na rodada. Alterações feitas aqui passam a valer no rascunho atual e nas próximas rodadas.
         </p>
       </fieldset>}
 

@@ -1,6 +1,7 @@
 import {
   calculateRankedPoints,
   normalizeBQScoringSnapshot,
+  type LinePosition,
 } from "./scoring-policy.js";
 
 export type StatisticsPlayer = {
@@ -107,7 +108,7 @@ export function buildRoundStatistics(input: {
   };
 }
 
-export type RankingRoleWeight = { role: "DEF" | "MEI" | "ATA"; overall: number; weight: 1 | 0.5 };
+export type RankingRoleWeight = { role: LinePosition; overall: number; weight: number };
 export type RoundStatRow = {
   player_id: string; round_id: string; league_id: string;
   games: number; wins: number; draws: number; losses: number; goals: number; assists: number;
@@ -119,6 +120,7 @@ export type RoundStatRow = {
   own_goals: number; team_goals_conceded: number;
   player_profile_locked: string | null; profile_decision_source: string | null;
   profile_appearance_number: number | null; profile_def_overall: number | null; profile_ata_overall: number | null;
+  primary_position_locked: LinePosition | null; secondary_position_locked: LinePosition | null;
   ranking_role_weights: RankingRoleWeight[]; ranking_position_bonus: number; points: number;
 };
 
@@ -130,6 +132,7 @@ export type RoundCalculationContext = {
     round_players: Array<{
       player_id: string; player_profile_locked: string | null; profile_decision_source: string | null;
       profile_appearance_number: number | null; profile_def_overall: number | null; profile_ata_overall: number | null;
+      primary_position_locked: LinePosition | null; secondary_position_locked: LinePosition | null;
     }>;
     matches: Array<{
       id: string; status: string; team_a_id: string; team_b_id: string; score_a: number; score_b: number;
@@ -137,8 +140,12 @@ export type RoundCalculationContext = {
       match_events: Array<{
         event_type: string; player_id: string; assist_player_id: string | null; team_id: string;
         goalkeeper_a_player_id: string | null; goalkeeper_b_player_id: string | null; is_own_goal: boolean;
+        elapsed_seconds: number | null;
       }>;
-      match_players: Array<{ player_id: string; team_id: string; result_eligible: boolean; scoring_eligible: boolean | null }>;
+      match_players: Array<{
+        player_id: string; team_id: string; result_eligible: boolean; scoring_eligible: boolean | null;
+        entered_elapsed_seconds: number; left_elapsed_seconds: number | null;
+      }>;
       match_goalkeepers: Array<{ player_id: string; team_id: string }>;
       match_goalkeeper_stints: Array<{
         player_id: string; team_id: string; entered_elapsed_seconds: number;
@@ -149,6 +156,7 @@ export type RoundCalculationContext = {
   players: Array<{
     id: string; name: string; avatar_url: string | null; member_category: string; is_selectable: boolean;
     player_profile: string | null; overall_traits: string[]; is_competitive_profile_complete: boolean;
+    primary_position: LinePosition | null; secondary_position: LinePosition | null;
   }>;
   frozenRoleWeights: Map<string, RankingRoleWeight[]>;
   playersWithPriorOfficialRound: Set<string>;
@@ -162,16 +170,91 @@ type GoalkeeperScout = {
   goalkeeperWins: number; goalkeeperDraws: number; goalkeeperLosses: number;
 };
 
+function isLinePosition(value: unknown): value is LinePosition {
+  return value === "DEF" || value === "MEI" || value === "ALA" || value === "ATA";
+}
+
+function matchActualDuration(match: RoundCalculationContext["round"]["matches"][number]) {
+  const officialElapsed = Math.max(
+    0,
+    Number(match.timer_accumulated_seconds || 0) + Number(match.eligibility_elapsed_offset_seconds || 0),
+  );
+  return Math.max(0, officialElapsed || Number(match.duration_seconds || 0));
+}
+
+function goalkeeperAt(
+  match: RoundCalculationContext["round"]["matches"][number],
+  event: RoundCalculationContext["round"]["matches"][number]["match_events"][number],
+  teamId: string,
+) {
+  const snapshot = teamId === match.team_a_id ? event.goalkeeper_a_player_id
+    : teamId === match.team_b_id ? event.goalkeeper_b_player_id : null;
+  if (snapshot) return snapshot;
+  const elapsed = Math.max(0, Number(event.elapsed_seconds || 0));
+  const stint = (match.match_goalkeeper_stints || [])
+    .filter((item) => item.team_id === teamId
+      && item.entered_elapsed_seconds <= elapsed
+      && (item.left_elapsed_seconds === null || item.left_elapsed_seconds > elapsed))
+    .sort((left, right) => right.entered_elapsed_seconds - left.entered_elapsed_seconds)[0];
+  if ((match.match_goalkeeper_stints || []).some((item) => item.team_id === teamId)) return stint?.player_id || null;
+  return match.match_goalkeepers.find((item) => item.team_id === teamId)?.player_id || null;
+}
+
+function participantActiveAt(
+  participant: RoundCalculationContext["round"]["matches"][number]["match_players"][number],
+  elapsed: number,
+) {
+  return participant.entered_elapsed_seconds <= elapsed
+    && (participant.left_elapsed_seconds === null || participant.left_elapsed_seconds > elapsed);
+}
+
+function effectiveGoalkeeperStints(match: RoundCalculationContext["round"]["matches"][number]) {
+  const recorded = match.match_goalkeeper_stints || [];
+  return [match.team_a_id, match.team_b_id].flatMap((teamId) => {
+    const teamStints = recorded.filter((stint) => stint.team_id === teamId);
+    if (teamStints.length > 0) return teamStints.map((stint) => ({ ...stint, legacy: false }));
+    return match.match_goalkeepers
+      .filter((item) => item.team_id === teamId)
+      .map((item) => ({
+        ...item,
+        entered_elapsed_seconds: 0,
+        left_elapsed_seconds: null as number | null,
+        selected_at: "",
+        legacy: true,
+      }));
+  });
+}
+
+function participantLineSeconds(
+  match: RoundCalculationContext["round"]["matches"][number],
+  participant: RoundCalculationContext["round"]["matches"][number]["match_players"][number],
+  duration: number,
+) {
+  const start = Math.max(0, Number(participant.entered_elapsed_seconds || 0));
+  const end = Math.min(
+    duration,
+    participant.left_elapsed_seconds === null ? duration : Math.max(start, Number(participant.left_elapsed_seconds)),
+  );
+  const gross = Math.max(0, end - start);
+  const goalkeeperSeconds = effectiveGoalkeeperStints(match)
+    .filter((stint) => stint.player_id === participant.player_id && stint.team_id === participant.team_id)
+    .reduce((total, stint) => {
+      const overlapStart = Math.max(start, Number(stint.entered_elapsed_seconds || 0));
+      const overlapEnd = Math.min(
+        end,
+        stint.left_elapsed_seconds === null ? duration : Number(stint.left_elapsed_seconds),
+      );
+      return total + Math.max(0, overlapEnd - overlapStart);
+    }, 0);
+  return Math.max(0, gross - goalkeeperSeconds);
+}
+
 function calculateGoalkeeperScouts(match: RoundCalculationContext["round"]["matches"][number]) {
   const goalEvents = match.match_events.filter((event) => event.event_type === "goal");
-  const stints = match.match_goalkeeper_stints || [];
-  const legacy = stints.length === 0;
-  const source = legacy
-    ? match.match_goalkeepers.map((item) => ({ ...item, entered_elapsed_seconds: 0, left_elapsed_seconds: null, selected_at: "" }))
-    : stints;
+  const source = effectiveGoalkeeperStints(match);
   const officialElapsed = Math.max(0, Number(match.timer_accumulated_seconds || 0)
     + Number(match.eligibility_elapsed_offset_seconds || 0));
-  const actualDuration = Math.max(0, officialElapsed || Number(match.duration_seconds || 0));
+  const actualDuration = matchActualDuration(match);
   const lastByTeam = new Map<string, typeof source[number]>();
   for (const stint of source) {
     const previous = lastByTeam.get(stint.team_id);
@@ -181,46 +264,44 @@ function calculateGoalkeeperScouts(match: RoundCalculationContext["round"]["matc
   }
   const stats = new Map<string, GoalkeeperScout>();
   const seconds = new Map<string, number>();
+  const legacyByPlayer = new Map<string, boolean>();
   for (const stint of source) {
     const start = Math.max(0, Number(stint.entered_elapsed_seconds || 0));
     const end = stint.left_elapsed_seconds == null ? actualDuration : Math.max(start, Number(stint.left_elapsed_seconds));
     const played = Math.max(0, end - start);
     const recorded = goalEvents.some((event) => event.goalkeeper_a_player_id === stint.player_id
       || event.goalkeeper_b_player_id === stint.player_id);
-    if (!legacy && match.status === "finished" && played === 0 && !recorded
+    if (!stint.legacy && match.status === "finished" && played === 0 && !recorded
       && !(officialElapsed === 0 && lastByTeam.get(stint.team_id) === stint)) continue;
     seconds.set(stint.player_id, (seconds.get(stint.player_id) || 0) + played);
+    if (stint.legacy) legacyByPlayer.set(stint.player_id, true);
     if (!stats.has(stint.player_id)) stats.set(stint.player_id, {
       playerId: stint.player_id, teamId: stint.team_id, goalkeeperGames: 1, goalsConceded: 0, cleanSheets: 0,
       goalkeeperGoals: 0, goalkeeperAssists: 0, goalkeeperOwnGoals: 0,
       goalkeeperWins: 0, goalkeeperDraws: 0, goalkeeperLosses: 0,
     });
   }
-  const keeperAt = (event: typeof goalEvents[number], teamId: string) => {
-    const snapshot = teamId === match.team_a_id ? event.goalkeeper_a_player_id
-      : teamId === match.team_b_id ? event.goalkeeper_b_player_id : null;
-    return snapshot || match.match_goalkeepers.find((item) => item.team_id === teamId)?.player_id || null;
-  };
   const eventGoalsA = goalEvents.filter((event) => event.team_id === match.team_a_id).length;
   const eventGoalsB = goalEvents.filter((event) => event.team_id === match.team_b_id).length;
   for (const event of goalEvents) {
     const concedingTeam = event.team_id === match.team_a_id ? match.team_b_id : match.team_a_id;
-    const conceding = keeperAt(event, concedingTeam);
+    const conceding = goalkeeperAt(match, event, concedingTeam);
     if (conceding && stats.has(conceding)) stats.get(conceding)!.goalsConceded += 1;
     const scorerTeam = event.is_own_goal ? concedingTeam : event.team_id;
-    if (keeperAt(event, scorerTeam) === event.player_id && stats.has(event.player_id)) {
+    if (goalkeeperAt(match, event, scorerTeam) === event.player_id && stats.has(event.player_id)) {
       if (event.is_own_goal) stats.get(event.player_id)!.goalkeeperOwnGoals += 1;
       else stats.get(event.player_id)!.goalkeeperGoals += 1;
     }
-    if (!event.is_own_goal && event.assist_player_id && keeperAt(event, event.team_id) === event.assist_player_id
+    if (!event.is_own_goal && event.assist_player_id && goalkeeperAt(match, event, event.team_id) === event.assist_player_id
       && stats.has(event.assist_player_id)) stats.get(event.assist_player_id)!.goalkeeperAssists += 1;
   }
   for (const scout of stats.values()) {
     const teamA = scout.teamId === match.team_a_id;
     const goalsFor = teamA ? Number(match.score_a) : Number(match.score_b);
     const goalsAgainst = teamA ? Number(match.score_b) : Number(match.score_a);
-    if (legacy) scout.goalsConceded += Math.max(0, goalsAgainst - (teamA ? eventGoalsB : eventGoalsA));
-    const qualifies = legacy || officialElapsed === 0 || (seconds.get(scout.playerId) || 0) * 2 >= actualDuration;
+    const isPlayerLegacy = legacyByPlayer.get(scout.playerId) === true;
+    if (isPlayerLegacy) scout.goalsConceded += Math.max(0, goalsAgainst - (teamA ? eventGoalsB : eventGoalsA));
+    const qualifies = isPlayerLegacy || officialElapsed === 0 || (seconds.get(scout.playerId) || 0) * 2 >= actualDuration;
     if (scout.goalsConceded === 0 && qualifies) scout.cleanSheets = 1;
     if (goalsFor > goalsAgainst) scout.goalkeeperWins = 1;
     else if (goalsFor === goalsAgainst) scout.goalkeeperDraws = 1;
@@ -234,9 +315,9 @@ function parseRoleWeights(value: unknown): RankingRoleWeight[] {
   return value.flatMap((raw): RankingRoleWeight[] => {
     if (!raw || typeof raw !== "object") return [];
     const item = raw as Record<string, unknown>;
-    if (!["DEF", "MEI", "ATA"].includes(String(item.role)) || !Number.isFinite(Number(item.overall))) return [];
+    if (!["DEF", "MEI", "ALA", "ATA"].includes(String(item.role)) || !Number.isFinite(Number(item.overall))) return [];
     const weight = Number(item.weight);
-    if (weight !== 1 && weight !== 0.5) return [];
+    if (!Number.isFinite(weight) || weight <= 0 || weight > 1) return [];
     return [{ role: item.role as RankingRoleWeight["role"], overall: Number(item.overall), weight }];
   }).slice(0, 2);
 }
@@ -288,6 +369,16 @@ export function calculateRoundStatRows(context: RoundCalculationContext): RoundS
     player.player_id,
     player.player_profile_locked || currentProfile.get(player.player_id) || null,
   ]));
+  const currentPrimaryPosition = new Map(context.players.map((player) => [player.id, player.primary_position]));
+  const currentSecondaryPosition = new Map(context.players.map((player) => [player.id, player.secondary_position]));
+  const primaryPosition = new Map(round.round_players.map((player) => [
+    player.player_id,
+    player.primary_position_locked || currentPrimaryPosition.get(player.player_id) || null,
+  ]));
+  const secondaryPosition = new Map(round.round_players.map((player) => [
+    player.player_id,
+    player.secondary_position_locked || currentSecondaryPosition.get(player.player_id) || null,
+  ]));
   const rows = new Map<string, RoundStatRow>();
   for (const player of round.round_players) rows.set(player.player_id, {
     player_id: player.player_id, round_id: round.id, league_id: round.league_id,
@@ -302,6 +393,8 @@ export function calculateRoundStatRows(context: RoundCalculationContext): RoundS
     profile_appearance_number: player.profile_appearance_number || null,
     profile_def_overall: player.profile_def_overall || null,
     profile_ata_overall: player.profile_ata_overall || null,
+    primary_position_locked: primaryPosition.get(player.player_id) || null,
+    secondary_position_locked: secondaryPosition.get(player.player_id) || null,
     ranking_role_weights: [], ranking_position_bonus: 0, points: 0,
   });
 
@@ -310,6 +403,10 @@ export function calculateRoundStatRows(context: RoundCalculationContext): RoundS
     const winner = draw ? null : Number(match.score_a) > Number(match.score_b) ? match.team_a_id : match.team_b_id;
     const goalkeeperScouts = calculateGoalkeeperScouts(match);
     const goalkeeperIds = new Set(goalkeeperScouts.keys());
+    const dualPositionScoring = Number(scoring.version) >= 15;
+    const actualDuration = matchActualDuration(match);
+    const cleanSheetMinShare = Number(scoring.lineCleanSheetMinShare ?? 0.5);
+    const goalEvents = match.match_events.filter((event) => event.event_type === "goal");
     const scoringEligible = new Set(match.match_players
       .filter((participant) => round.number < 7 || participant.scoring_eligible !== false)
       .map((participant) => participant.player_id));
@@ -320,9 +417,30 @@ export function calculateRoundStatRows(context: RoundCalculationContext): RoundS
         const row = rows.get(participant.player_id);
         if (!row) continue;
         row.games += 1;
-        row.team_goals_conceded += conceded;
+        if (dualPositionScoring) {
+          const lineSeconds = participantLineSeconds(match, participant, actualDuration);
+          const lineConceded = goalEvents.filter((event) => {
+            const concedingTeam = event.team_id === match.team_a_id ? match.team_b_id : match.team_a_id;
+            if (concedingTeam !== teamId) return false;
+            if (goalkeeperAt(match, event, teamId) === participant.player_id) return false;
+            if (event.elapsed_seconds == null) {
+              return actualDuration > 0 ? lineSeconds > 0 : !goalkeeperIds.has(participant.player_id);
+            }
+            return participantActiveAt(participant, Math.max(0, Number(event.elapsed_seconds)));
+          }).length;
+          row.team_goals_conceded += lineConceded;
+          const qualifiesForCleanSheet = actualDuration > 0
+            ? lineSeconds >= actualDuration * cleanSheetMinShare
+            : lineSeconds > 0 || (!goalkeeperIds.has(participant.player_id) && participant.result_eligible);
+          if (qualifiesForCleanSheet && lineConceded === 0) {
+            row.ranking_defensive_clean_games += 1;
+            row.defensive_clean_games += 1;
+          }
+        } else {
+          row.team_goals_conceded += conceded;
+        }
         const receivesDefense = profile.get(participant.player_id) === "defensive" || Number(round.scoring_version || 5) >= 7;
-        if (!goalkeeperIds.has(participant.player_id)) {
+        if (!dualPositionScoring && !goalkeeperIds.has(participant.player_id)) {
           if (conceded === 0) row.ranking_defensive_clean_games += 1;
           else if (conceded === 1) row.ranking_defensive_one_goal_games += 1;
           if (receivesDefense) {
@@ -371,8 +489,15 @@ export function calculateRoundStatRows(context: RoundCalculationContext): RoundS
     const fallbackRole = primaryTrait === "defensive" ? "DEF" : primaryTrait === "midfield" ? "MEI" : "ATA";
     const frozen = context.frozenRoleWeights.get(row.player_id) || [];
     const overall = context.overallPositions.get(row.player_id);
-    const roleWeights: RankingRoleWeight[] = !countsForRanking || row.games <= 0 || !player?.is_competitive_profile_complete
-      ? [] : columnC ? [{ role: lineRole, overall: 0, weight: 1 }]
+    const primary = primaryPosition.get(row.player_id);
+    const secondary = secondaryPosition.get(row.player_id);
+    const dualComplete = isLinePosition(primary) && isLinePosition(secondary) && primary !== secondary;
+    const roleWeights: RankingRoleWeight[] = !countsForRanking || row.games <= 0
+      || (Number(scoring.version) >= 15 ? !dualComplete : !player?.is_competitive_profile_complete)
+      ? [] : Number(scoring.version) >= 15 ? [
+        { role: primary as LinePosition, overall: 0, weight: Number(scoring.primaryWeight ?? 0.7) },
+        { role: secondary as LinePosition, overall: 0, weight: Number(scoring.secondaryWeight ?? 0.3) },
+      ] : columnC ? [{ role: lineRole, overall: 0, weight: 1 }]
         : frozen.length ? frozen : overall ? resolveRole(overall, primaryTrait, !context.playersWithPriorOfficialRound.has(row.player_id))
           : [{ role: fallbackRole, overall: 0, weight: 1 }];
     row.ranking_role_weights = roleWeights;
@@ -386,6 +511,8 @@ export function calculateRoundStatRows(context: RoundCalculationContext): RoundS
       goalkeeperCleanSheets: row.clean_sheets, teamGoalsConceded: row.team_goals_conceded,
       defensiveCleanGames: row.ranking_defensive_clean_games,
       defensiveOneGoalGames: row.ranking_defensive_one_goal_games, lineRole,
+      primaryPosition: dualComplete ? primary : null,
+      secondaryPosition: dualComplete ? secondary : null,
     }, scoring, { suppressGoalkeeperRewards: round.suppress_goalkeeper_rewards }) : 0;
     return row;
   });

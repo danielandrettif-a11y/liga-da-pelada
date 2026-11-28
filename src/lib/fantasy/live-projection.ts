@@ -6,7 +6,7 @@ import {
   type FantasySlotRole,
 } from "./lineup-positions";
 import { resolveFantasyReserveSubstitution, type FantasyReserveRole } from "./reserve";
-import { calculateGoalkeeperMatchScouts, type GoalkeeperTimelineStint } from "../goalkeeper-timeline";
+import { calculateGoalkeeperMatchScouts, effectiveGoalkeeperStints, goalkeeperAtEvent, type GoalkeeperTimelineStint } from "../goalkeeper-timeline";
 
 export type FantasyLiveEvent = {
   playerId: string;
@@ -15,6 +15,7 @@ export type FantasyLiveEvent = {
   isOwnGoal?: boolean;
   goalkeeperAPlayerId?: string | null;
   goalkeeperBPlayerId?: string | null;
+  elapsedSeconds?: number | null;
 };
 export type FantasyLiveMatchPlayer = {
   playerId: string;
@@ -22,6 +23,10 @@ export type FantasyLiveMatchPlayer = {
   resultEligible: boolean;
   scoringEligible?: boolean;
   playerProfile?: "offensive" | "midfield" | "defensive" | null;
+  primaryPosition?: "DEF" | "MEI" | "ALA" | "ATA" | null;
+  secondaryPosition?: "DEF" | "MEI" | "ALA" | "ATA" | null;
+  enteredElapsedSeconds?: number | null;
+  leftElapsedSeconds?: number | null;
 };
 export type FantasyLiveGoalkeeper = { playerId: string; teamId: string };
 export type FantasyLiveMatch = {
@@ -45,6 +50,8 @@ export type FantasyLivePlayerStats = {
   assists: number;
   ownGoals: number;
   playerProfile?: "offensive" | "midfield" | "defensive" | null;
+  primaryPosition?: "DEF" | "MEI" | "ALA" | "ATA" | null;
+  secondaryPosition?: "DEF" | "MEI" | "ALA" | "ATA" | null;
   wins: number;
   draws: number;
   losses: number;
@@ -130,7 +137,12 @@ export function projectFantasyLiveStats(
   options: { suppressGoalkeeperRewards?: boolean } = {},
 ): Map<string, FantasyLivePlayerStats> {
   const stats = new Map<string, Omit<FantasyLivePlayerStats, "basePoints">>();
-  const ensure = (playerId: string, playerProfile?: FantasyLivePlayerStats["playerProfile"]) => {
+  const ensure = (
+    playerId: string,
+    playerProfile?: FantasyLivePlayerStats["playerProfile"],
+    primaryPosition?: FantasyLivePlayerStats["primaryPosition"],
+    secondaryPosition?: FantasyLivePlayerStats["secondaryPosition"],
+  ) => {
     const existing = stats.get(playerId);
     if (existing) return existing;
     const next = {
@@ -139,6 +151,8 @@ export function projectFantasyLiveStats(
       assists: 0,
       ownGoals: 0,
       playerProfile,
+      primaryPosition,
+      secondaryPosition,
       wins: 0,
       draws: 0,
       losses: 0,
@@ -173,12 +187,44 @@ export function projectFantasyLiveStats(
 
     for (const participant of match.players) {
       if (!participant.resultEligible || participant.scoringEligible === false) continue;
-      const current = ensure(participant.playerId, participant.playerProfile);
+      const current = ensure(
+        participant.playerId,
+        participant.playerProfile,
+        participant.primaryPosition,
+        participant.secondaryPosition,
+      );
       const conceded = participant.teamId === match.teamAId ? match.scoreB : match.scoreA;
-      current.teamGoalsConceded += conceded;
+      const v15 = Number(settings.scoringVersion || 0) >= 15;
+      const duration = Math.max(0, Number(match.officialElapsedSeconds || 0) || Number(match.durationSeconds || 0));
+      const entered = Math.max(0, Number(participant.enteredElapsedSeconds || 0));
+      const left = Math.min(duration, participant.leftElapsedSeconds == null
+        ? duration : Math.max(entered, Number(participant.leftElapsedSeconds)));
+      const goalkeeperSeconds = effectiveGoalkeeperStints(match)
+        .filter((stint) => stint.playerId === participant.playerId && stint.teamId === participant.teamId)
+        .reduce((total, stint) => {
+          const overlapStart = Math.max(entered, Number(stint.enteredElapsedSeconds || 0));
+          const overlapEnd = Math.min(left, stint.leftElapsedSeconds == null ? duration : Number(stint.leftElapsedSeconds));
+          return total + Math.max(0, overlapEnd - overlapStart);
+        }, 0);
+      const lineSeconds = Math.max(0, left - entered - goalkeeperSeconds);
+      const lineConceded = v15 ? match.events.filter((event) => {
+        const concedingTeam = event.teamId === match.teamAId ? match.teamBId : match.teamAId;
+        if (concedingTeam !== participant.teamId) return false;
+        if (goalkeeperAtEvent(match, event, participant.teamId) === participant.playerId) return false;
+        if (event.elapsedSeconds == null) {
+          return duration > 0 ? lineSeconds > 0 : !goalkeeperIds.has(participant.playerId);
+        }
+        const elapsed = Math.max(0, Number(event.elapsedSeconds));
+        return entered <= elapsed && left > elapsed;
+      }).length : conceded;
+      current.teamGoalsConceded += lineConceded;
       const receivesLineDefenseScout = participant.playerProfile === "defensive"
         || Number(settings.scoringVersion || 5) >= 7;
-      if (receivesLineDefenseScout && !goalkeeperIds.has(participant.playerId) && isFinished) {
+      if (isFinished && v15) {
+        if (duration > 0 && lineSeconds >= duration * settings.lineCleanSheetMinShare && lineConceded === 0) {
+          current.defensiveCleanGames += 1;
+        }
+      } else if (receivesLineDefenseScout && !goalkeeperIds.has(participant.playerId) && isFinished) {
         if (conceded === 0) current.defensiveCleanGames += 1;
         else if (conceded === 1) current.defensiveOneGoalGames += 1;
       }

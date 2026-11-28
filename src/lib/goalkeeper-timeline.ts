@@ -5,6 +5,7 @@ export type GoalkeeperTimelineEvent = {
   isOwnGoal?: boolean;
   goalkeeperAPlayerId?: string | null;
   goalkeeperBPlayerId?: string | null;
+  elapsedSeconds?: number | null;
 };
 
 export type GoalkeeperTimelineStint = {
@@ -42,31 +43,49 @@ export type GoalkeeperMatchScouts = {
   goalkeeperLosses: number;
 };
 
+export function effectiveGoalkeeperStints(
+  match: Pick<GoalkeeperTimelineMatch, "teamAId" | "teamBId" | "goalkeepers" | "goalkeeperStints">,
+): Array<GoalkeeperTimelineStint & { legacy: boolean }> {
+  const recorded = match.goalkeeperStints || [];
+  return [match.teamAId, match.teamBId].flatMap((teamId): Array<GoalkeeperTimelineStint & { legacy: boolean }> => {
+    const teamStints = recorded.filter((stint) => stint.teamId === teamId);
+    if (teamStints.length > 0) return teamStints.map((stint) => ({ ...stint, legacy: false }));
+    return match.goalkeepers
+      .filter((item) => item.teamId === teamId)
+      .map((item) => ({
+        ...item,
+        enteredElapsedSeconds: 0,
+        leftElapsedSeconds: null,
+        legacy: true,
+      }));
+  });
+}
+
 export function goalkeeperAtEvent(
-  match: Pick<GoalkeeperTimelineMatch, "teamAId" | "teamBId" | "goalkeepers">,
+  match: Pick<GoalkeeperTimelineMatch, "teamAId" | "teamBId" | "goalkeepers" | "goalkeeperStints">,
   event: GoalkeeperTimelineEvent,
   teamId: string,
 ): string | null {
-  // Eventos novos guardam o titular de cada time no instante do gol. Eventos
-  // históricos sem snapshot continuam associados ao goleiro inicial antigo.
   const snapshot = teamId === match.teamAId
     ? event.goalkeeperAPlayerId
     : teamId === match.teamBId
       ? event.goalkeeperBPlayerId
       : null;
-  return snapshot || match.goalkeepers.find((item) => item.teamId === teamId)?.playerId || null;
+  if (snapshot) return snapshot;
+  const teamStints = (match.goalkeeperStints || []).filter((stint) => stint.teamId === teamId);
+  if (teamStints.length > 0) {
+    const elapsed = Math.max(0, Number(event.elapsedSeconds || 0));
+    const stint = [...teamStints]
+      .filter((item) => item.enteredElapsedSeconds <= elapsed
+        && (item.leftElapsedSeconds == null || item.leftElapsedSeconds > elapsed))
+      .sort((a, b) => b.enteredElapsedSeconds - a.enteredElapsedSeconds)[0];
+    return stint?.playerId || null;
+  }
+  return match.goalkeepers.find((item) => item.teamId === teamId)?.playerId || null;
 }
 
 export function calculateGoalkeeperMatchScouts(match: GoalkeeperTimelineMatch) {
-  const stints = match.goalkeeperStints || [];
-  const isLegacy = stints.length === 0;
-  const source: readonly GoalkeeperTimelineStint[] = isLegacy
-    ? match.goalkeepers.map((item) => ({
-        ...item,
-        enteredElapsedSeconds: 0,
-        leftElapsedSeconds: null,
-      }))
-    : stints;
+  const source = effectiveGoalkeeperStints(match);
   const officialElapsed = Math.max(0, Number(match.officialElapsedSeconds || 0));
   const actualDuration = Math.max(
     0,
@@ -87,6 +106,7 @@ export function calculateGoalkeeperMatchScouts(match: GoalkeeperTimelineMatch) {
   }
   const stats = new Map<string, GoalkeeperMatchScouts>();
   const secondsByPlayer = new Map<string, number>();
+  const legacyByPlayer = new Map<string, boolean>();
 
   for (const stint of source) {
     const start = Math.max(0, Number(stint.enteredElapsedSeconds || 0));
@@ -97,9 +117,10 @@ export function calculateGoalkeeperMatchScouts(match: GoalkeeperTimelineMatch) {
     const hadRecordedGoal = match.events.some((event) =>
       event.goalkeeperAPlayerId === stint.playerId || event.goalkeeperBPlayerId === stint.playerId,
     );
-    if (!isLegacy && match.status === "finished" && seconds === 0 && !hadRecordedGoal &&
+    if (!stint.legacy && match.status === "finished" && seconds === 0 && !hadRecordedGoal &&
       !(officialElapsed === 0 && lastStintByTeam.get(stint.teamId) === stint)) continue;
     secondsByPlayer.set(stint.playerId, (secondsByPlayer.get(stint.playerId) || 0) + seconds);
+    if (stint.legacy) legacyByPlayer.set(stint.playerId, true);
     if (!stats.has(stint.playerId)) {
       stats.set(stint.playerId, {
         playerId: stint.playerId,
@@ -147,12 +168,13 @@ export function calculateGoalkeeperMatchScouts(match: GoalkeeperTimelineMatch) {
     const isTeamA = scout.teamId === match.teamAId;
     const goalsFor = isTeamA ? match.scoreA : match.scoreB;
     const goalsAgainst = isTeamA ? match.scoreB : match.scoreA;
-    if (isLegacy) {
+    const isPlayerLegacy = legacyByPlayer.get(scout.playerId) === true;
+    if (isPlayerLegacy) {
       // Partidas históricas podem ter placar sem eventos detalhados.
       scout.goalsConceded += Math.max(0, goalsAgainst - (isTeamA ? teamBGoalsInEvents : teamAGoalsInEvents));
     }
     const playedSeconds = secondsByPlayer.get(scout.playerId) || 0;
-    const qualifiesForCleanSheet = isLegacy || officialElapsed === 0 || playedSeconds * 2 >= actualDuration;
+    const qualifiesForCleanSheet = isPlayerLegacy || officialElapsed === 0 || playedSeconds * 2 >= actualDuration;
     if (scout.goalsConceded === 0 && qualifiesForCleanSheet) scout.cleanSheets = 1;
     if (match.status === "finished") {
       if (goalsFor > goalsAgainst) scout.goalkeeperWins = 1;

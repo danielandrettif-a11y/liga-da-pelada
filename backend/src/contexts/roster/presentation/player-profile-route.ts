@@ -29,6 +29,7 @@ function sendFailure(error: unknown, request: FastifyRequest, reply: FastifyRepl
 
 const allowedFields = new Set([
   "name", "nickname", "profile_bio", "player_profile", "overall_traits", "member_category",
+  "primary_position", "secondary_position",
   "is_selectable", "remove_active_avatar", "remove_avatar", "remove_alternate_avatar", "use_alternate_avatar",
 ]);
 
@@ -67,6 +68,8 @@ async function parseMultipart(request: FastifyRequest) {
     nickname: first("nickname"),
     profile_bio: first("profile_bio"),
     player_profile: first("player_profile"),
+    primary_position: first("primary_position"),
+    secondary_position: first("secondary_position"),
     overall_traits: fields.get("overall_traits") || [],
     member_category: first("member_category"),
     is_selectable: first("is_selectable"),

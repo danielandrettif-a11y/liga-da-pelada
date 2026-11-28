@@ -1,4 +1,13 @@
-import { BQ_SCORING_V5, buildBQBasePointBreakdown, calculateBQBasePoints, type BQBaseScoringSnapshot, type BQPlayerStats } from "./bq-scoring";
+import {
+  BQ_SCORING_V5,
+  DEFAULT_POSITION_SCORING,
+  buildBQBasePointBreakdown,
+  calculateBQBasePoints,
+  type BQBaseScoringSnapshot,
+  type BQPlayerStats,
+  type LinePosition,
+  type PositionScoringRule,
+} from "./bq-scoring";
 import { COLUMN_C_SCORING, calculateColumnCRankedPoints, inferOneGoalGames, inferTwoGoalGames, type ColumnCLineRole } from "./column-c-scoring";
 
 export const RANKED_SCORING = {
@@ -29,6 +38,8 @@ export type RankedScoringStats = {
   defensiveCleanGames?: number;
   defensiveOneGoalGames?: number;
   lineRole?: ColumnCLineRole;
+  primaryPosition?: LinePosition | null;
+  secondaryPosition?: LinePosition | null;
 };
 
 export type RankedPointBreakdownItem = {
@@ -51,6 +62,41 @@ export function calculateRankedPoints(
   options: { suppressGoalkeeperRewards?: boolean } = {},
 ) {
   const scoring = snapshot ?? BQ_SCORING_V5;
+  if (Number(scoring.version || 0) >= 15) {
+    const primary = stats.primaryPosition;
+    const secondary = stats.secondaryPosition;
+    if (!primary || !secondary || primary === secondary) return 0;
+    const rules = scoring.positionRules ?? DEFAULT_POSITION_SCORING;
+    const primaryWeight = Number(scoring.primaryWeight ?? 0.7);
+    const secondaryWeight = Number(scoring.secondaryWeight ?? 0.3);
+    const blend = (field: keyof PositionScoringRule) =>
+      rules[primary][field] * primaryWeight + rules[secondary][field] * secondaryWeight;
+    const lineGoals = Math.max(0, amount(stats.goals) - amount(stats.goalkeeperGoals));
+    const lineAssists = Math.max(0, amount(stats.assists) - amount(stats.goalkeeperAssists));
+    const lineOwnGoals = Math.max(0, amount(stats.ownGoals) - amount(stats.goalkeeperOwnGoals));
+    const nonCleanGoalkeeperGames = Math.max(
+      0,
+      amount(stats.goalkeeperAppearances) - amount(stats.goalkeeperCleanSheets),
+    );
+    const goalkeeperOneGoalGames = Math.max(0, Math.min(
+      nonCleanGoalkeeperGames,
+      nonCleanGoalkeeperGames * 2 - amount(stats.goalkeeperGoalsConceded),
+    ));
+    return Math.round((
+      lineGoals * blend("goal")
+      + lineAssists * blend("assist")
+      + amount(stats.teamGoalsConceded) * blend("conceded")
+      + amount(stats.defensiveCleanGames) * blend("cleanSheet")
+      + lineOwnGoals * blend("ownGoal")
+      + amount(stats.goalkeeperAppearances) * scoring.goalkeeperAppearance
+      + amount(stats.goalkeeperGoals) * Number(scoring.goalkeeperGoal ?? 5)
+      + amount(stats.goalkeeperAssists) * Number(scoring.goalkeeperAssist ?? 3)
+      + amount(stats.goalkeeperGoalsConceded) * scoring.goalkeeperGoalConceded
+      + amount(stats.goalkeeperCleanSheets) * Number(scoring.goalkeeperCleanSheet ?? 4)
+      + goalkeeperOneGoalGames * Number(scoring.goalkeeperOneGoal ?? 2)
+      + amount(stats.goalkeeperOwnGoals) * Number(scoring.goalkeeperOwnGoal ?? -3)
+    ) * 100) / 100;
+  }
   if (Number(scoring.version || 0) >= 11) {
     return calculateColumnCRankedPoints(stats.lineRole || "ATA", {
       goals: stats.goals,
@@ -102,6 +148,38 @@ export function buildRankedPointBreakdown(
   snapshot: BQBaseScoringSnapshot = BQ_SCORING_V5,
   options: { suppressGoalkeeperRewards?: boolean } = {},
 ): RankedPointBreakdownItem[] {
+  if (Number(snapshot.version || 0) >= 15) {
+    const primary = stats.primaryPosition;
+    const secondary = stats.secondaryPosition;
+    if (!primary || !secondary || primary === secondary) return [];
+    const rules = snapshot.positionRules ?? DEFAULT_POSITION_SCORING;
+    const blend = (field: keyof PositionScoringRule) =>
+      rules[primary][field] * Number(snapshot.primaryWeight ?? 0.7)
+      + rules[secondary][field] * Number(snapshot.secondaryWeight ?? 0.3);
+    const goalkeeperOneGoalGames = inferOneGoalGames(
+      amount(stats.goalkeeperAppearances),
+      amount(stats.goalkeeperCleanSheets),
+      amount(stats.goalkeeperGoalsConceded),
+    );
+    const primaryPct = Math.round(Number(snapshot.primaryWeight ?? 0.7) * 100);
+    const secondaryPct = Math.round(Number(snapshot.secondaryWeight ?? 0.3) * 100);
+    const rows: Array<[string, number, number]> = [
+      [`Gols · ${primary} ${primaryPct}% / ${secondary} ${secondaryPct}%`, Math.max(0, amount(stats.goals) - amount(stats.goalkeeperGoals)), blend("goal")],
+      [`Assistências · ${primary} ${primaryPct}% / ${secondary} ${secondaryPct}%`, Math.max(0, amount(stats.assists) - amount(stats.goalkeeperAssists)), blend("assist")],
+      ["Gols sofridos na linha", amount(stats.teamGoalsConceded), blend("conceded")],
+      ["Partidas sem sofrer gol na linha", amount(stats.defensiveCleanGames), blend("cleanSheet")],
+      ["Gols contra na linha", Math.max(0, amount(stats.ownGoals) - amount(stats.goalkeeperOwnGoals)), blend("ownGoal")],
+      ["Atuações no gol", amount(stats.goalkeeperAppearances), snapshot.goalkeeperAppearance],
+      ["Gols feitos no gol", amount(stats.goalkeeperGoals), Number(snapshot.goalkeeperGoal ?? 5)],
+      ["Assistências no gol", amount(stats.goalkeeperAssists), Number(snapshot.goalkeeperAssist ?? 3)],
+      ["Gols sofridos no gol", amount(stats.goalkeeperGoalsConceded), snapshot.goalkeeperGoalConceded],
+      ["Clean sheets no gol", amount(stats.goalkeeperCleanSheets), Number(snapshot.goalkeeperCleanSheet ?? 4)],
+      ["Jogos com 1 gol sofrido no gol", goalkeeperOneGoalGames, Number(snapshot.goalkeeperOneGoal ?? 2)],
+      ["Gols contra no gol", amount(stats.goalkeeperOwnGoals), Number(snapshot.goalkeeperOwnGoal ?? -3)],
+    ];
+    return rows.filter(([, count]) => count > 0)
+      .map(([label, count, unit]) => ({ label, count, points: Math.round(count * unit * 100) / 100 }));
+  }
   if (Number(snapshot.version || 0) >= 11) {
     const role = stats.lineRole || "ATA";
     const rule = COLUMN_C_SCORING[role];

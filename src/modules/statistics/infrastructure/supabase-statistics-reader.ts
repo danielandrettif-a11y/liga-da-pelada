@@ -51,6 +51,8 @@ export async function readPlayerRoundHistoryRows(
       ranking_defensive_clean_games,
       ranking_defensive_one_goal_games,
       player_profile_locked,
+      primary_position_locked,
+      secondary_position_locked,
       rounds (
         number,
         date,

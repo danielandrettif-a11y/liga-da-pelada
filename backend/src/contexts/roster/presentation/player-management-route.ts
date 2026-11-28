@@ -37,6 +37,8 @@ const playerProperties = {
   nickname: { anyOf: [{ type: "string", maxLength: 60 }, { type: "null" }] },
   avatar_url: { anyOf: [{ type: "string", maxLength: 2048 }, { type: "null" }] },
   player_profile: { type: "string", enum: ["offensive", "midfield", "defensive"] },
+  primary_position: { anyOf: [{ type: "string", enum: ["DEF", "MEI", "ALA", "ATA"] }, { type: "null" }] },
+  secondary_position: { anyOf: [{ type: "string", enum: ["DEF", "MEI", "ALA", "ATA"] }, { type: "null" }] },
   overall_traits: {
     type: "array", maxItems: 3, items: { type: "string", enum: ["offensive", "midfield", "defensive"] },
   },

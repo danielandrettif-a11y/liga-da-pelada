@@ -4,7 +4,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { cache } from "react";
 import { createClient as createServerClient } from "../supabase/server";
 import { buildAwardSeasonsByPlayer } from "../awards";
-import type { Player, CreatePlayerInput, MemberCategory, PlayerProfile, RoundType, SeasonStatus } from "../types";
+import type { Player, CreatePlayerInput, LinePosition, MemberCategory, PlayerProfile, RoundType, SeasonStatus } from "../types";
 import { getActiveSeason, getActiveSeasonRoundIds } from "./seasons";
 import { getAdminClient, getCurrentAccount } from "../auth";
 import { TEAM_PRESETS } from "../teamPresets";
@@ -66,6 +66,8 @@ function playerWithLeagueProfile(member: any): Player | null {
   return {
     ...player,
     player_profile: playerProfile,
+    primary_position: member.primary_position ?? null,
+    secondary_position: member.secondary_position ?? null,
     initial_player_profile: member.initial_player_profile ?? playerProfile ?? player.initial_player_profile ?? player.player_profile,
     overall_traits: overallTraits,
     overall_seed_mode: member.overall_seed_mode ?? player.overall_seed_mode,
@@ -74,6 +76,14 @@ function playerWithLeagueProfile(member: any): Player | null {
       && Boolean(String(player.name || "").trim())
       && Boolean(String(player.avatar_url || "").trim())
       && ["defensive", "offensive"].includes(playerProfile)
+      && (
+        (member.primary_position == null && member.secondary_position == null)
+        || (
+          ["DEF", "MEI", "ALA", "ATA"].includes(String(member.primary_position))
+          && ["DEF", "MEI", "ALA", "ATA"].includes(String(member.secondary_position))
+          && member.primary_position !== member.secondary_position
+        )
+      )
       && Array.isArray(overallTraits)
       && overallTraits.length >= 1
       && overallTraits.length <= 2,
@@ -134,7 +144,7 @@ export async function getPlayers(selectableOnly = false) {
   const client = account.client;
   const { data, error } = await client
     .from("league_members")
-    .select("player_profile, initial_player_profile, overall_traits, overall_seed_mode, players(*)")
+    .select("player_profile, primary_position, secondary_position, initial_player_profile, overall_traits, overall_seed_mode, players(*)")
     .eq("league_id", league.id)
     .eq("is_active", true);
 
@@ -168,7 +178,7 @@ export async function getSelectableLeaguePlayers(leagueId: string) {
   const client = account.client;
   const { data, error } = await client
     .from("league_members")
-    .select("player_profile, initial_player_profile, overall_traits, overall_seed_mode, players(*)")
+    .select("player_profile, primary_position, secondary_position, initial_player_profile, overall_traits, overall_seed_mode, players(*)")
     .eq("league_id", leagueId)
     .eq("is_active", true)
     .order("joined_at");
@@ -201,7 +211,7 @@ export async function getPlayer(id: string) {
   }
   const client = account.client;
   const { data: membership } = await client.from("league_members")
-    .select("player_id, player_profile, initial_player_profile, overall_traits, overall_seed_mode")
+    .select("player_id, player_profile, primary_position, secondary_position, initial_player_profile, overall_traits, overall_seed_mode")
     .eq("league_id", league.id).eq("player_id", id).eq("is_active", true).maybeSingle();
   if (!membership) return null;
   const { data, error } = await client
@@ -393,6 +403,8 @@ export async function getPlayerRoundHistory(playerId: string, roundType: RoundTy
       defensiveCleanGames: row.ranking_defensive_clean_games,
       defensiveOneGoalGames: row.ranking_defensive_one_goal_games,
       lineRole: row.player_profile_locked === "defensive" ? "DEF" : "ATA",
+      primaryPosition: row.primary_position_locked,
+      secondaryPosition: row.secondary_position_locked,
       ownGoals: row.own_goals,
     }, normalizeBQScoringSnapshot(round?.scoring_snapshot));
     const positionBonus = roundRankingPoints(Number(row.ranking_position_bonus || 0));
@@ -707,6 +719,8 @@ export async function createPlayer(input: CreatePlayerInput) {
     player_profile: normalizeLineProfile(input.player_profile),
     initial_player_profile: normalizeLineProfile(input.player_profile),
     overall_traits: normalizeOverallTraits(input.overall_traits),
+    primary_position: input.primary_position ?? null,
+    secondary_position: input.secondary_position ?? null,
     overall_seed_mode: "observed",
   });
   if (membershipError) {
@@ -752,6 +766,8 @@ export async function updatePlayer(id: string, input: Partial<CreatePlayerInput>
       initial_player_profile: normalizeLineProfile(input.player_profile),
     } : {}),
     ...(input.overall_traits !== undefined ? { overall_traits: normalizeOverallTraits(input.overall_traits) } : {}),
+    ...(input.primary_position !== undefined ? { primary_position: input.primary_position } : {}),
+    ...(input.secondary_position !== undefined ? { secondary_position: input.secondary_position } : {}),
   };
 
   const playerKeys = Object.keys(playerInput);
@@ -813,6 +829,8 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
   const nickname = String(formData.get("nickname") || "").trim();
   const profileBio = String(formData.get("profile_bio") || "").trim();
   const playerProfile = normalizeLineProfile(String(formData.get("player_profile") || "offensive") as PlayerProfile);
+  const requestedPrimaryPosition = String(formData.get("primary_position") || "") as LinePosition | "";
+  const requestedSecondaryPosition = String(formData.get("secondary_position") || "") as LinePosition | "";
   const requestedOverallTraits = normalizeOverallTraits(formData.getAll("overall_traits"));
   const requestedCategory = String(formData.get("member_category") || "player") as MemberCategory;
   const requestedSelectable = formData.get("is_selectable") !== "false";
@@ -842,6 +860,14 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
   if (isLeagueAdmin && requestedOverallTraits.length > 2) {
     return { success: false, error: "Escolha no máximo duas características: principal e secundária." };
   }
+  const validPositions = ["DEF", "MEI", "ALA", "ATA"];
+  if (isLeagueAdmin && (requestedPrimaryPosition || requestedSecondaryPosition)) {
+    if (!validPositions.includes(requestedPrimaryPosition)
+      || !validPositions.includes(requestedSecondaryPosition)
+      || requestedPrimaryPosition === requestedSecondaryPosition) {
+      return { success: false, error: "Escolha duas posições diferentes." };
+    }
+  }
 
   if (!name) return { success: false, error: "O nome é obrigatório." };
   if (name.length > 120) return { success: false, error: "O nome deve ter no máximo 120 caracteres." };
@@ -864,6 +890,8 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
   let currentPlayerProfile: PlayerProfile | null = "offensive";
   let currentIsGoalkeeper = false;
   let currentOverallTraits: PlayerProfile[] = [];
+  let currentPrimaryPosition: LinePosition | null = null;
+  let currentSecondaryPosition: LinePosition | null = null;
   const id = playerId || crypto.randomUUID();
 
   if (playerId) {
@@ -872,7 +900,7 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
         .select("avatar_url, avatar_alternate_url, member_category, is_selectable, player_profile, overall_traits, is_goalkeeper")
         .eq("id", playerId).single(),
       client.from("league_members")
-        .select("player_profile, overall_traits")
+        .select("player_profile, primary_position, secondary_position, overall_traits")
         .eq("league_id", selectedLeague!.id).eq("player_id", playerId).eq("is_active", true).single(),
     ]);
 
@@ -885,6 +913,8 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
     currentSelectable = currentPlayer.is_selectable;
     currentPlayerProfile = (currentMembership.player_profile ?? currentPlayer.player_profile) as PlayerProfile | null;
     currentOverallTraits = normalizeOverallTraits(currentMembership.overall_traits ?? currentPlayer.overall_traits);
+    currentPrimaryPosition = currentMembership.primary_position as LinePosition | null;
+    currentSecondaryPosition = currentMembership.secondary_position as LinePosition | null;
     currentIsGoalkeeper = Boolean(currentPlayer.is_goalkeeper);
   }
 
@@ -946,6 +976,10 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
   const overallTraits = memberCategory === "wag" || memberCategory === "supporter"
     ? []
     : isLeagueAdmin ? requestedOverallTraits : currentOverallTraits;
+  const primaryPosition = memberCategory === "wag" || memberCategory === "supporter"
+    ? null : isLeagueAdmin ? requestedPrimaryPosition || null : currentPrimaryPosition;
+  const secondaryPosition = memberCategory === "wag" || memberCategory === "supporter"
+    ? null : isLeagueAdmin ? requestedSecondaryPosition || null : currentSecondaryPosition;
   const playerData = {
     id,
     name,
@@ -999,6 +1033,8 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
       player_profile: playerData.player_profile,
       initial_player_profile: playerData.player_profile,
       overall_traits: playerData.overall_traits,
+      primary_position: primaryPosition,
+      secondary_position: secondaryPosition,
       overall_seed_mode: "observed",
     });
     if (membershipError) {
@@ -1010,6 +1046,8 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
       player_profile: playerData.player_profile,
       initial_player_profile: playerData.player_profile,
       overall_traits: playerData.overall_traits,
+      primary_position: primaryPosition,
+      secondary_position: secondaryPosition,
     }).eq("league_id", selectedLeague!.id).eq("player_id", id).eq("is_active", true);
     if (membershipError) {
       return { success: false, error: membershipError.message };

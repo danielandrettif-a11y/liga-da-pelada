@@ -1,4 +1,5 @@
 export type PlayerProfile = "offensive" | "midfield" | "defensive";
+export type LinePosition = "DEF" | "MEI" | "ALA" | "ATA";
 export type OverallSeedMode = "legacy_tag" | "observed";
 export type MemberCategory = "player" | "guest" | "wag" | "supporter";
 export type RegistrationSource = "legacy" | "site_signup" | "admin";
@@ -11,6 +12,8 @@ export type RosterPlayer = {
   avatar_url: string | null;
   avatar_alternate_url: string | null;
   player_profile: PlayerProfile | null;
+  primary_position: LinePosition | null;
+  secondary_position: LinePosition | null;
   initial_player_profile: PlayerProfile | null;
   profile_decision_source: "initial" | "overall" | null;
   profile_source_round_id: string | null;
@@ -29,13 +32,16 @@ export type RosterPlayer = {
 
 export type PlayerCatalogRecord = Omit<
   RosterPlayer,
-  "player_profile" | "initial_player_profile" | "overall_traits" | "overall_seed_mode" | "is_competitive_profile_complete"
+  "player_profile" | "primary_position" | "secondary_position" | "initial_player_profile"
+  | "overall_traits" | "overall_seed_mode" | "is_competitive_profile_complete"
 > & {
   player_profile: PlayerProfile | null;
   initial_player_profile: PlayerProfile | null;
   overall_traits: PlayerProfile[];
   overall_seed_mode: OverallSeedMode;
   league_player_profile: PlayerProfile | null;
+  league_primary_position: LinePosition | null;
+  league_secondary_position: LinePosition | null;
   league_initial_player_profile: PlayerProfile | null;
   league_overall_traits: PlayerProfile[];
   league_overall_seed_mode: OverallSeedMode;
@@ -71,6 +77,8 @@ export function playerFromCatalogRecord(record: PlayerCatalogRecord): RosterPlay
   );
   const {
     league_player_profile: _leaguePlayerProfile,
+    league_primary_position: _leaguePrimaryPosition,
+    league_secondary_position: _leagueSecondaryPosition,
     league_initial_player_profile: _leagueInitialPlayerProfile,
     league_overall_traits: _leagueOverallTraits,
     league_overall_seed_mode: _leagueOverallSeedMode,
@@ -79,6 +87,8 @@ export function playerFromCatalogRecord(record: PlayerCatalogRecord): RosterPlay
   return {
     ...identity,
     player_profile: playerProfile,
+    primary_position: record.league_primary_position,
+    secondary_position: record.league_secondary_position,
     initial_player_profile: initialPlayerProfile,
     overall_traits: overallTraits,
     overall_seed_mode: record.league_overall_seed_mode ?? record.overall_seed_mode,
@@ -87,6 +97,14 @@ export function playerFromCatalogRecord(record: PlayerCatalogRecord): RosterPlay
       && record.name.trim().length > 0
       && Boolean(record.avatar_url?.trim())
       && (playerProfile === "defensive" || playerProfile === "offensive")
+      && (
+        (record.league_primary_position === null && record.league_secondary_position === null)
+        || (
+          Boolean(record.league_primary_position)
+          && Boolean(record.league_secondary_position)
+          && record.league_primary_position !== record.league_secondary_position
+        )
+      )
       && overallTraits.length >= 1
       && overallTraits.length <= 2,
   };

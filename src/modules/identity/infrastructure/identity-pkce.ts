@@ -14,10 +14,15 @@ export function createIdentityPkceFlow(): IdentityPkceFlow {
   return { flowId, codeVerifier, codeChallenge };
 }
 
+function useSecurePkceCookie(): boolean {
+  const publicUrl = process.env.APP_PUBLIC_URL || process.env.NEXT_PUBLIC_APP_URL || "";
+  return process.env.NODE_ENV === "production" && !/^http:\/\//i.test(publicUrl);
+}
+
 export async function storeIdentityPkceVerifier(flow: IdentityPkceFlow): Promise<void> {
   (await cookies()).set(`${COOKIE_PREFIX}${flow.flowId}`, flow.codeVerifier, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: useSecurePkceCookie(),
     sameSite: "lax",
     path: "/auth/callback",
     maxAge: 60 * 60,
@@ -31,7 +36,7 @@ export async function consumeIdentityPkceVerifier(flowId: string): Promise<strin
   const verifier = cookieStore.get(name)?.value || null;
   cookieStore.set(name, "", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: useSecurePkceCookie(),
     sameSite: "lax",
     path: "/auth/callback",
     maxAge: 0,

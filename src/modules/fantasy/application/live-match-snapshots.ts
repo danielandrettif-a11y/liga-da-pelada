@@ -41,7 +41,7 @@ export function fantasyGoalkeeperTimeline(match: any) {
     events: (match.match_events || []).map((item: any) => ({
       playerId: item.player_id, assistPlayerId: item.assist_player_id, teamId: item.team_id,
       isOwnGoal: Boolean(item.is_own_goal), goalkeeperAPlayerId: item.goalkeeper_a_player_id,
-      goalkeeperBPlayerId: item.goalkeeper_b_player_id,
+      goalkeeperBPlayerId: item.goalkeeper_b_player_id, elapsedSeconds: item.elapsed_seconds,
     })),
   };
 }
@@ -51,16 +51,30 @@ export function buildLiveLineupProjections(input: {
 }) {
   const members = input.memberships.map((membership) => {
     const player = Array.isArray(membership.players) ? membership.players[0] : membership.players;
-    return { ...player, id: membership.player_id, player_profile: membership.player_profile };
+    return {
+      ...player,
+      id: membership.player_id,
+      player_profile: membership.player_profile,
+      primary_position: membership.primary_position,
+      secondary_position: membership.secondary_position,
+    };
   });
-  const profiles = new Map(members.map((player) => [player.id, player.player_profile]));
+  const profiles = new Map(members.map((player) => [player.id, {
+    profile: player.player_profile,
+    primary: player.primary_position,
+    secondary: player.secondary_position,
+  }]));
   const eligible = new Set<string>(members.filter((player) => player.member_category === "player" && player.is_selectable).map((player) => String(player.id)));
   const stats = projectFantasyLiveStats(input.matches.map((match) => ({
     id: match.id, status: match.status, teamAId: match.team_a_id, teamBId: match.team_b_id,
     scoreA: Number(match.score_a || 0), scoreB: Number(match.score_b || 0),
     players: (match.match_players || []).map((item: any) => ({ playerId: item.player_id, teamId: item.team_id,
       resultEligible: Boolean(item.result_eligible), scoringEligible: item.scoring_eligible !== false,
-      playerProfile: profiles.get(item.player_id) || null })),
+      playerProfile: profiles.get(item.player_id)?.profile || null,
+      primaryPosition: profiles.get(item.player_id)?.primary || null,
+      secondaryPosition: profiles.get(item.player_id)?.secondary || null,
+      enteredElapsedSeconds: item.entered_elapsed_seconds,
+      leftElapsedSeconds: item.left_elapsed_seconds })),
     goalkeepers: (match.match_goalkeepers || []).map((item: any) => ({ playerId: item.player_id, teamId: item.team_id })),
     ...fantasyGoalkeeperTimeline(match),
   })), input.settings, { suppressGoalkeeperRewards: input.suppressGoalkeeperRewards });

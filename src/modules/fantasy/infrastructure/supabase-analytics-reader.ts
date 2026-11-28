@@ -7,7 +7,7 @@ export async function readFantasyPlayerDetailBase(
   const [membership, price, history, stats, cosmeticProfile] = await Promise.all([
     client
       .from("league_members")
-      .select("player_id, player_profile, players!inner(id, name, avatar_url, is_goalkeeper, member_category)")
+      .select("player_id, player_profile, primary_position, secondary_position, players!inner(id, name, avatar_url, is_goalkeeper, member_category)")
       .eq("league_id", input.leagueId)
       .eq("player_id", input.playerId)
       .eq("is_active", true)
@@ -26,7 +26,7 @@ export async function readFantasyPlayerDetailBase(
       .order("created_at", { ascending: true }),
     client
       .from("player_round_stats")
-      .select("round_id, goals, assists, wins, draws, losses, games, own_goals, team_goals_conceded, defensive_clean_games, defensive_one_goal_games, ranking_defensive_clean_games, ranking_defensive_one_goal_games, goalkeeper_games, goalkeeper_goals, goalkeeper_assists, goalkeeper_own_goals, goalkeeper_wins, goalkeeper_draws, goalkeeper_losses, goals_conceded, clean_sheets, points, ranking_points, ranking_position_bonus, player_profile_locked, round:round_id!inner(season_id)")
+      .select("round_id, goals, assists, wins, draws, losses, games, own_goals, team_goals_conceded, defensive_clean_games, defensive_one_goal_games, ranking_defensive_clean_games, ranking_defensive_one_goal_games, goalkeeper_games, goalkeeper_goals, goalkeeper_assists, goalkeeper_own_goals, goalkeeper_wins, goalkeeper_draws, goalkeeper_losses, goals_conceded, clean_sheets, points, ranking_points, ranking_position_bonus, player_profile_locked, primary_position_locked, secondary_position_locked, round:round_id!inner(season_id)")
       .eq("player_id", input.playerId)
       .eq("round.season_id", input.seasonId),
     client

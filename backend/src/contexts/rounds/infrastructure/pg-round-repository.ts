@@ -868,6 +868,40 @@ export function pgRoundRepository(pool: Pool, recalculateStats = persistRoundSta
           }
         }
 
+        if (round.round_type === "official") {
+          const scoringResult = await client.query<{ scoring_version: number }>(
+            "SELECT scoring_version FROM public.rounds WHERE id = $1::uuid",
+            [roundId],
+          );
+          if (Number(scoringResult.rows[0]?.scoring_version || 0) >= 15) {
+            const incompleteResult = await client.query<{ player_name: string }>(
+              `SELECT DISTINCT player.name AS player_name
+                 FROM public.match_players participant
+                 JOIN public.matches match_item ON match_item.id = participant.match_id
+                 JOIN public.round_players round_player
+                   ON round_player.round_id = match_item.round_id
+                  AND round_player.player_id = participant.player_id
+                 JOIN public.players player ON player.id = participant.player_id
+                WHERE match_item.round_id = $1::uuid
+                  AND participant.scoring_eligible IS DISTINCT FROM false
+                  AND (
+                    round_player.primary_position_locked IS NULL
+                    OR round_player.secondary_position_locked IS NULL
+                    OR round_player.primary_position_locked = round_player.secondary_position_locked
+                  )
+                ORDER BY player.name`,
+              [roundId],
+            );
+            if (incompleteResult.rows.length) {
+              throw new RoundPersistenceError(
+                `Defina posição primária e secundária para: ${incompleteResult.rows
+                  .map((item) => item.player_name).join(", ")}.`,
+                400,
+              );
+            }
+          }
+        }
+
         await recalculateStats(client, leagueId, roundId);
 
         await client.query(

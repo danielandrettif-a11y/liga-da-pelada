@@ -1,10 +1,13 @@
 import type { MemberCategory } from "./player-catalog.js";
+import type { LinePosition } from "./player-catalog.js";
 
 export type CreatePlayerCommand = {
   name: string;
   nickname: string | null;
   avatarUrl: string | null;
   playerProfile: "offensive" | "defensive";
+  primaryPosition: LinePosition | null;
+  secondaryPosition: LinePosition | null;
   overallTraits: ("offensive" | "defensive")[];
   memberCategory: Exclude<MemberCategory, "player">;
   isSelectable: boolean;
@@ -15,6 +18,8 @@ export type UpdatePlayerCommand = {
   nickname?: string | null;
   avatarUrl?: string | null;
   playerProfile?: "offensive" | "defensive";
+  primaryPosition?: LinePosition | null;
+  secondaryPosition?: LinePosition | null;
   overallTraits?: ("offensive" | "defensive")[];
   memberCategory?: MemberCategory;
   isSelectable?: boolean;
@@ -70,6 +75,21 @@ function playerProfile(value: unknown): "offensive" | "defensive" {
   throw new InvalidPlayerManagementError("Escolha um perfil de jogo válido.");
 }
 
+function linePosition(value: unknown, label: string): LinePosition | null {
+  if (value === undefined || value === null || value === "") return null;
+  if (value === "DEF" || value === "MEI" || value === "ALA" || value === "ATA") return value;
+  throw new InvalidPlayerManagementError(`${label} inválida.`);
+}
+
+function positions(primary: unknown, secondary: unknown) {
+  const primaryPosition = linePosition(primary, "Posição primária");
+  const secondaryPosition = linePosition(secondary, "Posição secundária");
+  if (primaryPosition && secondaryPosition && primaryPosition === secondaryPosition) {
+    throw new InvalidPlayerManagementError("As posições primária e secundária precisam ser diferentes.");
+  }
+  return { primaryPosition, secondaryPosition };
+}
+
 function overallTraits(value: unknown): ("offensive" | "defensive")[] {
   if (value === undefined || value === null) return [];
   if (!Array.isArray(value)) throw new InvalidPlayerManagementError("Características gerais inválidas.");
@@ -92,11 +112,13 @@ export function normalizeCreatePlayer(value: unknown): CreatePlayerCommand {
   if (category === "player") {
     throw new InvalidPlayerManagementError("Jogadores oficiais precisam criar o próprio perfil ao entrar no app.");
   }
+  const selectedPositions = positions(input.primary_position, input.secondary_position);
   return {
     name: requiredName(input.name),
     nickname: optionalText(input.nickname, "O apelido", 60),
     avatarUrl: optionalText(input.avatar_url, "A URL da foto", 2_048),
     playerProfile: playerProfile(input.player_profile),
+    ...selectedPositions,
     overallTraits: overallTraits(input.overall_traits),
     memberCategory: category,
     isSelectable: category !== "wag" && category !== "supporter",
@@ -110,6 +132,14 @@ export function normalizeUpdatePlayer(value: unknown): UpdatePlayerCommand {
   if (input.nickname !== undefined) command.nickname = optionalText(input.nickname, "O apelido", 60);
   if (input.avatar_url !== undefined) command.avatarUrl = optionalText(input.avatar_url, "A URL da foto", 2_048);
   if (input.player_profile !== undefined) command.playerProfile = playerProfile(input.player_profile);
+  if (input.primary_position !== undefined || input.secondary_position !== undefined) {
+    if (input.primary_position === undefined || input.secondary_position === undefined) {
+      throw new InvalidPlayerManagementError("Informe as posições primária e secundária juntas.");
+    }
+    const selectedPositions = positions(input.primary_position, input.secondary_position);
+    command.primaryPosition = selectedPositions.primaryPosition;
+    command.secondaryPosition = selectedPositions.secondaryPosition;
+  }
   if (input.overall_traits !== undefined) command.overallTraits = overallTraits(input.overall_traits);
   if (input.member_category !== undefined) command.memberCategory = memberCategory(input.member_category);
   if (input.is_selectable !== undefined) {

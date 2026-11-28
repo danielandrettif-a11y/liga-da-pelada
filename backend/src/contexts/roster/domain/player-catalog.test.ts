@@ -24,6 +24,8 @@ function record(overrides: Partial<PlayerCatalogRecord> = {}): PlayerCatalogReco
     created_by_user_id: null,
     created_at: "2026-10-20T10:00:00.000Z",
     league_player_profile: "defensive",
+    league_primary_position: null,
+    league_secondary_position: null,
     league_initial_player_profile: "offensive",
     league_overall_traits: ["defensive", "offensive"],
     league_overall_seed_mode: "legacy_tag",

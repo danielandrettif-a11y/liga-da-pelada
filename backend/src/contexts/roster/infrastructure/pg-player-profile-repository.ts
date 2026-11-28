@@ -51,6 +51,8 @@ type AccessRow = {
   member_category: "player" | "guest" | "wag" | "supporter";
   is_selectable: boolean;
   player_profile: "offensive" | "midfield" | "defensive" | null;
+  primary_position: "DEF" | "MEI" | "ALA" | "ATA" | null;
+  secondary_position: "DEF" | "MEI" | "ALA" | "ATA" | null;
   overall_traits: ("offensive" | "midfield" | "defensive")[] | null;
   is_goalkeeper: boolean;
   is_owner: boolean;
@@ -65,6 +67,7 @@ async function readAccess(
     `SELECT player.profile_bio, player.avatar_url, player.avatar_alternate_url,
             player.member_category, player.is_selectable,
             COALESCE(member.player_profile, player.player_profile) AS player_profile,
+            member.primary_position, member.secondary_position,
             COALESCE(member.overall_traits, player.overall_traits, ARRAY[]::text[]) AS overall_traits,
             player.is_goalkeeper,
             EXISTS (
@@ -89,6 +92,8 @@ async function readAccess(
       memberCategory: row.member_category,
       isSelectable: row.is_selectable,
       playerProfile: row.player_profile,
+      primaryPosition: row.primary_position,
+      secondaryPosition: row.secondary_position,
       overallTraits: row.overall_traits || [],
       isGoalkeeper: row.is_goalkeeper,
     },
@@ -127,9 +132,10 @@ export function pgPlayerProfileRepository(pool: Pool): PlayerProfileRepository {
         await client.query(
           `INSERT INTO public.league_members (
              league_id, player_id, role, is_active, player_profile, initial_player_profile,
-             overall_traits, overall_seed_mode
-           ) VALUES ($1::uuid, $2::uuid, 'player', true, $3::text, $3::text, $4::text[], 'observed')`,
-          [leagueId, command.playerId, command.playerProfile, command.overallTraits],
+             overall_traits, overall_seed_mode, primary_position, secondary_position
+           ) VALUES ($1::uuid, $2::uuid, 'player', true, $3::text, $3::text, $4::text[], 'observed', $5::text, $6::text)`,
+          [leagueId, command.playerId, command.playerProfile, command.overallTraits,
+            command.primaryPosition, command.secondaryPosition],
         );
         return;
       }
@@ -149,9 +155,11 @@ export function pgPlayerProfileRepository(pool: Pool): PlayerProfileRepository {
       if (access.isLeagueAdmin) {
         await client.query(
           `UPDATE public.league_members
-              SET player_profile = $3::text, initial_player_profile = $3::text, overall_traits = $4::text[]
+              SET player_profile = $3::text, initial_player_profile = $3::text,
+                  overall_traits = $4::text[], primary_position = $5::text, secondary_position = $6::text
             WHERE league_id = $1::uuid AND player_id = $2::uuid AND is_active`,
-          [leagueId, command.playerId, command.playerProfile, command.overallTraits],
+          [leagueId, command.playerId, command.playerProfile, command.overallTraits,
+            command.primaryPosition, command.secondaryPosition],
         );
       }
     }),

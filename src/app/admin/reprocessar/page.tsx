@@ -56,7 +56,7 @@ export default function ReprocessarPage() {
           <ArrowLeft className="h-5 w-5 text-muted" />
         </Link>
         <div>
-          <h1 className="text-xl font-bold text-foreground">Reprocessar Temporada (BQ v5)</h1>
+          <h1 className="text-xl font-bold text-foreground">Reprocessar Temporada (Posições v15)</h1>
           <p className="mt-0.5 text-xs text-muted">
             Recalcular todas as pontuações, posições e patrimônios da temporada ativa
           </p>
@@ -70,9 +70,10 @@ export default function ReprocessarPage() {
           <span>Ação Crítica de Temporada</span>
         </div>
         <p className="text-xs leading-relaxed text-muted">
-          Esta ferramenta aplica as regras do <strong>BQ v5</strong> (scouts básicos unificados,
-          bônus posicionais DEF/ALA-MEI/ATA e novo modelo de mercado) retroativamente em todas as rodadas
-          da temporada ativa. Escalações, capitães e palpites são preservados.
+          Esta ferramenta aplica as regras de <strong>posições duais v15</strong> retroativamente em todas
+          as rodadas encerradas da temporada ativa. As posições atuais são congeladas como cenário
+          histórico, a Ranked é recalculada pela linha do tempo das partidas e o Cartola é reprocessado
+          em seguida. Escalações, capitães e palpites são preservados.
         </p>
         <div className="pt-2">
           <button
@@ -109,9 +110,42 @@ export default function ReprocessarPage() {
       {/* Prévia */}
       {preview && (
         <div className="space-y-4">
+          {preview.historical_limitations && (
+            <div className="glass-card border border-amber-500/30 p-4 text-xs leading-relaxed text-muted">
+              <p className="font-bold text-amber-300">Limitações conhecidas do histórico desta temporada</p>
+              <ul className="mt-2 list-disc space-y-1 pl-5">
+                <li>
+                  Rodadas antigas permanecem com suas regras congeladas até você confirmar o reprocessamento; nenhuma posição secundária é inventada automaticamente.
+                </li>
+                {preview.historical_limitations.legacy_goalkeeper_matches_count > 0 && (
+                  <li>
+                    {preview.historical_limitations.legacy_goalkeeper_matches_count} partida(s) usam registro integral de goleiro por jogo (sem troca cronometrada no meio da partida). Goleiros integrais têm tempo de linha zero e não recebem clean sheet de linha.
+                  </li>
+                )}
+                {preview.historical_limitations.untimed_goal_rounds_count > 0 && (
+                  <li>
+                    {preview.historical_limitations.untimed_goal_rounds_count} rodada(s) possuem gols sem segundo exato registrado; nesses gols, a exposição na linha considera quem atuou na linha durante a partida.
+                  </li>
+                )}
+                {preview.historical_limitations.legacy_fantasy_rounds_count > 0 && (
+                  <li>
+                    {preview.historical_limitations.legacy_fantasy_rounds_count} rodada(s) anteriores do Cartola passarão da regra antiga para a pontuação consolidada v15 (vaga GOL usando scouts exclusivos no gol; rodadas sem vagas preservam os 5 atletas escalados).
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
+
           {!preview.can_reprocess ? (
             <div className="glass-card border border-rose-500/40 p-4 text-xs text-rose-400">
               ⛔ <strong>Reprocessamento Bloqueado:</strong> {preview.reason}
+              {preview.missing_positions && preview.missing_positions.length > 0 && (
+                <ul className="mt-3 list-disc space-y-1 pl-5 text-muted">
+                  {preview.missing_positions.map((player) => (
+                    <li key={player.player_id}>{player.name}</li>
+                  ))}
+                </ul>
+              )}
             </div>
           ) : (
             <>
@@ -173,7 +207,7 @@ export default function ReprocessarPage() {
             <h2 className="text-base font-bold text-rose-500">Tem certeza absoluta?</h2>
             <p className="text-xs leading-relaxed text-muted">
               Esta ação recalculará cronologicamente todas as rodadas da temporada ativa usando as
-              regras BQ v5. Os patrimônios e rankings de todos os jogadores serão atualizados.
+              regras de posições duais v15. Os patrimônios e rankings de todos os jogadores serão atualizados.
             </p>
             <div className="flex gap-3 pt-2">
               <button

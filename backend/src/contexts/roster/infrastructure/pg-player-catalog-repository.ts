@@ -6,6 +6,7 @@ import type {
   MemberCategory,
   OverallSeedMode,
   PlayerCatalogRecord,
+  LinePosition,
   PlayerProfile,
   RegistrationSource,
 } from "../domain/player-catalog.js";
@@ -39,6 +40,8 @@ export type PlayerCatalogRow = {
   created_by_user_id: string | null;
   created_at: string | Date;
   league_player_profile: PlayerProfile | null;
+  league_primary_position: LinePosition | null;
+  league_secondary_position: LinePosition | null;
   league_initial_player_profile: PlayerProfile | null;
   league_overall_traits: PlayerProfile[] | null;
   league_overall_seed_mode: OverallSeedMode;
@@ -54,6 +57,8 @@ export const playerCatalogProjection = `
          player.show_fitness_stats, player.registration_source, player.profile_scope,
          player.created_by_user_id, player.created_at,
          member.player_profile AS league_player_profile,
+         member.primary_position AS league_primary_position,
+         member.secondary_position AS league_secondary_position,
          member.initial_player_profile AS league_initial_player_profile,
          member.overall_traits AS league_overall_traits,
          member.overall_seed_mode AS league_overall_seed_mode

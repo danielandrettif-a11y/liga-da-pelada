@@ -80,6 +80,8 @@ export async function savePlayerProfile(
         memberCategory: input.memberCategory,
         isSelectable: input.isSelectable,
         playerProfile: input.playerProfile,
+        primaryPosition: input.primaryPosition,
+        secondaryPosition: input.secondaryPosition,
         overallTraits: input.overallTraits,
         isGoalkeeper: false,
       } } : access;

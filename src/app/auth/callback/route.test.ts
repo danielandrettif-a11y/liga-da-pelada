@@ -9,7 +9,7 @@ vi.mock("@/modules/identity/infrastructure/identity-pkce", () => ({
   consumeIdentityPkceVerifier: mocks.consume,
 }));
 vi.mock("next/headers", () => ({ cookies: mocks.cookies }));
-vi.mock("@/lib/siteUrl", () => ({ SITE_URL: "https://app.example" }));
+vi.mock("@/lib/siteUrl", () => ({ SITE_URL: "https://app.example", requestOrigin: () => "https://app.example" }));
 
 import { GET } from "./route";
 

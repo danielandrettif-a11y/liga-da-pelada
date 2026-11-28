@@ -16,6 +16,7 @@ export type User = {
 };
 
 export type PlayerProfile = 'offensive' | 'midfield' | 'defensive';
+export type LinePosition = 'DEF' | 'MEI' | 'ALA' | 'ATA';
 export type OverallSeedMode = 'legacy_tag' | 'observed';
 export type PrivateBalanceTag = 'bagre_1' | 'bagre_2' | 'craque_1' | 'craque_2';
 export type MemberCategory = 'player' | 'guest' | 'wag' | 'supporter';
@@ -78,6 +79,8 @@ export type Player = {
   /** Segunda foto guardada pelo perfil; avatar_url continua sendo a foto ativa. */
   avatar_alternate_url: string | null;
   player_profile: PlayerProfile | null;
+  primary_position?: LinePosition | null;
+  secondary_position?: LinePosition | null;
   initial_player_profile?: PlayerProfile | null;
   profile_decision_source?: "initial" | "overall" | null;
   profile_source_round_id?: string | null;
@@ -152,6 +155,8 @@ export type LeagueMember = {
   role: 'admin' | 'player';
   is_active: boolean;
   player_profile: PlayerProfile | null;
+  primary_position: LinePosition | null;
+  secondary_position: LinePosition | null;
   initial_player_profile: PlayerProfile | null;
   overall_traits: PlayerProfile[];
   overall_seed_mode: OverallSeedMode;
@@ -318,6 +323,8 @@ export type RoundPlayer = {
   attendance_status: 'pending' | 'present';
   attendance_order: number | null;
   attendance_marked_at: string | null;
+  primary_position_locked?: LinePosition | null;
+  secondary_position_locked?: LinePosition | null;
 };
 
 export type PushSubscriptionRecord = {
@@ -447,7 +454,7 @@ export type PlayerRoundStats = {
   points: number;
   ranking_defensive_clean_games: number;
   ranking_defensive_one_goal_games: number;
-  ranking_role_weights: Array<{ role: "DEF" | "MEI" | "ATA"; overall: number; weight: 1 | 0.5 }>;
+  ranking_role_weights: Array<{ role: LinePosition; overall: number; weight: number }>;
   ranking_position_bonus: number;
   ranking_points: number;
   player_profile_locked?: PlayerProfile | null;
@@ -455,6 +462,8 @@ export type PlayerRoundStats = {
   profile_appearance_number?: number | null;
   profile_def_overall?: number | null;
   profile_ata_overall?: number | null;
+  primary_position_locked?: LinePosition | null;
+  secondary_position_locked?: LinePosition | null;
 };
 
 // ============================================
@@ -523,6 +532,8 @@ export type CreatePlayerInput = {
   profile_bio?: string;
   avatar_url?: string;
   player_profile?: PlayerProfile;
+  primary_position?: LinePosition | null;
+  secondary_position?: LinePosition | null;
   overall_traits?: PlayerProfile[];
   is_goalkeeper?: boolean;
   member_category?: MemberCategory;

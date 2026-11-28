@@ -61,7 +61,8 @@ async function loadCalculationContext(
   const [roundPlayersResult, matchesResult] = await Promise.all([
     client.query<any>(
       `SELECT player_id, player_profile_locked, profile_decision_source,
-              profile_appearance_number, profile_def_overall, profile_ata_overall
+              profile_appearance_number, profile_def_overall, profile_ata_overall,
+              primary_position_locked, secondary_position_locked
        FROM public.round_players WHERE round_id = $1::uuid`,
       [roundId],
     ),
@@ -78,11 +79,12 @@ async function loadCalculationContext(
   const [eventsResult, participantsResult, goalkeepersResult, stintsResult, membersResult, overridesResult] = await Promise.all([
     matchIds.length ? client.query<any>(
       `SELECT match_id, event_type, player_id, assist_player_id, team_id,
-              goalkeeper_a_player_id, goalkeeper_b_player_id, is_own_goal
+              goalkeeper_a_player_id, goalkeeper_b_player_id, is_own_goal, elapsed_seconds
        FROM public.match_events WHERE match_id = ANY($1::uuid[])`, [matchIds],
     ) : Promise.resolve(empty),
     matchIds.length ? client.query<any>(
-      `SELECT match_id, player_id, team_id, result_eligible, scoring_eligible
+      `SELECT match_id, player_id, team_id, result_eligible, scoring_eligible,
+              entered_elapsed_seconds, left_elapsed_seconds
        FROM public.match_players WHERE match_id = ANY($1::uuid[])`, [matchIds],
     ) : Promise.resolve(empty),
     matchIds.length ? client.query<any>(
@@ -95,7 +97,8 @@ async function loadCalculationContext(
     ) : Promise.resolve(empty),
     playerIds.length ? client.query<any>(
       `SELECT player.id, player.name, player.avatar_url, player.member_category, player.is_selectable,
-              membership.player_profile, membership.overall_traits
+              membership.player_profile, membership.overall_traits,
+              membership.primary_position, membership.secondary_position
        FROM public.league_members membership
        JOIN public.players player ON player.id = membership.player_id
        WHERE membership.league_id = $1::uuid AND membership.is_active = true
@@ -174,10 +177,11 @@ async function upsertRows(client: PoolClient, rows: ReturnType<typeof calculateR
       defensive_clean_games, defensive_one_goal_games, ranking_defensive_clean_games,
       ranking_defensive_one_goal_games, own_goals, team_goals_conceded, player_profile_locked,
       profile_decision_source, profile_appearance_number, profile_def_overall, profile_ata_overall,
+      primary_position_locked, secondary_position_locked,
       points, ranking_role_weights, ranking_position_bonus
     ) VALUES (
       $1::uuid,$2::uuid,$3::uuid,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,
-      $19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31::jsonb,$32
+      $19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33::jsonb,$34
     ) ON CONFLICT (player_id, round_id) DO UPDATE SET
       league_id=EXCLUDED.league_id, games=EXCLUDED.games, wins=EXCLUDED.wins, draws=EXCLUDED.draws,
       losses=EXCLUDED.losses, goals=EXCLUDED.goals, assists=EXCLUDED.assists,
@@ -192,7 +196,9 @@ async function upsertRows(client: PoolClient, rows: ReturnType<typeof calculateR
       own_goals=EXCLUDED.own_goals, team_goals_conceded=EXCLUDED.team_goals_conceded,
       player_profile_locked=EXCLUDED.player_profile_locked, profile_decision_source=EXCLUDED.profile_decision_source,
       profile_appearance_number=EXCLUDED.profile_appearance_number, profile_def_overall=EXCLUDED.profile_def_overall,
-      profile_ata_overall=EXCLUDED.profile_ata_overall, points=EXCLUDED.points,
+      profile_ata_overall=EXCLUDED.profile_ata_overall,
+      primary_position_locked=EXCLUDED.primary_position_locked,
+      secondary_position_locked=EXCLUDED.secondary_position_locked, points=EXCLUDED.points,
       ranking_role_weights=EXCLUDED.ranking_role_weights, ranking_position_bonus=EXCLUDED.ranking_position_bonus`;
   for (const row of rows) await client.query(sql, [
     row.player_id, row.round_id, row.league_id, row.games, row.wins, row.draws, row.losses, row.goals, row.assists,
@@ -201,6 +207,7 @@ async function upsertRows(client: PoolClient, rows: ReturnType<typeof calculateR
     row.defensive_clean_games, row.defensive_one_goal_games, row.ranking_defensive_clean_games,
     row.ranking_defensive_one_goal_games, row.own_goals, row.team_goals_conceded, row.player_profile_locked,
     row.profile_decision_source, row.profile_appearance_number, row.profile_def_overall, row.profile_ata_overall,
+    row.primary_position_locked, row.secondary_position_locked,
     row.points, JSON.stringify(row.ranking_role_weights), row.ranking_position_bonus,
   ]);
 }

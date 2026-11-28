@@ -5,8 +5,12 @@ import { BQ_SCORING_V5, type BQBaseScoringSnapshot } from "@/lib/bq-scoring";
 import {
   saveBQScoringRules,
   saveColumnCScoringRules,
+  saveDualPositionScoringRules,
   type ColumnCScoringSettings,
+  type DualPositionScoringSettings,
+  type PositionBalanceScoutRow,
 } from "@/lib/actions/bq-scoring";
+import { PositionBalancePanel } from "@/components/PositionBalancePanel";
 
 function formatPoints(points: number, suffix = "") {
   return `${points > 0 ? "+" : ""}${points}${suffix}`;
@@ -15,21 +19,29 @@ function formatPoints(points: number, suffix = "") {
 type ScoringRulesFormProps = {
   initialValues?: BQBaseScoringSnapshot;
   initialColumnCValues: ColumnCScoringSettings;
+  initialDualPositionValues: DualPositionScoringSettings;
+  balanceRows: PositionBalanceScoutRow[];
   isAdmin?: boolean;
 };
 
 export function ScoringRulesForm({
   initialValues = BQ_SCORING_V5,
   initialColumnCValues,
+  initialDualPositionValues,
+  balanceRows,
   isAdmin = false,
 }: ScoringRulesFormProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isPositionEditing, setIsPositionEditing] = useState(false);
+  const [isDualEditing, setIsDualEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savingPositions, setSavingPositions] = useState<"future" | "ranked" | null>(null);
+  const [savingDual, setSavingDual] = useState(false);
   const [values, setValues] = useState<BQBaseScoringSnapshot>(initialValues);
   const [columnCValues, setColumnCValues] = useState<ColumnCScoringSettings>(initialColumnCValues);
   const [savedColumnCValues, setSavedColumnCValues] = useState<ColumnCScoringSettings>(initialColumnCValues);
+  const [dualValues, setDualValues] = useState<DualPositionScoringSettings>(initialDualPositionValues);
+  const [savedDualValues, setSavedDualValues] = useState<DualPositionScoringSettings>(initialDualPositionValues);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const rulesList = [
@@ -90,6 +102,14 @@ export function ScoringRulesForm({
     },
   ];
 
+  const dualRuleFields = [
+    ["goal", "Gol"],
+    ["assist", "Assistência"],
+    ["cleanSheet", "Sem sofrer gol"],
+    ["conceded", "Por gol sofrido"],
+    ["ownGoal", "Gol contra"],
+  ] as const;
+
   function handleChange(key: keyof BQBaseScoringSnapshot, val: string) {
     const num = parseFloat(val);
     if (!isNaN(num)) {
@@ -101,6 +121,46 @@ export function ScoringRulesForm({
     const num = parseFloat(val);
     if (!isNaN(num)) {
       setColumnCValues((prev) => ({ ...prev, [key]: num }));
+    }
+  }
+
+  function handleDualRuleChange(
+    position: keyof DualPositionScoringSettings["positionRules"],
+    key: keyof DualPositionScoringSettings["positionRules"]["DEF"],
+    val: string,
+  ) {
+    const num = parseFloat(val);
+    if (!Number.isNaN(num)) setDualValues((current) => ({
+      ...current,
+      positionRules: {
+        ...current.positionRules,
+        [position]: { ...current.positionRules[position], [key]: num },
+      },
+    }));
+  }
+
+  function handleDualScalarChange(key: Exclude<keyof DualPositionScoringSettings, "positionRules">, val: string) {
+    const num = parseFloat(val);
+    if (!Number.isNaN(num)) setDualValues((current) => ({ ...current, [key]: num }));
+  }
+
+  async function handleSaveDual() {
+    if (Math.abs(dualValues.primaryWeight + dualValues.secondaryWeight - 1) > 0.000001) {
+      setMessage({ type: "error", text: "Os pesos primário e secundário precisam somar 100%." });
+      return;
+    }
+    setSavingDual(true);
+    setMessage(null);
+    try {
+      const result = await saveDualPositionScoringRules(dualValues);
+      if (!result.success) setMessage({ type: "error", text: result.error || "Erro ao salvar a pontuação dual." });
+      else {
+        setSavedDualValues(dualValues);
+        setIsDualEditing(false);
+        setMessage({ type: "success", text: `Posições 2.0 salvas; ${result.draftRoundsUpdated || 0} rodada(s) em rascunho atualizada(s).` });
+      }
+    } finally {
+      setSavingDual(false);
     }
   }
 
@@ -182,6 +242,102 @@ export function ScoringRulesForm({
           {message.text}
         </div>
       )}
+
+      <section className="space-y-3">
+        <div className="glass-card flex items-center justify-between gap-3 p-4">
+          <div>
+            <p className="text-sm font-bold text-foreground">Posições 2.0 · v15</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted">Valores publicados para DEF, MEI, ALA e ATA. A simulação usa os mesmos parâmetros sem alterar rodadas encerradas.</p>
+          </div>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => {
+                if (isDualEditing) setDualValues(savedDualValues);
+                setIsDualEditing((value) => !value);
+              }}
+              className="shrink-0 rounded-xl bg-surface px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-hover"
+            >
+              {isDualEditing ? "Cancelar" : "Editar"}
+            </button>
+          )}
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          {(["DEF", "MEI", "ALA", "ATA"] as const).map((position) => (
+            <div key={position} className="glass-card overflow-hidden">
+              <div className="border-b border-border p-3">
+                <p className="text-sm font-black text-accent">{position}</p>
+              </div>
+              {dualRuleFields.map(([key, label]) => {
+                const value = dualValues.positionRules[position][key];
+                return (
+                  <div key={key} className="flex items-center justify-between gap-3 border-b border-border/60 px-3 py-2 last:border-b-0">
+                    <span className="text-[11px] font-semibold text-muted">{label}</span>
+                    {isDualEditing ? (
+                      <input type="number" step="0.25" value={value}
+                        onChange={(event) => handleDualRuleChange(position, key, event.target.value)}
+                        className="w-20 rounded-lg border border-border bg-surface px-2 py-1 text-right text-xs font-bold text-foreground focus:border-accent focus:outline-none" />
+                    ) : (
+                      <span className={`text-sm font-black ${value > 0 ? "text-accent" : value < 0 ? "text-danger" : "text-muted"}`}>{formatPoints(value)}</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+
+        <div className="glass-card grid gap-3 p-4 sm:grid-cols-3">
+          {([
+            ["primaryWeight", "Peso primário", 0.05],
+            ["secondaryWeight", "Peso secundário", 0.05],
+            ["lineCleanSheetMinShare", "Mínimo para clean sheet", 0.05],
+          ] as const).map(([key, label, step]) => (
+            <label key={key} className="space-y-1">
+              <span className="text-[10px] font-bold uppercase text-muted">{label}</span>
+              {isDualEditing ? (
+                <input type="number" min="0" max="1" step={step} value={dualValues[key]}
+                  onChange={(event) => handleDualScalarChange(key, event.target.value)}
+                  className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm font-bold text-foreground focus:border-accent focus:outline-none" />
+              ) : <p className="text-lg font-black text-foreground">{Math.round(dualValues[key] * 100)}%</p>}
+            </label>
+          ))}
+        </div>
+
+        <div className="glass-card overflow-hidden">
+          <div className="border-b border-border p-3"><p className="text-sm font-black text-accent">GOL · cálculo separado</p></div>
+          {([
+            ["goalkeeperAppearance", "Atuação"], ["goalkeeperGoal", "Gol"],
+            ["goalkeeperAssist", "Assistência"], ["goalkeeperGoalConceded", "Por gol sofrido"],
+            ["goalkeeperCleanSheet", "Sem sofrer gol"], ["goalkeeperOneGoal", "Exatamente 1 sofrido"],
+            ["goalkeeperOwnGoal", "Gol contra"],
+          ] as const).map(([key, label]) => {
+            const value = dualValues[key];
+            return (
+              <div key={key} className="flex items-center justify-between gap-3 border-b border-border/60 px-3 py-2 last:border-b-0">
+                <span className="text-[11px] font-semibold text-muted">{label}</span>
+                {isDualEditing ? (
+                  <input type="number" step="0.25" value={value}
+                    onChange={(event) => handleDualScalarChange(key, event.target.value)}
+                    className="w-20 rounded-lg border border-border bg-surface px-2 py-1 text-right text-xs font-bold text-foreground focus:border-accent focus:outline-none" />
+                ) : (
+                  <span className={`text-sm font-black ${value > 0 ? "text-accent" : value < 0 ? "text-danger" : "text-muted"}`}>{formatPoints(value)}</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {isDualEditing && (
+          <button type="button" onClick={() => void handleSaveDual()} disabled={savingDual}
+            className="w-full rounded-xl bg-accent px-4 py-3 text-xs font-bold text-background disabled:opacity-50">
+            {savingDual ? "Salvando..." : "Publicar para rodadas em rascunho e futuras"}
+          </button>
+        )}
+      </section>
+
+      <PositionBalancePanel rows={balanceRows} settings={dualValues} />
 
       {/* Regras Gerais */}
       <div className="glass-card overflow-hidden">

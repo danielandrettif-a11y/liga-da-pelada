@@ -82,9 +82,10 @@ export function pgPlayerManagementRepository(pool: Pool): PlayerManagementReposi
       await client.query(
         `INSERT INTO public.league_members (
            league_id, player_id, role, is_active, player_profile, initial_player_profile,
-           overall_traits, overall_seed_mode
-         ) VALUES ($1::uuid, $2::uuid, 'player', true, $3, $3, $4::text[], 'observed')`,
-        [leagueId, playerId, command.playerProfile, command.overallTraits],
+           overall_traits, overall_seed_mode, primary_position, secondary_position
+         ) VALUES ($1::uuid, $2::uuid, 'player', true, $3, $3, $4::text[], 'observed', $5, $6)`,
+        [leagueId, playerId, command.playerProfile, command.overallTraits,
+          command.primaryPosition, command.secondaryPosition],
       );
       return readPlayer(client, leagueId, playerId);
     }),
@@ -121,6 +122,14 @@ export function pgPlayerManagementRepository(pool: Pool): PlayerManagementReposi
       if (command.overallTraits !== undefined) {
         memberValues.push(command.overallTraits);
         memberFields.push(`overall_traits = $${memberValues.length}::text[]`);
+      }
+      if (command.primaryPosition !== undefined) {
+        memberValues.push(command.primaryPosition);
+        memberFields.push(`primary_position = $${memberValues.length}`);
+      }
+      if (command.secondaryPosition !== undefined) {
+        memberValues.push(command.secondaryPosition);
+        memberFields.push(`secondary_position = $${memberValues.length}`);
       }
       if (memberFields.length) {
         memberValues.push(leagueId, playerId);

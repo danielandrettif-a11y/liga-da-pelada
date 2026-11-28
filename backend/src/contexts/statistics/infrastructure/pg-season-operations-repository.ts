@@ -2,6 +2,7 @@ import type { Pool, PoolClient } from "pg";
 import { withAuthenticatedTransaction } from "../../../infrastructure/authenticated-transaction.js";
 import type { Actor } from "../../../shared/actor.js";
 import type { SeasonOperationsRepository } from "../application/manage-season-operations.js";
+import { persistRoundStatistics } from "./pg-round-statistics-repository.js";
 import {
   buildPlayerCardOverallMap,
   buildSeasonTeamStandings,
@@ -15,10 +16,53 @@ export class SeasonOperationsPersistenceError extends Error {
   }
 }
 
-async function requireAppAdmin(client: PoolClient) {
-  const result = await client.query<{ allowed: boolean }>("SELECT public.is_app_admin() AS allowed");
+async function requireSeasonReprocessAdmin(client: PoolClient, leagueId: string) {
+  const result = await client.query<{ allowed: boolean }>(
+    "SELECT (public.is_app_admin() AND public.is_league_admin($1::uuid)) AS allowed",
+    [leagueId],
+  );
   if (result.rows[0]?.allowed !== true) {
-    throw new SeasonOperationsPersistenceError("Acesso negado. Apenas administradores.", 403);
+    throw new SeasonOperationsPersistenceError("Acesso negado. Apenas administradores desta pelada.", 403);
+  }
+}
+
+async function withPrivilegedReprocessTransaction<T>(
+  pool: Pool,
+  actor: Actor,
+  operation: (
+    client: PoolClient,
+    roles: { useAuthenticated: () => Promise<void>; useExecutor: () => Promise<void> },
+  ) => Promise<T>,
+): Promise<T> {
+  const client = await pool.connect();
+  let inTransaction = false;
+  let discardConnection = false;
+  try {
+    await client.query("BEGIN");
+    inTransaction = true;
+    await client.query(
+      "SELECT set_config('role', 'reprocess_executor', true), set_config('lock_timeout', '5s', true), set_config('statement_timeout', '60s', true), set_config('request.jwt.claim.sub', $1, true), set_config('request.jwt.claim.role', 'authenticated', true), set_config('request.jwt.claims', $2, true), set_config('search_path', 'public, auth', true)",
+      [actor.userId, JSON.stringify({ sub: actor.userId, role: "authenticated" })],
+    );
+    const roles = {
+      useAuthenticated: async () => {
+        await client.query("SELECT set_config('role', 'authenticated', true)");
+      },
+      useExecutor: async () => {
+        await client.query("SELECT set_config('role', 'reprocess_executor', true)");
+      },
+    };
+    const result = await operation(client, roles);
+    await client.query("COMMIT");
+    inTransaction = false;
+    return result;
+  } catch (error) {
+    if (inTransaction) {
+      try { await client.query("ROLLBACK"); } catch { discardConnection = true; }
+    }
+    throw error;
+  } finally {
+    client.release(discardConnection);
   }
 }
 
@@ -30,7 +74,19 @@ async function activeSeasonId(client: PoolClient, leagueId: string) {
   return result.rows[0]?.id || null;
 }
 
-export function pgSeasonOperationsRepository(pool: Pool): SeasonOperationsRepository {
+type V15ReprocessPreparation = {
+  success: boolean;
+  season_id: string;
+  round_ids: string[];
+  first_round_id: string | null;
+  rounds_count: number;
+  lineups_count: number;
+};
+
+export function pgSeasonOperationsRepository(
+  pool: Pool,
+  recalculateRound = persistRoundStatistics,
+): SeasonOperationsRepository {
   return {
     async findPlayerCardOveralls(actor: Actor, leagueId: string) {
       return withAuthenticatedTransaction(pool, actor, async (client) => {
@@ -98,7 +154,7 @@ export function pgSeasonOperationsRepository(pool: Pool): SeasonOperationsReposi
     async previewReprocess(actor: Actor, leagueId: string) {
       try {
         return await withAuthenticatedTransaction(pool, actor, async (client) => {
-          await requireAppAdmin(client);
+          await requireSeasonReprocessAdmin(client, leagueId);
           const result = await client.query<{ result: unknown }>(
             "SELECT public.preview_reprocess_season($1::uuid) AS result",
             [leagueId],
@@ -113,13 +169,37 @@ export function pgSeasonOperationsRepository(pool: Pool): SeasonOperationsReposi
 
     async executeReprocess(actor: Actor, leagueId: string) {
       try {
-        return await withAuthenticatedTransaction(pool, actor, async (client) => {
-          await requireAppAdmin(client);
-          const result = await client.query<{ result: unknown }>(
-            "SELECT public.reprocess_active_season_v5($1::uuid) AS result",
+        return await withPrivilegedReprocessTransaction(pool, actor, async (client, roles) => {
+          await requireSeasonReprocessAdmin(client, leagueId);
+          const prepared = await client.query<{ result: V15ReprocessPreparation }>(
+            "SELECT public.prepare_reprocess_active_season_v15($1::uuid) AS result",
             [leagueId],
           );
-          return result.rows[0]?.result as Awaited<ReturnType<SeasonOperationsRepository["executeReprocess"]>>;
+          const result = prepared.rows[0]?.result;
+          if (!result?.success) throw new SeasonOperationsPersistenceError("Não foi possível preparar o reprocessamento v15.");
+
+          await roles.useAuthenticated();
+
+          const roundIds = result.round_ids || [];
+          for (const roundId of roundIds) {
+            await recalculateRound(client, leagueId, roundId);
+          }
+          if (result.first_round_id) {
+            await client.query("SELECT public.reprocess_fantasy_from_round($1::uuid)", [result.first_round_id]);
+          }
+
+          await roles.useExecutor();
+          await client.query(
+            "SELECT public.finalize_reprocess_active_season_v15($1::uuid, $2::uuid, $3::uuid[], $4::int, $5::int)",
+            [leagueId, result.season_id, roundIds, result.rounds_count, result.lineups_count],
+          );
+
+          return {
+            success: true,
+            season_id: result.season_id,
+            rounds_reprocessed: result.rounds_count,
+            lineups_reprocessed: result.lineups_count,
+          };
         });
       } catch (error) {
         if (error instanceof SeasonOperationsPersistenceError) throw error;

@@ -34,22 +34,87 @@ describe("pgSeasonOperationsRepository", () => {
     expect(result[0]).toMatchObject({ name: "Meia Boca Juniors", points: 3 });
   });
 
-  it("rejects reprocessing before the RPC when the actor is not an app admin", async () => {
+  it("rejects reprocessing before the RPC when the actor is not a league/app admin", async () => {
     const query = vi.fn().mockImplementation(async (sql: string) => sql.includes("is_app_admin")
       ? { rows: [{ allowed: false }] } : { rows: [] });
     await expect(pgSeasonOperationsRepository(pool(query)).executeReprocess(actor, leagueId))
       .rejects.toBeInstanceOf(SeasonOperationsPersistenceError);
-    expect(query.mock.calls.some(([sql]) => String(sql).includes("reprocess_active_season_v5"))).toBe(false);
+    expect(query.mock.calls.some(([sql]) => String(sql).includes("prepare_reprocess_active_season_v15"))).toBe(false);
+    expect(query).toHaveBeenCalledWith("ROLLBACK");
   });
 
-  it("executes the legacy atomic RPC as the authenticated administrator", async () => {
+  it("prepares v15 under privileged boundary, drops role to authenticated, recalculates rounds and audits fantasy", async () => {
+    const roundA = "44444444-4444-4444-8444-444444444444";
+    const roundB = "55555555-5555-4555-8555-555555555555";
+    const callOrder: string[] = [];
+    const recalculateRound = vi.fn(async (_client: PoolClient, _leagueId: string, roundId: string) => {
+      callOrder.push(`recalc:${roundId}`);
+    });
     const query = vi.fn().mockImplementation(async (sql: string) => {
       if (sql.includes("is_app_admin")) return { rows: [{ allowed: true }] };
-      if (sql.includes("reprocess_active_season_v5")) return { rows: [{ result: { success: true, rounds_reprocessed: 3 } }] };
+      if (sql.includes("prepare_reprocess_active_season_v15")) {
+        callOrder.push("prepare");
+        return { rows: [{ result: {
+          success: true,
+          season_id: "33333333-3333-4333-8333-333333333333",
+          round_ids: [roundA, roundB],
+          first_round_id: roundA,
+          rounds_count: 2,
+          lineups_count: 36,
+        } }] };
+      }
+      if (sql.includes("set_config('role', 'authenticated', true)")) {
+        callOrder.push("drop_role");
+        return { rows: [] };
+      }
+      if (sql.includes("reprocess_fantasy_from_round")) {
+        callOrder.push("reprocess_fantasy");
+        return { rows: [] };
+      }
+      if (sql === "SELECT set_config('role', 'reprocess_executor', true)") {
+        callOrder.push("elevate_executor");
+        return { rows: [] };
+      }
+      if (sql.includes("finalize_reprocess_active_season_v15")) {
+        callOrder.push("finalize_and_audit");
+        return { rows: [] };
+      }
       return { rows: [] };
     });
-    await expect(pgSeasonOperationsRepository(pool(query)).executeReprocess(actor, leagueId))
-      .resolves.toMatchObject({ success: true, rounds_reprocessed: 3 });
+    await expect(pgSeasonOperationsRepository(pool(query), recalculateRound).executeReprocess(actor, leagueId))
+      .resolves.toMatchObject({ success: true, rounds_reprocessed: 2, lineups_reprocessed: 36 });
+    expect(callOrder).toEqual([
+      "prepare",
+      "drop_role",
+      `recalc:${roundA}`,
+      `recalc:${roundB}`,
+      "reprocess_fantasy",
+      "elevate_executor",
+      "finalize_and_audit",
+    ]);
     expect(query).toHaveBeenCalledWith("COMMIT");
+  });
+
+  it("rolls back the entire transaction when round calculation or fantasy audit fails", async () => {
+    const roundA = "44444444-4444-4444-8444-444444444444";
+    const query = vi.fn().mockImplementation(async (sql: string) => {
+      if (sql.includes("is_app_admin")) return { rows: [{ allowed: true }] };
+      if (sql.includes("prepare_reprocess_active_season_v15")) return { rows: [{ result: {
+        success: true,
+        season_id: "33333333-3333-4333-8333-333333333333",
+        round_ids: [roundA],
+        first_round_id: roundA,
+        rounds_count: 1,
+        lineups_count: 18,
+      } }] };
+      if (sql.includes("finalize_reprocess_active_season_v15")) {
+        throw new Error("Divergência detectada na auditoria do Cartola pós-reprocessamento");
+      }
+      return { rows: [] };
+    });
+    await expect(pgSeasonOperationsRepository(pool(query), async () => undefined).executeReprocess(actor, leagueId))
+      .rejects.toThrow("Divergência detectada na auditoria do Cartola");
+    expect(query).toHaveBeenCalledWith("ROLLBACK");
+    expect(query).not.toHaveBeenCalledWith("COMMIT");
   });
 });

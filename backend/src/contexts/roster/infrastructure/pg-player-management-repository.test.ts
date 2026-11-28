@@ -12,6 +12,7 @@ const row = {
   overall_seed_mode: "observed", is_goalkeeper: false, member_category: "guest", is_selectable: true,
   show_fitness_stats: false, registration_source: "admin", profile_scope: "persistent",
   created_by_user_id: null, created_at: "2026-10-20T10:00:00.000Z", league_player_profile: "offensive",
+  league_primary_position: null, league_secondary_position: null,
   league_initial_player_profile: "offensive", league_overall_traits: ["offensive"],
   league_overall_seed_mode: "observed",
 };
@@ -28,10 +29,11 @@ describe("pgPlayerManagementRepository", () => {
     const target = pgPlayerManagementRepository(poolWith(query));
     await expect(target.create(leagueId, {
       name: "Convidado", nickname: null, avatarUrl: null, playerProfile: "offensive",
+      primaryPosition: null, secondaryPosition: null,
       overallTraits: ["offensive"], memberCategory: "guest", isSelectable: true,
     }, actor)).resolves.toMatchObject({ id: playerId });
     expect(query).toHaveBeenCalledWith(expect.stringContaining("INSERT INTO public.league_members"), [
-      leagueId, expect.stringMatching(/^[0-9a-f-]{36}$/), "offensive", ["offensive"],
+      leagueId, expect.stringMatching(/^[0-9a-f-]{36}$/), "offensive", ["offensive"], null, null,
     ]);
     expect(query).toHaveBeenCalledWith("COMMIT");
   });

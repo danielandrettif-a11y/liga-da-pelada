@@ -254,12 +254,12 @@ async function loadFantasyMatchSnapshots(
   const [eventsResult, playersResult, goalkeepersResult] = await Promise.all([
     client
       .from("match_events")
-      .select("match_id, event_type, player_id, assist_player_id, team_id, is_own_goal, goalkeeper_a_player_id, goalkeeper_b_player_id")
+      .select("match_id, event_type, player_id, assist_player_id, team_id, is_own_goal, goalkeeper_a_player_id, goalkeeper_b_player_id, elapsed_seconds")
       .in("match_id", matchIds)
       .eq("event_type", "goal"),
     client
       .from("match_players")
-      .select("match_id, player_id, team_id, result_eligible, scoring_eligible")
+      .select("match_id, player_id, team_id, result_eligible, scoring_eligible, entered_elapsed_seconds, left_elapsed_seconds")
       .in("match_id", matchIds),
     client
       .from("match_goalkeepers")
@@ -496,6 +496,13 @@ export async function getFantasyDashboard() {
         defenderOneGoalConcededPoints: Number(scoringSnapshot.defender_one_goal_conceded_points ?? settings.defenderOneGoalConcededPoints),
         defenderTwoGoalsConcededPoints: Number(scoringSnapshot.defender_two_goals_conceded_points ?? settings.defenderTwoGoalsConcededPoints),
         lineGoalConcededPoints: Number(scoringSnapshot.line_goal_conceded_points ?? settings.lineGoalConcededPoints),
+        positionScoringRules: scoringSnapshot.position_scoring_rules ?? settings.positionScoringRules,
+        primaryPositionWeight: Number(scoringSnapshot.primary_position_weight ?? settings.primaryPositionWeight),
+        secondaryPositionWeight: Number(scoringSnapshot.secondary_position_weight ?? settings.secondaryPositionWeight),
+        lineCleanSheetMinShare: Number(scoringSnapshot.line_clean_sheet_min_share ?? settings.lineCleanSheetMinShare),
+        goalkeeperGoalPoints: Number(scoringSnapshot.goalkeeper_goal_points ?? settings.goalkeeperGoalPoints),
+        goalkeeperAssistPoints: Number(scoringSnapshot.goalkeeper_assist_points ?? settings.goalkeeperAssistPoints),
+        goalkeeperOwnGoalPoints: Number(scoringSnapshot.goalkeeper_own_goal_points ?? settings.goalkeeperOwnGoalPoints),
         assistPoints: Number(scoringSnapshot.assist_points ?? settings.assistPoints),
         winPoints: Number(scoringSnapshot.win_points ?? settings.winPoints),
         drawPoints: Number(scoringSnapshot.draw_points ?? settings.drawPoints),
@@ -710,7 +717,7 @@ export async function getFantasyDashboard() {
       ? Promise.resolve({ data: marketReadModel.players || [] })
       : account.client
           .from("league_members")
-          .select("player_id, player_profile, overall_traits, players!inner(id, name, avatar_url, is_goalkeeper, member_category, is_selectable)")
+          .select("player_id, player_profile, primary_position, secondary_position, overall_traits, players!inner(id, name, avatar_url, is_goalkeeper, member_category, is_selectable)")
           .eq("league_id", season.league_id).eq("is_active", true),
     marketReadModel
       ? Promise.resolve({ data: marketReadModel.history || [] })
@@ -773,7 +780,13 @@ export async function getFantasyDashboard() {
     : (selectablePlayers || []).flatMap((membership: any) => {
       const player = Array.isArray(membership.players) ? membership.players[0] : membership.players;
       if (!player?.is_selectable || player.member_category !== "player") return [];
-      return [{ ...player, player_profile: membership.player_profile, overall_traits: membership.overall_traits }];
+      return [{
+        ...player,
+        player_profile: membership.player_profile,
+        primary_position: membership.primary_position,
+        secondary_position: membership.secondary_position,
+        overall_traits: membership.overall_traits,
+      }];
     });
   const selectableById = new Map(normalizedSelectablePlayers.map((player: any) => [player.id, player]));
   const additionalPlayerIds = [...new Set([
@@ -786,12 +799,18 @@ export async function getFantasyDashboard() {
   const { data: additionalPlayers } = additionalPlayerIds.length
     ? await account.client
         .from("league_members")
-        .select("player_id, player_profile, overall_traits, players!inner(id, name, avatar_url, is_goalkeeper, member_category, is_selectable)")
+        .select("player_id, player_profile, primary_position, secondary_position, overall_traits, players!inner(id, name, avatar_url, is_goalkeeper, member_category, is_selectable)")
         .eq("league_id", season.league_id).in("player_id", additionalPlayerIds)
     : { data: [] as any[] };
   const normalizedAdditionalPlayers = (additionalPlayers || []).map((membership: any) => {
     const player = Array.isArray(membership.players) ? membership.players[0] : membership.players;
-    return { ...player, player_profile: membership.player_profile, overall_traits: membership.overall_traits };
+    return {
+      ...player,
+      player_profile: membership.player_profile,
+      primary_position: membership.primary_position,
+      secondary_position: membership.secondary_position,
+      overall_traits: membership.overall_traits,
+    };
   });
   const allPlayersById = new Map([
     ...normalizedSelectablePlayers.map((player: any) => [player.id, player] as const),
@@ -973,6 +992,10 @@ export async function getFantasyDashboard() {
         resultEligible: Boolean(item.result_eligible),
         scoringEligible: item.scoring_eligible !== false,
         playerProfile: allPlayersById.get(item.player_id)?.player_profile || null,
+        primaryPosition: allPlayersById.get(item.player_id)?.primary_position || null,
+        secondaryPosition: allPlayersById.get(item.player_id)?.secondary_position || null,
+        enteredElapsedSeconds: item.entered_elapsed_seconds,
+        leftElapsedSeconds: item.left_elapsed_seconds,
       })),
       goalkeepers: (match.match_goalkeepers || []).map((item: any) => ({
         playerId: item.player_id,
@@ -1078,7 +1101,14 @@ export async function getFantasyDashboard() {
 
   const market: FantasyMarketPlayer[] = (players || [])
     .filter((player: any) => isFantasyMarketPlayerEligible({
-      profileComplete: isCompetitiveProfileComplete(player),
+      profileComplete: isCompetitiveProfileComplete(player) && (
+        Number(scoringSettings.scoringVersion || 0) < 15
+        || Boolean(
+          player.primary_position
+          && player.secondary_position
+          && player.primary_position !== player.secondary_position,
+        )
+      ),
     }))
     .map((player: any) => {
       const priceRow = priceByPlayer.get(player.id) as any;
@@ -1134,6 +1164,8 @@ export async function getFantasyDashboard() {
                   defensiveOneGoalGames: currentRoundStats?.defensiveOneGoalGames || 0,
                   teamGoalsConceded: currentRoundStats?.teamGoalsConceded || 0,
                   playerProfile: player.player_profile,
+                  primaryPosition: player.primary_position,
+                  secondaryPosition: player.secondary_position,
                 },
                 scoringSettings,
               )
@@ -2299,7 +2331,12 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
     ? playerMembershipRow.players[0]
     : playerMembershipRow?.players;
   const playerRow = playerIdentity
-    ? { ...playerIdentity, player_profile: playerMembershipRow?.player_profile }
+    ? {
+        ...playerIdentity,
+        player_profile: playerMembershipRow?.player_profile,
+        primary_position: playerMembershipRow?.primary_position,
+        secondary_position: playerMembershipRow?.secondary_position,
+      }
     : null;
   if (!playerRow) return null;
 
@@ -2413,6 +2450,13 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       defenderOneGoalConcededPoints: Number(snapshot.defender_one_goal_conceded_points ?? liveSettingsRow?.defender_one_goal_conceded_points ?? DEFAULT_FANTASY_SETTINGS.defenderOneGoalConcededPoints),
       defenderTwoGoalsConcededPoints: Number(snapshot.defender_two_goals_conceded_points ?? liveSettingsRow?.defender_two_goals_conceded_points ?? DEFAULT_FANTASY_SETTINGS.defenderTwoGoalsConcededPoints),
       lineGoalConcededPoints: Number(snapshot.line_goal_conceded_points ?? liveSettingsRow?.line_goal_conceded_points ?? DEFAULT_FANTASY_SETTINGS.lineGoalConcededPoints),
+      positionScoringRules: snapshot.position_scoring_rules ?? liveSettingsRow?.position_scoring_rules ?? DEFAULT_FANTASY_SETTINGS.positionScoringRules,
+      primaryPositionWeight: Number(snapshot.primary_position_weight ?? liveSettingsRow?.primary_position_weight ?? DEFAULT_FANTASY_SETTINGS.primaryPositionWeight),
+      secondaryPositionWeight: Number(snapshot.secondary_position_weight ?? liveSettingsRow?.secondary_position_weight ?? DEFAULT_FANTASY_SETTINGS.secondaryPositionWeight),
+      lineCleanSheetMinShare: Number(snapshot.line_clean_sheet_min_share ?? liveSettingsRow?.line_clean_sheet_min_share ?? DEFAULT_FANTASY_SETTINGS.lineCleanSheetMinShare),
+      goalkeeperGoalPoints: Number(snapshot.goalkeeper_goal_points ?? liveSettingsRow?.goalkeeper_goal_points ?? DEFAULT_FANTASY_SETTINGS.goalkeeperGoalPoints),
+      goalkeeperAssistPoints: Number(snapshot.goalkeeper_assist_points ?? liveSettingsRow?.goalkeeper_assist_points ?? DEFAULT_FANTASY_SETTINGS.goalkeeperAssistPoints),
+      goalkeeperOwnGoalPoints: Number(snapshot.goalkeeper_own_goal_points ?? liveSettingsRow?.goalkeeper_own_goal_points ?? DEFAULT_FANTASY_SETTINGS.goalkeeperOwnGoalPoints),
       assistPoints: Number(snapshot.assist_points ?? liveSettingsRow?.assist_points ?? DEFAULT_FANTASY_SETTINGS.assistPoints),
       winPoints: Number(snapshot.win_points ?? liveSettingsRow?.win_points ?? DEFAULT_FANTASY_SETTINGS.winPoints),
       drawPoints: Number(snapshot.draw_points ?? liveSettingsRow?.draw_points ?? DEFAULT_FANTASY_SETTINGS.drawPoints),
@@ -2440,7 +2484,7 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       loadFantasyMatchSnapshots(liveReadClient, scoringRound.round_id, scoringRoundInfo?.number),
       liveReadClient
         .from("player_round_stats")
-        .select("goals, assists, wins, draws, losses, own_goals, team_goals_conceded, defensive_clean_games, defensive_one_goal_games, ranking_defensive_clean_games, ranking_defensive_one_goal_games, goalkeeper_games, goalkeeper_goals, goalkeeper_assists, goalkeeper_own_goals, goalkeeper_wins, goalkeeper_draws, goalkeeper_losses, goals_conceded, clean_sheets, points, ranking_points, ranking_position_bonus, player_profile_locked")
+        .select("goals, assists, wins, draws, losses, own_goals, team_goals_conceded, defensive_clean_games, defensive_one_goal_games, ranking_defensive_clean_games, ranking_defensive_one_goal_games, goalkeeper_games, goalkeeper_goals, goalkeeper_assists, goalkeeper_own_goals, goalkeeper_wins, goalkeeper_draws, goalkeeper_losses, goals_conceded, clean_sheets, points, ranking_points, ranking_position_bonus, player_profile_locked, primary_position_locked, secondary_position_locked")
         .eq("round_id", scoringRound.round_id)
         .eq("player_id", playerId)
         .maybeSingle(),
@@ -2464,6 +2508,8 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
       ]),
     );
     const playerProfile = playerRow.player_profile as "offensive" | "midfield" | "defensive" | null;
+    const primaryPosition = playerRow.primary_position as "DEF" | "MEI" | "ALA" | "ATA" | null;
+    const secondaryPosition = playerRow.secondary_position as "DEF" | "MEI" | "ALA" | "ATA" | null;
     const lineupPlayer = (userLineup?.fantasy_lineup_players || []).find(
       (item: any) => item.player_id === playerId,
     ) || null;
@@ -2483,6 +2529,10 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
           resultEligible: Boolean(item.result_eligible),
           scoringEligible: item.scoring_eligible !== false,
           playerProfile: item.player_id === playerId ? playerProfile : null,
+          primaryPosition: item.player_id === playerId ? primaryPosition : null,
+          secondaryPosition: item.player_id === playerId ? secondaryPosition : null,
+          enteredElapsedSeconds: item.entered_elapsed_seconds,
+          leftElapsedSeconds: item.left_elapsed_seconds,
         })),
         goalkeepers: [
           ...(match.match_goalkeepers || []),
@@ -2501,6 +2551,8 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
     const projectedCurrent = liveStats.get(playerId) || {
       playerId,
       playerProfile,
+      primaryPosition,
+      secondaryPosition,
       goals: 0, assists: 0, ownGoals: 0, wins: 0, draws: 0, losses: 0,
       goalkeeperGames: 0, goalsConceded: 0, cleanSheets: 0, defensiveCleanGames: 0,
       goalkeeperGoals: 0, goalkeeperAssists: 0, goalkeeperOwnGoals: 0,
@@ -2536,6 +2588,8 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
               ?? 0,
           ),
           playerProfile: consolidatedRoundStats.player_profile_locked || projectedCurrent.playerProfile,
+          primaryPosition: consolidatedRoundStats.primary_position_locked || projectedCurrent.primaryPosition,
+          secondaryPosition: consolidatedRoundStats.secondary_position_locked || projectedCurrent.secondaryPosition,
           goalkeeperGames: Number(consolidatedRoundStats.goalkeeper_games || 0),
           goalkeeperGoals: Number(consolidatedRoundStats.goalkeeper_goals || 0),
           goalkeeperAssists: Number(consolidatedRoundStats.goalkeeper_assists || 0),
@@ -2668,6 +2722,8 @@ export async function getFantasyPlayerDetail(playerId: string, fantasyRoundId?: 
           defensiveCleanGames: current.defensiveCleanGames,
           defensiveOneGoalGames: current.defensiveOneGoalGames,
           lineRole: current.playerProfile === "defensive" ? "DEF" : "ATA",
+          primaryPosition: current.primaryPosition,
+          secondaryPosition: current.secondaryPosition,
         }, getFantasyRankedScoringSnapshot(liveSettings)).map((item, index) => ({
           key: `ranked_${index}`,
           label: item.label,
@@ -2988,7 +3044,7 @@ async function getLiveRoundProjections(
       .select("id, user_id, status, score_breakdown, captain_player_id, top_scorer_player_id, top_assist_player_id, fantasy_lineup_players(player_id, slot_role, player_profile_locked), fantasy_lineup_reserves(player_id, slot_role)")
       .eq("fantasy_round_id", activeRound.id),
     projectionInputs ? projectionInputs.then((input) => ({ data: input.players })) : liveReadClient.from("league_members")
-      .select("player_id, player_profile, players!inner(id, member_category, is_selectable)")
+      .select("player_id, player_profile, primary_position, secondary_position, players!inner(id, member_category, is_selectable)")
       .eq("league_id", leagueId).eq("is_active", true),
   ]);
   // A prévia precisa usar as regras congeladas quando a rodada foi aberta.
@@ -3010,6 +3066,13 @@ async function getLiveRoundProjections(
     defenderOneGoalConcededPoints: Number(snapshot.defender_one_goal_conceded_points ?? settingsRow?.defender_one_goal_conceded_points ?? DEFAULT_FANTASY_SETTINGS.defenderOneGoalConcededPoints),
     defenderTwoGoalsConcededPoints: Number(snapshot.defender_two_goals_conceded_points ?? settingsRow?.defender_two_goals_conceded_points ?? DEFAULT_FANTASY_SETTINGS.defenderTwoGoalsConcededPoints),
     lineGoalConcededPoints: Number(snapshot.line_goal_conceded_points ?? settingsRow?.line_goal_conceded_points ?? DEFAULT_FANTASY_SETTINGS.lineGoalConcededPoints),
+    positionScoringRules: snapshot.position_scoring_rules ?? settingsRow?.position_scoring_rules ?? DEFAULT_FANTASY_SETTINGS.positionScoringRules,
+    primaryPositionWeight: Number(snapshot.primary_position_weight ?? settingsRow?.primary_position_weight ?? DEFAULT_FANTASY_SETTINGS.primaryPositionWeight),
+    secondaryPositionWeight: Number(snapshot.secondary_position_weight ?? settingsRow?.secondary_position_weight ?? DEFAULT_FANTASY_SETTINGS.secondaryPositionWeight),
+    lineCleanSheetMinShare: Number(snapshot.line_clean_sheet_min_share ?? settingsRow?.line_clean_sheet_min_share ?? DEFAULT_FANTASY_SETTINGS.lineCleanSheetMinShare),
+    goalkeeperGoalPoints: Number(snapshot.goalkeeper_goal_points ?? settingsRow?.goalkeeper_goal_points ?? DEFAULT_FANTASY_SETTINGS.goalkeeperGoalPoints),
+    goalkeeperAssistPoints: Number(snapshot.goalkeeper_assist_points ?? settingsRow?.goalkeeper_assist_points ?? DEFAULT_FANTASY_SETTINGS.goalkeeperAssistPoints),
+    goalkeeperOwnGoalPoints: Number(snapshot.goalkeeper_own_goal_points ?? settingsRow?.goalkeeper_own_goal_points ?? DEFAULT_FANTASY_SETTINGS.goalkeeperOwnGoalPoints),
     assistPoints: Number(snapshot.assist_points ?? settingsRow?.assist_points ?? DEFAULT_FANTASY_SETTINGS.assistPoints),
     winPoints: Number(snapshot.win_points ?? settingsRow?.win_points ?? DEFAULT_FANTASY_SETTINGS.winPoints),
     drawPoints: Number(snapshot.draw_points ?? settingsRow?.draw_points ?? DEFAULT_FANTASY_SETTINGS.drawPoints),

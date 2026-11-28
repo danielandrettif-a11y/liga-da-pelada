@@ -470,10 +470,11 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
           ORDER BY s.selected_at) FROM public.match_goalkeeper_stints s WHERE s.match_id=m.id),'[]'::jsonb) AS match_goalkeeper_stints,
         COALESCE((SELECT jsonb_agg(jsonb_build_object('match_id',e.match_id,'event_type',e.event_type,'player_id',e.player_id,
           'assist_player_id',e.assist_player_id,'team_id',e.team_id,'is_own_goal',e.is_own_goal,
-          'goalkeeper_a_player_id',e.goalkeeper_a_player_id,'goalkeeper_b_player_id',e.goalkeeper_b_player_id)
+          'goalkeeper_a_player_id',e.goalkeeper_a_player_id,'goalkeeper_b_player_id',e.goalkeeper_b_player_id,'elapsed_seconds',e.elapsed_seconds)
           ORDER BY e.created_at, e.id) FROM public.match_events e WHERE e.match_id=m.id AND e.event_type='goal'),'[]'::jsonb) AS match_events,
         COALESCE((SELECT jsonb_agg(jsonb_build_object('match_id',p.match_id,'player_id',p.player_id,'team_id',p.team_id,
-          'result_eligible',p.result_eligible,'scoring_eligible',p.scoring_eligible)) FROM public.match_players p WHERE p.match_id=m.id),'[]'::jsonb) AS match_players,
+          'result_eligible',p.result_eligible,'scoring_eligible',p.scoring_eligible,
+          'entered_elapsed_seconds',p.entered_elapsed_seconds,'left_elapsed_seconds',p.left_elapsed_seconds)) FROM public.match_players p WHERE p.match_id=m.id),'[]'::jsonb) AS match_players,
         COALESCE((SELECT jsonb_agg(jsonb_build_object('match_id',g.match_id,'player_id',g.player_id,'team_id',g.team_id))
           FROM public.match_goalkeepers g WHERE g.match_id=m.id),'[]'::jsonb) AS match_goalkeepers
         FROM public.matches m WHERE m.round_id=$1::uuid ORDER BY m.created_at, m.id`, [roundId]);
@@ -501,6 +502,7 @@ export class PgFantasyMarketLineupRepository implements FantasyMarketLineupRepos
           FROM public.fantasy_lineup_reserves r WHERE r.lineup_id=l.id),'[]'::jsonb) AS fantasy_lineup_reserves
         FROM public.fantasy_lineups l WHERE l.fantasy_round_id=$1::uuid`, [round.rows[0].id]);
       const players = await client.query(`SELECT lm.player_id, lm.player_profile,
+        lm.primary_position, lm.secondary_position,
         jsonb_build_object('id',p.id,'member_category',p.member_category,'is_selectable',p.is_selectable) AS players
         FROM public.league_members lm JOIN public.players p ON p.id=lm.player_id
         WHERE lm.league_id=$1::uuid AND lm.is_active`, [leagueId]);

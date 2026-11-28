@@ -17,6 +17,26 @@ export type BQBaseScoringSnapshot = {
   teamGoalConceded?: number;
   goalkeeperCleanSheet?: number;
   goalkeeperOneGoal?: number;
+  positionRules?: PositionScoringRules;
+  primaryWeight?: number;
+  secondaryWeight?: number;
+  lineCleanSheetMinShare?: number;
+  goalkeeperGoal?: number;
+  goalkeeperAssist?: number;
+  goalkeeperOwnGoal?: number;
+};
+
+export type LinePosition = "DEF" | "MEI" | "ALA" | "ATA";
+export type PositionScoringRule = {
+  goal: number; assist: number; cleanSheet: number; conceded: number; ownGoal: number;
+};
+export type PositionScoringRules = Record<LinePosition, PositionScoringRule>;
+
+export const DEFAULT_POSITION_SCORING: PositionScoringRules = {
+  DEF: { goal: 4.5, assist: 2.5, cleanSheet: 3, conceded: -1, ownGoal: -3 },
+  MEI: { goal: 4.5, assist: 3.5, cleanSheet: 1, conceded: -0.6, ownGoal: -3 },
+  ALA: { goal: 4.75, assist: 3, cleanSheet: 1.5, conceded: -0.8, ownGoal: -3 },
+  ATA: { goal: 5.5, assist: 2.5, cleanSheet: 0, conceded: -0.4, ownGoal: -3 },
 };
 
 export type ColumnCScoringSettings = {
@@ -97,7 +117,7 @@ export function validateBQScoringSnapshot(snapshot: unknown): BQBaseScoringSnaps
     }
   }
 
-  return {
+  const normalized: BQBaseScoringSnapshot = {
     version: typeof s.version === "number" ? s.version : 5,
     goal: Number(s.goal),
     assist: Number(s.assist),
@@ -117,6 +137,37 @@ export function validateBQScoringSnapshot(snapshot: unknown): BQBaseScoringSnaps
     ...(typeof s.goalkeeperCleanSheet === "number" ? { goalkeeperCleanSheet: s.goalkeeperCleanSheet } : {}),
     ...(typeof s.goalkeeperOneGoal === "number" ? { goalkeeperOneGoal: s.goalkeeperOneGoal } : {}),
   };
+
+  if (normalized.version >= 15) {
+    const rules = normalizeBQScoringSnapshot(s).positionRules ?? DEFAULT_POSITION_SCORING;
+    const primaryWeight = Number(s.primaryWeight ?? s.primary_position_weight ?? 0.7);
+    const secondaryWeight = Number(s.secondaryWeight ?? s.secondary_position_weight ?? 0.3);
+    const lineCleanSheetMinShare = Number(s.lineCleanSheetMinShare ?? s.line_clean_sheet_min_share ?? 0.5);
+    if (!Number.isFinite(primaryWeight) || !Number.isFinite(secondaryWeight)
+      || Math.abs(primaryWeight + secondaryWeight - 1) > 0.000001
+      || primaryWeight <= 0 || secondaryWeight <= 0) {
+      throw new ScoringPolicyValidationError("Os pesos das posições precisam ser positivos e somar 100%.");
+    }
+    if (!Number.isFinite(lineCleanSheetMinShare) || lineCleanSheetMinShare < 0 || lineCleanSheetMinShare > 1) {
+      throw new ScoringPolicyValidationError("A participação mínima para clean sheet deve ficar entre 0% e 100%.");
+    }
+    for (const position of Object.keys(rules) as LinePosition[]) {
+      for (const [field, value] of Object.entries(rules[position])) {
+        if (!Number.isFinite(value) || Math.abs(value) > 100) {
+          throw new ScoringPolicyValidationError(`A regra '${position}.${field}' deve ser numérica e ficar entre -100 e +100.`);
+        }
+      }
+    }
+    normalized.positionRules = rules;
+    normalized.primaryWeight = primaryWeight;
+    normalized.secondaryWeight = secondaryWeight;
+    normalized.lineCleanSheetMinShare = lineCleanSheetMinShare;
+    normalized.goalkeeperGoal = Number(s.goalkeeperGoal ?? s.goalkeeper_goal_points ?? 5);
+    normalized.goalkeeperAssist = Number(s.goalkeeperAssist ?? s.goalkeeper_assist_points ?? 3);
+    normalized.goalkeeperOwnGoal = Number(s.goalkeeperOwnGoal ?? s.goalkeeper_own_goal_points ?? -3);
+  }
+
+  return normalized;
 }
 
 export function validateColumnCScoringSettings(settings: unknown): ColumnCScoringSettings {
@@ -198,6 +249,22 @@ export function normalizeBQScoringSnapshot(
   const source = value || {};
   const numeric = (camel: string, snake: string, fallback: number) =>
     Number(source[camel] ?? source[snake] ?? fallback);
+  const rulesSource = source.positionRules && typeof source.positionRules === "object"
+    ? source.positionRules as Record<string, unknown> : {};
+  const positionRules = Object.fromEntries(
+    (Object.keys(DEFAULT_POSITION_SCORING) as LinePosition[]).map((position) => {
+      const candidate = rulesSource[position] && typeof rulesSource[position] === "object"
+        ? rulesSource[position] as Record<string, unknown> : {};
+      const fallback = DEFAULT_POSITION_SCORING[position];
+      return [position, {
+        goal: Number(candidate.goal ?? fallback.goal),
+        assist: Number(candidate.assist ?? fallback.assist),
+        cleanSheet: Number(candidate.cleanSheet ?? fallback.cleanSheet),
+        conceded: Number(candidate.conceded ?? fallback.conceded),
+        ownGoal: Number(candidate.ownGoal ?? fallback.ownGoal),
+      }];
+    }),
+  ) as PositionScoringRules;
   return {
     version: numeric("version", "scoring_version", BQ_SCORING_V5.version),
     goal: numeric("goal", "goal_points", BQ_SCORING_V5.goal),
@@ -217,6 +284,13 @@ export function normalizeBQScoringSnapshot(
     teamGoalConceded: numeric("teamGoalConceded", "line_goal_conceded_points", -0.5),
     goalkeeperCleanSheet: numeric("goalkeeperCleanSheet", "goalkeeper_slot_clean_sheet_points", 4),
     goalkeeperOneGoal: numeric("goalkeeperOneGoal", "goalkeeper_slot_one_goal_points", 2),
+    positionRules,
+    primaryWeight: numeric("primaryWeight", "primary_position_weight", 0.7),
+    secondaryWeight: numeric("secondaryWeight", "secondary_position_weight", 0.3),
+    lineCleanSheetMinShare: numeric("lineCleanSheetMinShare", "line_clean_sheet_min_share", 0.5),
+    goalkeeperGoal: numeric("goalkeeperGoal", "goalkeeper_goal_points", 5),
+    goalkeeperAssist: numeric("goalkeeperAssist", "goalkeeper_assist_points", 3),
+    goalkeeperOwnGoal: numeric("goalkeeperOwnGoal", "goalkeeper_own_goal_points", -3),
   };
 }
 
@@ -226,6 +300,8 @@ export type RankedScoringStats = {
   goalkeeperAssists?: number; goalkeeperOwnGoals?: number; goalkeeperCleanSheets?: number;
   teamGoalsConceded?: number; defensiveCleanGames?: number; defensiveOneGoalGames?: number;
   lineRole?: "DEF" | "ATA";
+  primaryPosition?: LinePosition | null;
+  secondaryPosition?: LinePosition | null;
 };
 
 const count = (value: number | null | undefined) => Number(value || 0);
@@ -260,6 +336,34 @@ export function calculateRankedPoints(
   const lineAssists = Math.max(0, count(stats.assists) - count(stats.goalkeeperAssists));
   const lineOwnGoals = Math.max(0, count(stats.ownGoals) - count(stats.goalkeeperOwnGoals));
   const lineConceded = Math.max(0, count(stats.teamGoalsConceded) - count(stats.goalkeeperGoalsConceded));
+  if (Number(snapshot.version) >= 15) {
+    const primary = stats.primaryPosition;
+    const secondary = stats.secondaryPosition;
+    if (!primary || !secondary || primary === secondary) return 0;
+    const rules = snapshot.positionRules ?? DEFAULT_POSITION_SCORING;
+    const primaryWeight = Number(snapshot.primaryWeight ?? 0.7);
+    const secondaryWeight = Number(snapshot.secondaryWeight ?? 0.3);
+    const blend = (field: keyof PositionScoringRule) =>
+      rules[primary][field] * primaryWeight + rules[secondary][field] * secondaryWeight;
+    const line = lineGoals * blend("goal")
+      + lineAssists * blend("assist")
+      + count(stats.teamGoalsConceded) * blend("conceded")
+      + count(stats.defensiveCleanGames) * blend("cleanSheet")
+      + lineOwnGoals * blend("ownGoal");
+    const goalkeeperOneGoalGames = inferOneGoalGames(
+      count(stats.goalkeeperAppearances),
+      count(stats.goalkeeperCleanSheets),
+      count(stats.goalkeeperGoalsConceded),
+    );
+    const goalkeeper = count(stats.goalkeeperAppearances) * snapshot.goalkeeperAppearance
+      + count(stats.goalkeeperGoals) * Number(snapshot.goalkeeperGoal ?? 5)
+      + count(stats.goalkeeperAssists) * Number(snapshot.goalkeeperAssist ?? 3)
+      + count(stats.goalkeeperGoalsConceded) * snapshot.goalkeeperGoalConceded
+      + count(stats.goalkeeperCleanSheets) * Number(snapshot.goalkeeperCleanSheet ?? 4)
+      + goalkeeperOneGoalGames * Number(snapshot.goalkeeperOneGoal ?? 2)
+      + count(stats.goalkeeperOwnGoals) * Number(snapshot.goalkeeperOwnGoal ?? -3);
+    return Math.round((line + goalkeeper) * 100) / 100;
+  }
   const progressive = Number(snapshot.version) >= 12;
   const tiered = defensive && Number(snapshot.version) >= 13;
   const oneGoalGames = defensive ? count(stats.defensiveOneGoalGames) : 0;

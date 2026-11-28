@@ -1,14 +1,16 @@
 import Link from "next/link";
 import { ArrowLeft } from "@/components/icons";
 import { ScoringRulesForm } from "@/components/ScoringRulesForm";
-import { getBQScoringRules, getColumnCScoringRules } from "@/lib/actions/bq-scoring";
+import { getBQScoringRules, getColumnCScoringRules, getDualPositionScoringRules, getPositionBalanceScoutRows } from "@/lib/actions/bq-scoring";
 import { getCurrentAccount } from "@/lib/auth";
 
 export default async function PontuacaoPage() {
   const account = await getCurrentAccount();
-  const [rules, columnCRules] = await Promise.all([
+  const [rules, columnCRules, dualPositionRules, balanceRows] = await Promise.all([
     getBQScoringRules(),
     getColumnCScoringRules(),
+    getDualPositionScoringRules(),
+    getPositionBalanceScoutRows(),
   ]);
 
   return (
@@ -30,6 +32,8 @@ export default async function PontuacaoPage() {
       <ScoringRulesForm
         initialValues={rules}
         initialColumnCValues={columnCRules}
+        initialDualPositionValues={dualPositionRules}
+        balanceRows={balanceRows}
         isAdmin={account.isAdmin}
       />
     </div>
