@@ -223,6 +223,9 @@ export function PlayerForm({
     setError("");
 
     const formData = new FormData(event.currentTarget);
+    formData.delete("speed_rating");
+    formData.delete("overall_trait_primary");
+    formData.delete("overall_trait_secondary");
     formData.delete("overall_traits");
     const orderedTraits = [
       ...(primaryOverallTrait && overallTraits.includes(primaryOverallTrait) ? [primaryOverallTrait] : []),

@@ -32,13 +32,14 @@ const allowedFields = new Set([
   "primary_position", "secondary_position",
   "is_selectable", "remove_active_avatar", "remove_avatar", "remove_alternate_avatar", "use_alternate_avatar",
 ]);
+const ignoredUiFields = new Set(["speed_rating", "overall_trait_primary", "overall_trait_secondary"]);
 
 async function parseMultipart(request: FastifyRequest) {
   const fields = new Map<string, string[]>();
   let activeAvatar: ParsedAsset | null = null;
   let alternateAvatar: ParsedAsset | null = null;
   for await (const part of request.parts({
-    limits: { fieldNameSize: 60, fieldSize: 2_048, fields: 16, files: 2, parts: 18, fileSize: 5 * 1024 * 1024 },
+    limits: { fieldNameSize: 60, fieldSize: 2_048, fields: 24, files: 2, parts: 28, fileSize: 5 * 1024 * 1024 },
   })) {
     if (part.type === "file") {
       const active = part.fieldname === "avatar_active" || part.fieldname === "avatar";
@@ -51,6 +52,7 @@ async function parseMultipart(request: FastifyRequest) {
       if (active) activeAvatar = asset;
       else alternateAvatar = asset;
     } else {
+      if (ignoredUiFields.has(part.fieldname)) continue;
       if (!allowedFields.has(part.fieldname) || typeof part.value !== "string") {
         throw new InvalidPlayerManagementError("Campo de perfil desconhecido.");
       }
