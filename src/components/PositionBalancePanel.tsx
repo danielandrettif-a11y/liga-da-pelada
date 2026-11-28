@@ -48,11 +48,14 @@ export function PositionBalancePanel({
       .sort((a, b) => b.average - a.average);
     const actualGroups = new Map<string, { points: number; games: number }>();
     for (const row of scoped) {
-      if (!row.primaryPosition || !row.secondaryPosition || row.primaryPosition === row.secondaryPosition) continue;
-      const label = `${row.primaryPosition}/${row.secondaryPosition}`;
+      if (!row.primaryPosition || (row.secondaryPosition && row.primaryPosition === row.secondaryPosition)) continue;
+      const isDual = Boolean(row.secondaryPosition);
+      const label = isDual ? `${row.primaryPosition}/${row.secondaryPosition}` : `${row.primaryPosition} · Fixo 100%`;
       const current = actualGroups.get(label) || { points: 0, games: 0 };
-      current.points += pointsFor(row, row.primaryPosition, settings) * settings.primaryWeight
-        + pointsFor(row, row.secondaryPosition, settings) * settings.secondaryWeight;
+      current.points += isDual && row.secondaryPosition
+        ? pointsFor(row, row.primaryPosition, settings) * settings.primaryWeight
+          + pointsFor(row, row.secondaryPosition, settings) * settings.secondaryWeight
+        : pointsFor(row, row.primaryPosition, settings);
       current.games += row.games;
       actualGroups.set(label, current);
     }

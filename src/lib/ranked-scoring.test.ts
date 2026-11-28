@@ -206,9 +206,9 @@ describe("Auditoria de equilíbrio DEF/VOL × ATA/ALA — Coluna C v14", () => {
 describe("Pontuação dual por posição — v15", () => {
   const scoring = {
     version: 15, goal: 4, assist: 2.5, win: 0, draw: 0, loss: 0, ownGoal: -3,
-    goalkeeperAppearance: 1, goalkeeperGoalConceded: -0.5,
-    goalkeeperCleanSheet: 4, goalkeeperOneGoal: 2,
-    primaryWeight: 0.7, secondaryWeight: 0.3,
+    goalkeeperAppearance: 0.5, goalkeeperGoalConceded: -0.5,
+    goalkeeperCleanSheet: 3, goalkeeperOneGoal: 1,
+    primaryWeight: 0.6, secondaryWeight: 0.4,
   };
 
   it.each([
@@ -226,15 +226,27 @@ describe("Pontuação dual por posição — v15", () => {
       primaryPosition, secondaryPosition }, scoring)).toHaveLength(4);
   });
 
+  it("calcula modo fixo (100%) quando não há posição secundária", () => {
+    const points = calculateRankedPoints({
+      goals: 1, defensiveCleanGames: 1, teamGoalsConceded: 2,
+      primaryPosition: "DEF", secondaryPosition: null,
+    }, scoring);
+    expect(points).toBe(5.85);
+    expect(buildRankedPointBreakdown({ goals: 1, primaryPosition: "DEF", secondaryPosition: null }, scoring))
+      .toEqual([{ label: "Gols · DEF 100%", count: 1, points: 3.5 }]);
+  });
+
   it("preserva precisão interna e arredonda somente o total final", () => {
-    expect(calculateRankedPoints({ goals: 3, primaryPosition: "ALA", secondaryPosition: "ATA" }, scoring)).toBe(14.93);
+    expect(calculateRankedPoints({
+      goals: 3, primaryPosition: "ALA", secondaryPosition: "ATA",
+    }, { ...scoring, primaryWeight: 0.65, secondaryWeight: 0.35 })).toBe(15.04);
   });
 
   it("inverter primária e secundária altera o resultado", () => {
     const defMei = calculateRankedPoints({ assists: 1, primaryPosition: "DEF", secondaryPosition: "MEI" }, scoring);
     const meiDef = calculateRankedPoints({ assists: 1, primaryPosition: "MEI", secondaryPosition: "DEF" }, scoring);
-    expect(defMei).toBe(2.8);
-    expect(meiDef).toBe(3.2);
+    expect(defMei).toBe(3.1);
+    expect(meiDef).toBe(3.4);
   });
 
   it("mantém os scouts de goleiro fora da ponderação dual", () => {
@@ -242,6 +254,6 @@ describe("Pontuação dual por posição — v15", () => {
       goalkeeperAppearances: 1, goalkeeperGoals: 1, goalkeeperAssists: 1,
       goalkeeperGoalsConceded: 1, goalkeeperCleanSheets: 0,
       primaryPosition: "DEF", secondaryPosition: "ATA",
-    }, scoring)).toBe(10.5);
+    }, scoring)).toBe(9);
   });
 });

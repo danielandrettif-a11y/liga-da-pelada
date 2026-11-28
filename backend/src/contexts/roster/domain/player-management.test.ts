@@ -23,6 +23,11 @@ describe("player management domain", () => {
     expect(normalizeUpdatePlayer({ avatar_url: null, is_selectable: false })).toEqual({
       avatarUrl: null, isSelectable: false,
     });
+    expect(normalizeUpdatePlayer({ primary_position: "DEF", secondary_position: null })).toEqual({
+      primaryPosition: "DEF", secondaryPosition: null,
+    });
+    expect(() => normalizeUpdatePlayer({ primary_position: null, secondary_position: "MEI" }))
+      .toThrow("Defina a posição primária antes da secundária.");
   });
 
   it("rejects official-player creation and invalid names", () => {

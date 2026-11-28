@@ -491,13 +491,18 @@ export function calculateRoundStatRows(context: RoundCalculationContext): RoundS
     const overall = context.overallPositions.get(row.player_id);
     const primary = primaryPosition.get(row.player_id);
     const secondary = secondaryPosition.get(row.player_id);
-    const dualComplete = isLinePosition(primary) && isLinePosition(secondary) && primary !== secondary;
+    const hasSecondary = isLinePosition(secondary);
+    const positionValid = isLinePosition(primary) && (!hasSecondary || primary !== secondary);
     const roleWeights: RankingRoleWeight[] = !countsForRanking || row.games <= 0
-      || (Number(scoring.version) >= 15 ? !dualComplete : !player?.is_competitive_profile_complete)
-      ? [] : Number(scoring.version) >= 15 ? [
-        { role: primary as LinePosition, overall: 0, weight: Number(scoring.primaryWeight ?? 0.7) },
-        { role: secondary as LinePosition, overall: 0, weight: Number(scoring.secondaryWeight ?? 0.3) },
-      ] : columnC ? [{ role: lineRole, overall: 0, weight: 1 }]
+      || (Number(scoring.version) >= 15 ? !positionValid : !player?.is_competitive_profile_complete)
+      ? [] : Number(scoring.version) >= 15 ? (
+        hasSecondary
+          ? [
+            { role: primary as LinePosition, overall: 0, weight: Number(scoring.primaryWeight ?? 0.6) },
+            { role: secondary as LinePosition, overall: 0, weight: Number(scoring.secondaryWeight ?? 0.4) },
+          ]
+          : [{ role: primary as LinePosition, overall: 0, weight: 1 }]
+      ) : columnC ? [{ role: lineRole, overall: 0, weight: 1 }]
         : frozen.length ? frozen : overall ? resolveRole(overall, primaryTrait, !context.playersWithPriorOfficialRound.has(row.player_id))
           : [{ role: fallbackRole, overall: 0, weight: 1 }];
     row.ranking_role_weights = roleWeights;
@@ -511,8 +516,8 @@ export function calculateRoundStatRows(context: RoundCalculationContext): RoundS
       goalkeeperCleanSheets: row.clean_sheets, teamGoalsConceded: row.team_goals_conceded,
       defensiveCleanGames: row.ranking_defensive_clean_games,
       defensiveOneGoalGames: row.ranking_defensive_one_goal_games, lineRole,
-      primaryPosition: dualComplete ? primary : null,
-      secondaryPosition: dualComplete ? secondary : null,
+      primaryPosition: positionValid ? primary : null,
+      secondaryPosition: positionValid && hasSecondary ? secondary : null,
     }, scoring, { suppressGoalkeeperRewards: round.suppress_goalkeeper_rewards }) : 0;
     return row;
   });

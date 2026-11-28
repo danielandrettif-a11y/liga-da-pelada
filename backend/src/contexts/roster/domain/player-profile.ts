@@ -142,6 +142,9 @@ export function parsePlayerProfileForm(input: Record<string, unknown> & {
 }): PlayerProfileForm {
   const primaryPosition = position(input.primary_position, "Posição primária");
   const secondaryPosition = position(input.secondary_position, "Posição secundária");
+  if (secondaryPosition && !primaryPosition) {
+    throw new InvalidPlayerManagementError("Defina a posição primária antes da secundária.");
+  }
   if (primaryPosition && secondaryPosition && primaryPosition === secondaryPosition) {
     throw new InvalidPlayerManagementError("As posições primária e secundária precisam ser diferentes.");
   }

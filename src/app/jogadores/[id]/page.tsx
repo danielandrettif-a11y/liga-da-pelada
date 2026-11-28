@@ -141,6 +141,7 @@ export default async function JogadorPerfilPage({ params, searchParams }: PagePr
     && player.secondary_position
     && player.primary_position !== player.secondary_position,
   );
+  const hasFixedPosition = Boolean(player.primary_position && !hasDualPosition);
 
   const cardGradient = cosmetics?.bannerAssetKey
     ? `bg-gradient-to-b ${cosmeticVisual(cosmetics.bannerAssetKey)}/30`
@@ -252,15 +253,35 @@ export default async function JogadorPerfilPage({ params, searchParams }: PagePr
               <span className="rounded-full border border-border bg-surface/50 backdrop-blur-xs px-2.5 py-1 text-[9px] font-black uppercase text-muted">{categoryLabel}</span>
               {isPlayable && <PlayerProfileBadge profile={player.player_profile} isGoalkeeper={player.is_goalkeeper} />}
             </div>
-            {isPlayable && hasDualPosition && (
+            {isPlayable && (hasDualPosition || hasFixedPosition) && (
               <div className="mt-3 w-full max-w-xs rounded-xl border border-white/10 bg-black/25 p-3 text-left backdrop-blur-sm">
                 <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider">
-                  <span className="text-accent">{player.primary_position} 70%</span>
-                  <span className="text-foreground">{player.secondary_position} 30%</span>
+                  {hasDualPosition ? (
+                    <>
+                      <span className="text-accent">{player.primary_position} 60%</span>
+                      <span className="text-foreground">{player.secondary_position} 40%</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-accent">{player.primary_position} 100%</span>
+                      <span className="text-muted">Fixo</span>
+                    </>
+                  )}
                 </div>
-                <div className="mt-2 flex h-2 overflow-hidden rounded-full bg-white/10" aria-label={`${player.primary_position} 70%, ${player.secondary_position} 30%`}>
-                  <span className="h-full bg-accent" style={{ width: "70%" }} />
-                  <span className="h-full bg-foreground/70" style={{ width: "30%" }} />
+                <div
+                  className="mt-2 flex h-2 overflow-hidden rounded-full bg-white/10"
+                  aria-label={hasDualPosition
+                    ? `${player.primary_position} 60%, ${player.secondary_position} 40%`
+                    : `${player.primary_position} 100% fixo`}
+                >
+                  {hasDualPosition ? (
+                    <>
+                      <span className="h-full bg-accent" style={{ width: "60%" }} />
+                      <span className="h-full bg-foreground/70" style={{ width: "40%" }} />
+                    </>
+                  ) : (
+                    <span className="h-full bg-accent" style={{ width: "100%" }} />
+                  )}
                 </div>
               </div>
             )}

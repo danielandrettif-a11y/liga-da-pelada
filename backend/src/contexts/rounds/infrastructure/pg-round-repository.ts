@@ -886,15 +886,17 @@ export function pgRoundRepository(pool: Pool, recalculateStats = persistRoundSta
                   AND participant.scoring_eligible IS DISTINCT FROM false
                   AND (
                     round_player.primary_position_locked IS NULL
-                    OR round_player.secondary_position_locked IS NULL
-                    OR round_player.primary_position_locked = round_player.secondary_position_locked
+                    OR (
+                      round_player.secondary_position_locked IS NOT NULL
+                      AND round_player.primary_position_locked = round_player.secondary_position_locked
+                    )
                   )
                 ORDER BY player.name`,
               [roundId],
             );
             if (incompleteResult.rows.length) {
               throw new RoundPersistenceError(
-                `Defina posição primária e secundária para: ${incompleteResult.rows
+                `Defina uma posição primária válida para: ${incompleteResult.rows
                   .map((item) => item.player_name).join(", ")}.`,
                 400,
               );

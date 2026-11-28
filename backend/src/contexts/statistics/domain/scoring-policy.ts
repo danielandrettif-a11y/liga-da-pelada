@@ -33,10 +33,10 @@ export type PositionScoringRule = {
 export type PositionScoringRules = Record<LinePosition, PositionScoringRule>;
 
 export const DEFAULT_POSITION_SCORING: PositionScoringRules = {
-  DEF: { goal: 4.5, assist: 2.5, cleanSheet: 3, conceded: -1, ownGoal: -3 },
-  MEI: { goal: 4.5, assist: 3.5, cleanSheet: 1, conceded: -0.6, ownGoal: -3 },
-  ALA: { goal: 4.75, assist: 3, cleanSheet: 1.5, conceded: -0.8, ownGoal: -3 },
-  ATA: { goal: 5.5, assist: 2.5, cleanSheet: 0, conceded: -0.4, ownGoal: -3 },
+  DEF: { goal: 3.5, assist: 2.5, cleanSheet: 4.25, conceded: -0.95, ownGoal: -3 },
+  MEI: { goal: 4.5, assist: 4, cleanSheet: 1.5, conceded: -0.6, ownGoal: -3 },
+  ALA: { goal: 4.75, assist: 3.25, cleanSheet: 2, conceded: -0.75, ownGoal: -3 },
+  ATA: { goal: 5.5, assist: 2.5, cleanSheet: 0, conceded: -0.25, ownGoal: -3 },
 };
 
 export type ColumnCScoringSettings = {
@@ -140,8 +140,8 @@ export function validateBQScoringSnapshot(snapshot: unknown): BQBaseScoringSnaps
 
   if (normalized.version >= 15) {
     const rules = normalizeBQScoringSnapshot(s).positionRules ?? DEFAULT_POSITION_SCORING;
-    const primaryWeight = Number(s.primaryWeight ?? s.primary_position_weight ?? 0.7);
-    const secondaryWeight = Number(s.secondaryWeight ?? s.secondary_position_weight ?? 0.3);
+    const primaryWeight = Number(s.primaryWeight ?? s.primary_position_weight ?? 0.6);
+    const secondaryWeight = Number(s.secondaryWeight ?? s.secondary_position_weight ?? 0.4);
     const lineCleanSheetMinShare = Number(s.lineCleanSheetMinShare ?? s.line_clean_sheet_min_share ?? 0.5);
     if (!Number.isFinite(primaryWeight) || !Number.isFinite(secondaryWeight)
       || Math.abs(primaryWeight + secondaryWeight - 1) > 0.000001
@@ -285,8 +285,8 @@ export function normalizeBQScoringSnapshot(
     goalkeeperCleanSheet: numeric("goalkeeperCleanSheet", "goalkeeper_slot_clean_sheet_points", 4),
     goalkeeperOneGoal: numeric("goalkeeperOneGoal", "goalkeeper_slot_one_goal_points", 2),
     positionRules,
-    primaryWeight: numeric("primaryWeight", "primary_position_weight", 0.7),
-    secondaryWeight: numeric("secondaryWeight", "secondary_position_weight", 0.3),
+    primaryWeight: numeric("primaryWeight", "primary_position_weight", 0.6),
+    secondaryWeight: numeric("secondaryWeight", "secondary_position_weight", 0.4),
     lineCleanSheetMinShare: numeric("lineCleanSheetMinShare", "line_clean_sheet_min_share", 0.5),
     goalkeeperGoal: numeric("goalkeeperGoal", "goalkeeper_goal_points", 5),
     goalkeeperAssist: numeric("goalkeeperAssist", "goalkeeper_assist_points", 3),
@@ -339,12 +339,15 @@ export function calculateRankedPoints(
   if (Number(snapshot.version) >= 15) {
     const primary = stats.primaryPosition;
     const secondary = stats.secondaryPosition;
-    if (!primary || !secondary || primary === secondary) return 0;
+    if (!primary || (secondary && primary === secondary)) return 0;
     const rules = snapshot.positionRules ?? DEFAULT_POSITION_SCORING;
-    const primaryWeight = Number(snapshot.primaryWeight ?? 0.7);
-    const secondaryWeight = Number(snapshot.secondaryWeight ?? 0.3);
+    const isDual = Boolean(secondary);
+    const primaryWeight = isDual ? Number(snapshot.primaryWeight ?? 0.6) : 1;
+    const secondaryWeight = isDual ? Number(snapshot.secondaryWeight ?? 0.4) : 0;
     const blend = (field: keyof PositionScoringRule) =>
-      rules[primary][field] * primaryWeight + rules[secondary][field] * secondaryWeight;
+      secondary
+        ? rules[primary][field] * primaryWeight + rules[secondary][field] * secondaryWeight
+        : rules[primary][field];
     const line = lineGoals * blend("goal")
       + lineAssists * blend("assist")
       + count(stats.teamGoalsConceded) * blend("conceded")
@@ -359,8 +362,8 @@ export function calculateRankedPoints(
       + count(stats.goalkeeperGoals) * Number(snapshot.goalkeeperGoal ?? 5)
       + count(stats.goalkeeperAssists) * Number(snapshot.goalkeeperAssist ?? 3)
       + count(stats.goalkeeperGoalsConceded) * snapshot.goalkeeperGoalConceded
-      + count(stats.goalkeeperCleanSheets) * Number(snapshot.goalkeeperCleanSheet ?? 4)
-      + goalkeeperOneGoalGames * Number(snapshot.goalkeeperOneGoal ?? 2)
+      + count(stats.goalkeeperCleanSheets) * Number(snapshot.goalkeeperCleanSheet ?? 3)
+      + goalkeeperOneGoalGames * Number(snapshot.goalkeeperOneGoal ?? 1)
       + count(stats.goalkeeperOwnGoals) * Number(snapshot.goalkeeperOwnGoal ?? -3);
     return Math.round((line + goalkeeper) * 100) / 100;
   }

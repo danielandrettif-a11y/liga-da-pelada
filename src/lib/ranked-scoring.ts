@@ -65,12 +65,15 @@ export function calculateRankedPoints(
   if (Number(scoring.version || 0) >= 15) {
     const primary = stats.primaryPosition;
     const secondary = stats.secondaryPosition;
-    if (!primary || !secondary || primary === secondary) return 0;
+    if (!primary || (secondary && primary === secondary)) return 0;
     const rules = scoring.positionRules ?? DEFAULT_POSITION_SCORING;
-    const primaryWeight = Number(scoring.primaryWeight ?? 0.7);
-    const secondaryWeight = Number(scoring.secondaryWeight ?? 0.3);
+    const isDual = Boolean(secondary);
+    const primaryWeight = isDual ? Number(scoring.primaryWeight ?? 0.6) : 1;
+    const secondaryWeight = isDual ? Number(scoring.secondaryWeight ?? 0.4) : 0;
     const blend = (field: keyof PositionScoringRule) =>
-      rules[primary][field] * primaryWeight + rules[secondary][field] * secondaryWeight;
+      secondary
+        ? rules[primary][field] * primaryWeight + rules[secondary][field] * secondaryWeight
+        : rules[primary][field];
     const lineGoals = Math.max(0, amount(stats.goals) - amount(stats.goalkeeperGoals));
     const lineAssists = Math.max(0, amount(stats.assists) - amount(stats.goalkeeperAssists));
     const lineOwnGoals = Math.max(0, amount(stats.ownGoals) - amount(stats.goalkeeperOwnGoals));
@@ -92,8 +95,8 @@ export function calculateRankedPoints(
       + amount(stats.goalkeeperGoals) * Number(scoring.goalkeeperGoal ?? 5)
       + amount(stats.goalkeeperAssists) * Number(scoring.goalkeeperAssist ?? 3)
       + amount(stats.goalkeeperGoalsConceded) * scoring.goalkeeperGoalConceded
-      + amount(stats.goalkeeperCleanSheets) * Number(scoring.goalkeeperCleanSheet ?? 4)
-      + goalkeeperOneGoalGames * Number(scoring.goalkeeperOneGoal ?? 2)
+      + amount(stats.goalkeeperCleanSheets) * Number(scoring.goalkeeperCleanSheet ?? 3)
+      + goalkeeperOneGoalGames * Number(scoring.goalkeeperOneGoal ?? 1)
       + amount(stats.goalkeeperOwnGoals) * Number(scoring.goalkeeperOwnGoal ?? -3)
     ) * 100) / 100;
   }
@@ -151,21 +154,27 @@ export function buildRankedPointBreakdown(
   if (Number(snapshot.version || 0) >= 15) {
     const primary = stats.primaryPosition;
     const secondary = stats.secondaryPosition;
-    if (!primary || !secondary || primary === secondary) return [];
+    if (!primary || (secondary && primary === secondary)) return [];
     const rules = snapshot.positionRules ?? DEFAULT_POSITION_SCORING;
+    const primaryWeight = Number(snapshot.primaryWeight ?? 0.6);
+    const secondaryWeight = Number(snapshot.secondaryWeight ?? 0.4);
     const blend = (field: keyof PositionScoringRule) =>
-      rules[primary][field] * Number(snapshot.primaryWeight ?? 0.7)
-      + rules[secondary][field] * Number(snapshot.secondaryWeight ?? 0.3);
+      secondary
+        ? rules[primary][field] * primaryWeight + rules[secondary][field] * secondaryWeight
+        : rules[primary][field];
     const goalkeeperOneGoalGames = inferOneGoalGames(
       amount(stats.goalkeeperAppearances),
       amount(stats.goalkeeperCleanSheets),
       amount(stats.goalkeeperGoalsConceded),
     );
-    const primaryPct = Math.round(Number(snapshot.primaryWeight ?? 0.7) * 100);
-    const secondaryPct = Math.round(Number(snapshot.secondaryWeight ?? 0.3) * 100);
+    const primaryPct = Math.round(primaryWeight * 100);
+    const secondaryPct = Math.round(secondaryWeight * 100);
+    const positionLabel = secondary
+      ? `${primary} ${primaryPct}% / ${secondary} ${secondaryPct}%`
+      : `${primary} 100%`;
     const rows: Array<[string, number, number]> = [
-      [`Gols · ${primary} ${primaryPct}% / ${secondary} ${secondaryPct}%`, Math.max(0, amount(stats.goals) - amount(stats.goalkeeperGoals)), blend("goal")],
-      [`Assistências · ${primary} ${primaryPct}% / ${secondary} ${secondaryPct}%`, Math.max(0, amount(stats.assists) - amount(stats.goalkeeperAssists)), blend("assist")],
+      [`Gols · ${positionLabel}`, Math.max(0, amount(stats.goals) - amount(stats.goalkeeperGoals)), blend("goal")],
+      [`Assistências · ${positionLabel}`, Math.max(0, amount(stats.assists) - amount(stats.goalkeeperAssists)), blend("assist")],
       ["Gols sofridos na linha", amount(stats.teamGoalsConceded), blend("conceded")],
       ["Partidas sem sofrer gol na linha", amount(stats.defensiveCleanGames), blend("cleanSheet")],
       ["Gols contra na linha", Math.max(0, amount(stats.ownGoals) - amount(stats.goalkeeperOwnGoals)), blend("ownGoal")],
@@ -173,8 +182,8 @@ export function buildRankedPointBreakdown(
       ["Gols feitos no gol", amount(stats.goalkeeperGoals), Number(snapshot.goalkeeperGoal ?? 5)],
       ["Assistências no gol", amount(stats.goalkeeperAssists), Number(snapshot.goalkeeperAssist ?? 3)],
       ["Gols sofridos no gol", amount(stats.goalkeeperGoalsConceded), snapshot.goalkeeperGoalConceded],
-      ["Clean sheets no gol", amount(stats.goalkeeperCleanSheets), Number(snapshot.goalkeeperCleanSheet ?? 4)],
-      ["Jogos com 1 gol sofrido no gol", goalkeeperOneGoalGames, Number(snapshot.goalkeeperOneGoal ?? 2)],
+      ["Clean sheets no gol", amount(stats.goalkeeperCleanSheets), Number(snapshot.goalkeeperCleanSheet ?? 3)],
+      ["Jogos com 1 gol sofrido no gol", goalkeeperOneGoalGames, Number(snapshot.goalkeeperOneGoal ?? 1)],
       ["Gols contra no gol", amount(stats.goalkeeperOwnGoals), Number(snapshot.goalkeeperOwnGoal ?? -3)],
     ];
     return rows.filter(([, count]) => count > 0)

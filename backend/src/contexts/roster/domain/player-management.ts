@@ -84,6 +84,9 @@ function linePosition(value: unknown, label: string): LinePosition | null {
 function positions(primary: unknown, secondary: unknown) {
   const primaryPosition = linePosition(primary, "Posição primária");
   const secondaryPosition = linePosition(secondary, "Posição secundária");
+  if (secondaryPosition && !primaryPosition) {
+    throw new InvalidPlayerManagementError("Defina a posição primária antes da secundária.");
+  }
   if (primaryPosition && secondaryPosition && primaryPosition === secondaryPosition) {
     throw new InvalidPlayerManagementError("As posições primária e secundária precisam ser diferentes.");
   }

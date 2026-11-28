@@ -247,7 +247,7 @@ export function ScoringRulesForm({
         <div className="glass-card flex items-center justify-between gap-3 p-4">
           <div>
             <p className="text-sm font-bold text-foreground">Posições 2.0 · v15</p>
-            <p className="mt-1 text-xs leading-relaxed text-muted">Valores publicados para DEF, MEI, ALA e ATA. A simulação usa os mesmos parâmetros sem alterar rodadas encerradas.</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted">Valores publicados para DEF, MEI, ALA e ATA (100% no modo Fixo ou {Math.round(dualValues.primaryWeight * 100)}%/{Math.round(dualValues.secondaryWeight * 100)}% no modo Dual). A simulação usa os mesmos parâmetros sem alterar rodadas encerradas.</p>
           </div>
           {isAdmin && (
             <button

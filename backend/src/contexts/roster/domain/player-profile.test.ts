@@ -21,6 +21,12 @@ describe("player profile domain", () => {
       name: "Jogador", member_category: "guest",
       activeAvatar: { contentType: "image/png", bytes: new Uint8Array([1, 2, 3]) },
     })).toThrow("JPG, PNG ou WebP");
+    expect(parsePlayerProfileForm({
+      name: "Fixo", member_category: "guest", primary_position: "DEF", secondary_position: "",
+    })).toMatchObject({ primaryPosition: "DEF", secondaryPosition: null });
+    expect(() => parsePlayerProfileForm({
+      name: "Invalido", member_category: "guest", primary_position: "", secondary_position: "MEI",
+    })).toThrow("Defina a posição primária antes da secundária.");
   });
 
   it("lets league admins control category and competitive profile", () => {

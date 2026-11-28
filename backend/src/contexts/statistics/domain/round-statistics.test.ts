@@ -107,9 +107,36 @@ describe("round statistics domain", () => {
     const mixed = rows.find((row) => row.player_id === playerB)!;
 
     expect(attacker).toMatchObject({ goals: 2, team_goals_conceded: 0, ranking_defensive_clean_games: 1 });
-    expect(attacker.points).toBe(10.7);
+    expect(attacker.points).toBe(10.85);
     expect(mixed).toMatchObject({ team_goals_conceded: 1, goalkeeper_games: 1, goals_conceded: 1 });
-    expect(mixed.points).toBe(1.56);
+    expect(mixed.points).toBe(1.61);
+  });
+
+  it("applies fixed 100% primary position scoring when secondary position is omitted in v15", () => {
+    const input = context();
+    input.round.scoring_version = 15;
+    input.round.scoring_snapshot = {
+      version: 15, goal: 4, assist: 2.5, win: 0, draw: 0, loss: 0, ownGoal: -3,
+      goalkeeperAppearance: 0.5, goalkeeperGoalConceded: -0.5,
+      goalkeeperCleanSheet: 3, goalkeeperOneGoal: 1,
+      primaryWeight: 0.6, secondaryWeight: 0.4, lineCleanSheetMinShare: 0.5,
+    };
+    input.round.round_players[0].primary_position_locked = "ATA";
+    input.round.round_players[0].secondary_position_locked = null;
+    input.round.round_players[1].primary_position_locked = "DEF";
+    input.round.round_players[1].secondary_position_locked = null;
+    input.round.matches[0].match_goalkeepers = [];
+    input.round.matches[0].match_events[0].goalkeeper_b_player_id = null;
+
+    const rows = calculateRoundStatRows(input);
+    const attacker = rows.find((row) => row.player_id === playerA)!;
+    const defender = rows.find((row) => row.player_id === playerB)!;
+
+    // 1 gol ATA (5.5) + 0 CS (0) + 0 sofrido = 5.5; DEF: 0 gol + 0 CS + 1 sofrido (-0.95) = -0.95
+    expect(attacker.ranking_role_weights).toEqual([{ role: "ATA", overall: 0, weight: 1 }]);
+    expect(attacker.points).toBe(5.5);
+    expect(defender.ranking_role_weights).toEqual([{ role: "DEF", overall: 0, weight: 1 }]);
+    expect(defender.points).toBe(-0.95);
   });
 
   it("does not grant line clean sheets to legacy full-match goalkeepers without stints and preserves partial-stint opponent keepers", () => {

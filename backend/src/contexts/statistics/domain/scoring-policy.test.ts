@@ -103,5 +103,27 @@ describe("scoring-policy domain", () => {
       expect(snapshot).toEqual(BQ_SCORING_V5);
     });
   });
+
+  describe("calculateRankedPoints v15 (fixo 100% e dual 60/40)", () => {
+    const v15 = {
+      version: 15, goal: 4, assist: 2.5, win: 0, draw: 0, loss: 0, ownGoal: -3,
+      goalkeeperAppearance: 0.5, goalkeeperGoalConceded: -0.5,
+      goalkeeperCleanSheet: 3, goalkeeperOneGoal: 1,
+      primaryWeight: 0.6, secondaryWeight: 0.4,
+    };
+
+    it("uses 100% of primary position when secondaryPosition is omitted", () => {
+      expect(calculateRankedPoints({
+        goals: 1, defensiveCleanGames: 1, teamGoalsConceded: 2,
+        primaryPosition: "DEF", secondaryPosition: null,
+      }, v15)).toBe(5.85);
+    });
+
+    it("blends 60% primary and 40% secondary when both positions are set", () => {
+      expect(calculateRankedPoints({
+        assists: 1, primaryPosition: "MEI", secondaryPosition: "DEF",
+      }, v15)).toBe(3.4);
+    });
+  });
 });
 

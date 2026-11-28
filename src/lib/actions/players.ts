@@ -863,9 +863,10 @@ export async function savePlayer(playerId: string | null, formData: FormData) {
   const validPositions = ["DEF", "MEI", "ALA", "ATA"];
   if (isLeagueAdmin && (requestedPrimaryPosition || requestedSecondaryPosition)) {
     if (!validPositions.includes(requestedPrimaryPosition)
-      || !validPositions.includes(requestedSecondaryPosition)
-      || requestedPrimaryPosition === requestedSecondaryPosition) {
-      return { success: false, error: "Escolha duas posições diferentes." };
+      || (requestedSecondaryPosition
+        && (!validPositions.includes(requestedSecondaryPosition)
+          || requestedPrimaryPosition === requestedSecondaryPosition))) {
+      return { success: false, error: "Escolha uma posição primária válida e uma secundária diferente (ou deixe a secundária vazia para Fixo)." };
     }
   }
 

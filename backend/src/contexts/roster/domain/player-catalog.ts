@@ -101,8 +101,10 @@ export function playerFromCatalogRecord(record: PlayerCatalogRecord): RosterPlay
         (record.league_primary_position === null && record.league_secondary_position === null)
         || (
           Boolean(record.league_primary_position)
-          && Boolean(record.league_secondary_position)
-          && record.league_primary_position !== record.league_secondary_position
+          && (
+            !record.league_secondary_position
+            || record.league_primary_position !== record.league_secondary_position
+          )
         )
       )
       && overallTraits.length >= 1

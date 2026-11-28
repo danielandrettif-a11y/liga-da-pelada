@@ -214,10 +214,15 @@ export function PlayerForm({
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (mode === "admin" && (memberCategory === "player" || memberCategory === "guest")
-      && (!primaryPosition || !secondaryPosition || primaryPosition === secondaryPosition)) {
-      setError("Escolha duas posições diferentes para o jogador.");
-      return;
+    if (mode === "admin" && (memberCategory === "player" || memberCategory === "guest")) {
+      if (!primaryPosition) {
+        setError("Escolha a posição principal do jogador.");
+        return;
+      }
+      if (secondaryPosition && primaryPosition === secondaryPosition) {
+        setError("As posições primária e secundária precisam ser diferentes.");
+        return;
+      }
     }
     setLoading(true);
     setError("");
@@ -475,8 +480,8 @@ export function PlayerForm({
           <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] font-bold">
             <span className={player?.name?.trim() ? "text-success" : "text-warning"}>{player?.name?.trim() ? "✓" : "○"} Nome</span>
             <span className={player?.avatar_url ? "text-success" : "text-warning"}>{player?.avatar_url ? "✓" : "○"} Foto</span>
-            <span className={player?.primary_position && player?.secondary_position ? "text-success" : "text-warning"}>
-              {player?.primary_position && player?.secondary_position ? "✓" : "○"} Posições
+            <span className={player?.primary_position ? "text-success" : "text-warning"}>
+              {player?.primary_position ? "✓" : "○"} Posição
             </span>
             <span className={overallTraits.length >= 1 && overallTraits.length <= 2 ? "text-success" : "text-warning"}>
               {overallTraits.length >= 1 && overallTraits.length <= 2 ? "✓" : "○"} Estilo pelo ADM
@@ -515,7 +520,7 @@ export function PlayerForm({
         <input type="hidden" name="player_profile" value={primaryPosition === "DEF" ? "defensive" : "offensive"} />
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="space-y-1.5 text-xs font-bold text-muted">
-            Posição primária · 70%
+            {secondaryPosition ? "Posição primária · 60%" : "Posição principal · 100% (Fixo)"}
             <select
               name="primary_position"
               value={primaryPosition}
@@ -534,7 +539,7 @@ export function PlayerForm({
             </select>
           </label>
           <label className="space-y-1.5 text-xs font-bold text-muted">
-            Posição secundária · 30%
+            Posição secundária · 40% (opcional)
             <select
               name="secondary_position"
               value={secondaryPosition}
@@ -542,7 +547,7 @@ export function PlayerForm({
               onChange={(event) => setSecondaryPosition(event.target.value as LinePosition | "")}
               className="w-full rounded-xl border border-border bg-surface-hover px-4 py-3 text-sm text-foreground outline-none focus:border-accent disabled:opacity-70"
             >
-              <option value="">Selecione</option>
+              <option value="">Nenhuma · Fixo 100%</option>
               {LINE_POSITION_OPTIONS.filter((option) => option.value !== primaryPosition).map((option) => (
                 <option key={option.value} value={option.value}>{option.label} · {option.description}</option>
               ))}
@@ -550,7 +555,7 @@ export function PlayerForm({
           </label>
         </div>
         <p className="text-[10px] leading-4 text-muted">
-          As posições são congeladas na rodada. Alterações feitas aqui passam a valer no rascunho atual e nas próximas rodadas.
+          Deixe a secundária vazia para atuar 100% na função fixa, ou defina uma segunda posição para dividir em 60% / 40%. Alterações valem no rascunho atual e próximas rodadas.
         </p>
       </fieldset>}
 

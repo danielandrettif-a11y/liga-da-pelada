@@ -41,15 +41,15 @@ export type PositionBalanceScoutRow = {
 
 const DEFAULT_DUAL_POSITION_SCORING: DualPositionScoringSettings = {
   positionRules: DEFAULT_POSITION_SCORING,
-  primaryWeight: 0.7,
-  secondaryWeight: 0.3,
+  primaryWeight: 0.6,
+  secondaryWeight: 0.4,
   lineCleanSheetMinShare: 0.5,
-  goalkeeperAppearance: 1,
+  goalkeeperAppearance: 0.5,
   goalkeeperGoal: 5,
   goalkeeperAssist: 3,
   goalkeeperGoalConceded: -0.5,
-  goalkeeperCleanSheet: 4,
-  goalkeeperOneGoal: 2,
+  goalkeeperCleanSheet: 3,
+  goalkeeperOneGoal: 1,
   goalkeeperOwnGoal: -3,
 };
 
@@ -123,15 +123,15 @@ export async function getDualPositionScoringRules(): Promise<DualPositionScoring
   if (error || !data) return DEFAULT_DUAL_POSITION_SCORING;
   return {
     positionRules: (data.position_scoring_rules || DEFAULT_POSITION_SCORING) as PositionScoringRules,
-    primaryWeight: Number(data.primary_position_weight ?? 0.7),
-    secondaryWeight: Number(data.secondary_position_weight ?? 0.3),
+    primaryWeight: Number(data.primary_position_weight ?? 0.6),
+    secondaryWeight: Number(data.secondary_position_weight ?? 0.4),
     lineCleanSheetMinShare: Number(data.line_clean_sheet_min_share ?? 0.5),
-    goalkeeperAppearance: Number(data.goalkeeper_slot_appearance_points ?? 1),
+    goalkeeperAppearance: Number(data.goalkeeper_slot_appearance_points ?? 0.5),
     goalkeeperGoal: Number(data.goalkeeper_goal_points ?? 5),
     goalkeeperAssist: Number(data.goalkeeper_assist_points ?? 3),
     goalkeeperGoalConceded: Number(data.goalkeeper_slot_goal_conceded_points ?? -0.5),
-    goalkeeperCleanSheet: Number(data.goalkeeper_slot_clean_sheet_points ?? 4),
-    goalkeeperOneGoal: Number(data.goalkeeper_slot_one_goal_points ?? 2),
+    goalkeeperCleanSheet: Number(data.goalkeeper_slot_clean_sheet_points ?? 3),
+    goalkeeperOneGoal: Number(data.goalkeeper_slot_one_goal_points ?? 1),
     goalkeeperOwnGoal: Number(data.goalkeeper_own_goal_points ?? -3),
   };
 }

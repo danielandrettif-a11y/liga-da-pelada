@@ -45,10 +45,10 @@ export type PositionScoringRule = {
 export type PositionScoringRules = Record<LinePosition, PositionScoringRule>;
 
 export const DEFAULT_POSITION_SCORING: PositionScoringRules = {
-  DEF: { goal: 4.5, assist: 2.5, cleanSheet: 3, conceded: -1, ownGoal: -3 },
-  MEI: { goal: 4.5, assist: 3.5, cleanSheet: 1, conceded: -0.6, ownGoal: -3 },
-  ALA: { goal: 4.75, assist: 3, cleanSheet: 1.5, conceded: -0.8, ownGoal: -3 },
-  ATA: { goal: 5.5, assist: 2.5, cleanSheet: 0, conceded: -0.4, ownGoal: -3 },
+  DEF: { goal: 3.5, assist: 2.5, cleanSheet: 4.25, conceded: -0.95, ownGoal: -3 },
+  MEI: { goal: 4.5, assist: 4, cleanSheet: 1.5, conceded: -0.6, ownGoal: -3 },
+  ALA: { goal: 4.75, assist: 3.25, cleanSheet: 2, conceded: -0.75, ownGoal: -3 },
+  ATA: { goal: 5.5, assist: 2.5, cleanSheet: 0, conceded: -0.25, ownGoal: -3 },
 };
 
 /** Estatísticas brutas de um atleta na rodada. */
@@ -175,8 +175,8 @@ export function normalizeBQScoringSnapshot(
     goalkeeperCleanSheet: numeric("goalkeeperCleanSheet", "goalkeeper_slot_clean_sheet_points", 4),
     goalkeeperOneGoal: numeric("goalkeeperOneGoal", "goalkeeper_slot_one_goal_points", 2),
     positionRules,
-    primaryWeight: numeric("primaryWeight", "primary_position_weight", 0.7),
-    secondaryWeight: numeric("secondaryWeight", "secondary_position_weight", 0.3),
+    primaryWeight: numeric("primaryWeight", "primary_position_weight", 0.6),
+    secondaryWeight: numeric("secondaryWeight", "secondary_position_weight", 0.4),
     lineCleanSheetMinShare: numeric("lineCleanSheetMinShare", "line_clean_sheet_min_share", 0.5),
     goalkeeperGoal: numeric("goalkeeperGoal", "goalkeeper_goal_points", 5),
     goalkeeperAssist: numeric("goalkeeperAssist", "goalkeeper_assist_points", 3),

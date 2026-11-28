@@ -45,6 +45,14 @@ describe("player catalog domain", () => {
     });
   });
 
+  it("marks single primary position as competitive profile complete", () => {
+    expect(playerFromCatalogRecord(record({ league_primary_position: "DEF", league_secondary_position: null }))).toMatchObject({
+      primary_position: "DEF",
+      secondary_position: null,
+      is_competitive_profile_complete: true,
+    });
+  });
+
   it("filters selectable athletes and keeps the Portuguese name order", () => {
     const players = orderedPlayers([
       record({ id: "2", name: "Zeca" }),
